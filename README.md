@@ -43,6 +43,34 @@ Entorno Completo GitOps:
 
 ## 🚀 Inicio Rápido
 
+## ⚡ Instalación Ultra-Rápida (Un Solo Comando)
+
+Para usuarios que quieren **todo automático** sin tocar nada:
+
+```bash
+# Solo con Git instalado en Ubuntu/WSL:
+git clone https://github.com/andres20980/gh-gitops-infra.git
+cd gh-gitops-infra
+./install-everything.sh
+```
+
+**✨ Qué hace automáticamente:**
+- 📦 **Instala Docker** si no existe
+- 📦 **Instala kubectl** última versión
+- 📦 **Instala Minikube** última versión  
+- 📦 **Instala Helm** última versión
+- 🔧 **Configura permisos** Docker automáticamente
+- 🚀 **Despliega 18 aplicaciones** GitOps
+- ⏱️ **5-15 minutos** y listo
+
+**🎯 Resultado:** Infraestructura GitOps empresarial completa funcionando.
+
+---
+
+## 🛠️ Instalación Manual (Control Total)
+
+Si prefieres instalar prerrequisitos manualmente:
+
 ### Prerrequisitos
 
 Asegúrate de tener instalado:

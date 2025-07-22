@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://jaegertracing.github.io/helm-charts
+    chart: jaeger
+    targetRevision: 3.4.1
+    helm:
+      values: |
+        # Use all-in-one deployment for simplicity
+        allInOne:
+          enabled: true
+          replicas: 1
+          args:
+            - --memory.max-traces=50000
+            - --log-level=info
+          resources:
+            limits:
+              cpu: 200m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          ingress:
+            enabled: false
+        
+        # Use memory storage (no persistence needed for demo)
+        storage:
+          type: memory
+        
+        # Disable data store provisioning since we use memory
+        provisionDataStore:
+          cassandra: false
+          elasticsearch: false
+          kafka: false
+        
+        # Disable other components since all-in-one includes everything
+        agent:
+          enabled: false
+        collector:
+          enabled: false
+        query:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true

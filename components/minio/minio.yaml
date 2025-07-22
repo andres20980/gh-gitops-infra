@@ -1,0 +1,64 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.min.io/
+    chart: minio
+    targetRevision: 5.2.0
+    helm:
+      values: |
+        # Development configuration
+        mode: standalone
+        
+        # Credentials (change in production!)
+        rootUser: minioadmin
+        rootPassword: minioadmin123
+        
+        # Storage
+        persistence:
+          enabled: false  # For development
+        
+        # Resources for development
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+        
+        # Service configuration
+        service:
+          type: ClusterIP
+          port: 9000
+          
+        # Console (MinIO UI)
+        consoleService:
+          type: ClusterIP
+          port: 9001
+        
+        # Create default bucket for Argo artifacts
+        buckets:
+          - name: argo-artifacts
+            policy: none
+            purge: false
+        
+        # Users for Argo Workflows
+        users:
+          - accessKey: argo
+            secretKey: argoworkflows123
+            policy: readwrite
+        
+        # Disable metrics for simplicity
+        metrics:
+          serviceMonitor:
+            enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

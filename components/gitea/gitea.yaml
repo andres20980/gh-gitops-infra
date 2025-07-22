@@ -1,0 +1,85 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: "PrunePropagationPolicy=foreground"
+spec:
+  project: default
+  source:
+    repoURL: https://dl.gitea.io/charts/
+    chart: gitea
+    targetRevision: 12.1.2
+    helm:
+      values: |
+        # Gitea configuration
+        gitea:
+          admin:
+            username: admin
+            password: admin123
+            email: admin@gitea.local
+          config:
+            server:
+              DOMAIN: gitea.local
+              ROOT_URL: http://gitea.local:3000
+              PROTOCOL: http
+              HTTP_PORT: 3000
+            database:
+              DB_TYPE: sqlite3
+            security:
+              INSTALL_LOCK: true
+        
+        # Service configuration
+        service:
+          http:
+            type: ClusterIP
+            port: 3000
+        
+        # Ingress disabled for simplicity
+        ingress:
+          enabled: false
+        
+        # Persistence configuration - use existing PVC size
+        persistence:
+          enabled: true
+          create: false
+          existingClaim: gitea-shared-storage
+        
+        # Resources
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  
+  # Ignore differences in PVC storage size
+  ignoreDifferences:
+  - group: ""
+    kind: PersistentVolumeClaim
+    name: gitea-shared-storage
+    jsonPointers:
+    - /spec/resources/requests/storage
+    - /spec/volumeName
+    - /spec/storageClassName
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - Replace=true
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

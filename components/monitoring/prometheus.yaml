@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 75.12.0
+    helm:
+      # Pass all our collected fixes as values
+      values: |
+        prometheus-node-exporter:
+          hostPort: 9101
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    # Use ServerSideApply to handle large CRDs correctly
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true

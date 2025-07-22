@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-project
+  namespace: argocd
+  labels:
+    project: demo-project
+spec:
+  project: default
+  source:
+    repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    targetRevision: HEAD
+    path: projects/demo-project/apps
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-workflows
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-workflows
+    targetRevision: 0.42.5
+    helm:
+      values: |
+        server:
+          enabled: true
+          serviceType: ClusterIP
+          servicePort: 2746
+          # Enable insecure mode for development
+          extraArgs:
+          - --auth-mode=server
+          - --secure=false
+        
+        controller:
+          enabled: true
+          workflowNamespaces:
+          - argo-workflows
+          - default
+        
+        # Disable workflow controller in other namespaces for simplicity
+        singleNamespace: false
+        
+        # Basic RBAC for development
+        useDefaultArtifactRepo: true
+        useStaticCredentials: true
+        
+        artifactRepository:
+          archiveLogs: false
+          s3:
+            # Use minio for artifact storage in development
+            endpoint: minio.minio.svc.cluster.local:9000
+            bucket: argo-artifacts
+            insecure: true
+            accessKeySecret:
+              name: argo-artifacts
+              key: accesskey
+            secretKeySecret:
+              name: argo-artifacts  
+              key: secretkey
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-workflows
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

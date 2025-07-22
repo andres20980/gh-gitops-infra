@@ -1,0 +1,96 @@
+# 🎯 Ejemplo de Configuración Kargo para Promociones Multi-Entorno
+
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: demo-project-promotion
+  namespace: kargo
+spec:
+  promotionPolicies:
+  - stage: dev
+    autoPromotionEnabled: true
+  - stage: uat  
+    autoPromotionEnabled: false # Promoción manual requerida
+  - stage: prod
+    autoPromotionEnabled: false # Promoción manual requerida
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: dev
+  namespace: kargo
+spec:
+  subscriptions:
+    warehouse: demo-project-warehouse
+  promotionMechanisms:
+    gitRepoUpdates:
+    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      writeBranch: main
+      kustomize:
+        path: manifests/demo-project
+        images:
+        - image: demo-backend
+          path: backend
+        - image: demo-frontend  
+          path: frontend
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: uat
+  namespace: kargo
+spec:
+  subscriptions:
+    upstreamStages:
+    - name: dev
+  promotionMechanisms:
+    gitRepoUpdates:
+    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      writeBranch: uat
+      kustomize:
+        path: manifests/demo-project-uat
+        images:
+        - image: demo-backend
+          path: backend
+        - image: demo-frontend
+          path: frontend
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prod
+  namespace: kargo
+spec:
+  subscriptions:
+    upstreamStages:
+    - name: uat
+  promotionMechanisms:
+    gitRepoUpdates:
+    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      writeBranch: prod
+      kustomize:
+        path: manifests/demo-project-prod
+        images:
+        - image: demo-backend
+          path: backend
+        - image: demo-frontend
+          path: frontend
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: demo-project-warehouse
+  namespace: kargo
+spec:
+  subscriptions:
+  - image:
+      repoURL: docker.io/library/nginx
+      semverConstraint: "^1.25.0"
+      discoveryLimit: 10
+  - image:
+      repoURL: docker.io/library/postgres
+      semverConstraint: "^15.0.0"
+      discoveryLimit: 5
+  - git:
+      repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      branch: main

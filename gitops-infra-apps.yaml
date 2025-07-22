@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-infra-apps
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    targetRevision: HEAD
+    path: components
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+# App-de-apps para proyectos de aplicaciones
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-projects
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    targetRevision: HEAD
+    path: projects
+    directory:
+      recurse: true
+      include: "**/app-of-apps.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

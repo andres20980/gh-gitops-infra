@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: 5.47.2
+    helm:
+      skipCrds: true
+      values: |
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+          memberlist:
+            join_members: []
+        singleBinary:
+          replicas: 1
+        
+        test:
+          enabled: false
+        
+        grafanaAgent:
+          enabled: false
+        lokiCanary:
+          enabled: false
+        
+        monitoring:
+          enabled: false
+          serviceMonitor:
+            enabled: false
+          rules:
+            enabled: false
+          dashboards:
+            enabled: false
+          selfMonitoring:
+            enabled: false
+            grafanaAgent:
+              installOperator: false
+
+        grafanaAgentOperator:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+    syncOptions:
+      - CreateNamespace=true

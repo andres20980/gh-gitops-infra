@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: kargo
+    repoURL: ghcr.io/akuity/kargo-charts
+    targetRevision: 1.6.1
+    helm:
+      values: |
+        # Kargo API Server Configuration
+        api:
+          adminAccount:
+            passwordHash: '$2a$10$Zrhhie4vLz5ygtVSaif6o.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm'
+            tokenSigningKey: 'iwishtowashmyirishwristwatch'
+          service:
+            type: ClusterIP
+          
+        # Controller Configuration
+        controller:
+          replicas: 1
+          
+        # Management Controller Configuration  
+        managementController:
+          replicas: 1
+          
+        # Webhooks Server Configuration
+        webhooksServer:
+          replicas: 1
+          
+        # External Webhooks Server Configuration
+        externalWebhooksServer:
+          replicas: 1
+          service:
+            type: ClusterIP
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kargo
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

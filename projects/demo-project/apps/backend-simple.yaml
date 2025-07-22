@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-backend
+  namespace: argocd
+  labels:
+    project: demo-project
+    tier: backend
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    targetRevision: HEAD
+    path: manifests/demo-project/backend
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-project
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+  revisionHistoryLimit: 3

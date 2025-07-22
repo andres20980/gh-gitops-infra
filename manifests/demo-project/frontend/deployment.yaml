@@ -1,0 +1,289 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-frontend-content
+  namespace: demo-project
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Demo Frontend - GitOps Infrastructure</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                text-align: center;
+            }
+            h1 {
+                font-size: 3em;
+                margin-bottom: 0.5em;
+            }
+            .status {
+                background: rgba(255,255,255,0.1);
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+            }
+            .api-test {
+                background: rgba(255,255,255,0.2);
+                padding: 15px;
+                border-radius: 8px;
+                margin: 10px 0;
+            }
+            button {
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+            }
+            button:hover {
+                background: #45a049;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 Demo Frontend</h1>
+            <p>GitOps Infrastructure - Aplicación de Prueba</p>
+            
+            <div class="status">
+                <h2>Estado del Sistema</h2>
+                <p>✅ Frontend: Funcionando</p>
+                <p id="backend-status">🔄 Backend: Verificando...</p>
+                <p id="database-status">🔄 Database: Verificando...</p>
+            </div>
+            
+            <div class="api-test">
+                <h3>Prueba de API</h3>
+                <button onclick="testBackend()">Probar Backend</button>
+                <p id="api-result"></p>
+            </div>
+            
+            <div class="status">
+                <h2>Información Técnica</h2>
+                <p>Namespace: demo-project</p>
+                <p>Tecnología: NGINX + JavaScript</p>
+                <p>Deployment: GitOps con ArgoCD</p>
+            </div>
+        </div>
+
+        <script>
+            function testBackend() {
+                document.getElementById('api-result').innerHTML = '🔄 Probando conexión...';
+                
+                fetch('/api/health')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('api-result').innerHTML = 
+                            '✅ Backend responde: ' + JSON.stringify(data);
+                        document.getElementById('backend-status').innerHTML = 
+                            '✅ Backend: Funcionando';
+                        
+                        // Verificar estado de la base de datos desde la respuesta de health
+                        if (data.database && data.database.status === 'connected') {
+                            document.getElementById('database-status').innerHTML = 
+                                '✅ Database: Conectado (' + data.database.type + ')';
+                        } else {
+                            document.getElementById('database-status').innerHTML = 
+                                '❌ Database: No conectado';
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById('api-result').innerHTML = 
+                            '❌ Error: ' + error.message;
+                        document.getElementById('backend-status').innerHTML = 
+                            '❌ Backend: No disponible';
+                        document.getElementById('database-status').innerHTML = 
+                            '❌ Database: No verificable';
+                    });
+            }
+
+            function checkSystemStatus() {
+                // Verificar estado general del sistema
+                fetch('/api/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Actualizar estados basado en la respuesta del sistema
+                        if (data.frontend === 'running') {
+                            // Frontend ya está marcado como funcionando
+                        }
+                        if (data.backend === 'running') {
+                            document.getElementById('backend-status').innerHTML = 
+                                '✅ Backend: Funcionando';
+                        }
+                        if (data.database === 'running') {
+                            document.getElementById('database-status').innerHTML = 
+                                '✅ Database: Funcionando';
+                        }
+                    })
+                    .catch(error => {
+                        console.log('Error checking system status:', error);
+                    });
+            }
+
+            // Verificaciones automáticas al cargar
+            window.addEventListener('load', function() {
+                setTimeout(testBackend, 1000);
+                setTimeout(checkSystemStatus, 2000);
+                
+                // Actualizar cada 10 segundos
+                setInterval(checkSystemStatus, 10000);
+            });
+        </script>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-frontend
+  namespace: demo-project
+  labels:
+    app: demo-frontend
+    tier: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-frontend
+  template:
+    metadata:
+      labels:
+        app: demo-frontend
+        tier: frontend
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: content
+          mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: content
+        configMap:
+          name: demo-frontend-content
+      - name: nginx-config
+        configMap:
+          name: demo-frontend-nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-frontend-nginx-config
+  namespace: demo-project
+data:
+  default.conf: |
+    resolver 10.96.0.10 valid=30s;
+    
+    server {
+        listen 80;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # Health check - always respond
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+
+        # Health check proxy (map /api/health to /health) - MUST BE FIRST for specificity
+        location /api/health {
+            set $backend "demo-backend.demo-project.svc.cluster.local:3000";
+            proxy_pass http://$backend/health;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            
+            # Handle backend unavailable
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 5s;
+            proxy_read_timeout 5s;
+            
+            # Fallback when backend is down
+            error_page 502 503 504 = @backend_fallback;
+        }
+
+        # API proxy to backend (with dynamic resolution) - General rule for other /api/* endpoints
+        location /api/ {
+            set $backend "demo-backend.demo-project.svc.cluster.local:3000";
+            proxy_pass http://$backend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            
+            # Handle backend unavailable
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 5s;
+            proxy_read_timeout 5s;
+            
+            # Fallback when backend is down
+            error_page 502 503 504 = @backend_fallback;
+        }
+        
+        location @backend_fallback {
+            add_header Content-Type application/json;
+            return 503 '{"status":"error","message":"Backend not available"}';
+        }
+
+        # Static files
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-frontend
+  namespace: demo-project
+  labels:
+    app: demo-frontend
+    tier: frontend
+spec:
+  selector:
+    app: demo-frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  type: ClusterIP

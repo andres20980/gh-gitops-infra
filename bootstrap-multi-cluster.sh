@@ -34,7 +34,7 @@ load_configuration() {
         log_warning "Configuration file not found: $CONFIG_FILE"
         log_info "Using default configuration. Run ./setup-config.sh to customize."
         
-        # Default configuration
+        # Default configuration (single ArgoCD approach)
         GITHUB_REPO_URL="https://github.com/andres20980/gh-gitops-infra.git"
         GITHUB_USERNAME="andres20980"
         DEV_CLUSTER_PROFILE="gitops-dev"
@@ -43,9 +43,11 @@ load_configuration() {
         DEV_CLUSTER_RESOURCES="2,4g,20g"
         PRE_CLUSTER_RESOURCES="2,3g,15g"
         PROD_CLUSTER_RESOURCES="2,4g,20g"
+        # Single ArgoCD approach - same port for all clusters
+        ARGOCD_PORT="8080"
         ARGOCD_DEV_PORT="8080"
-        ARGOCD_PRE_PORT="8081"
-        ARGOCD_PROD_PORT="8082"
+        ARGOCD_PRE_PORT="8080"
+        ARGOCD_PROD_PORT="8080"
         ARGOCD_VERSION="v2.12.3"
         KARGO_VERSION="v0.8.4"
         ORGANIZATION_NAME="YourOrg"
@@ -168,7 +170,7 @@ deploy_environment_apps() {
     
     case $profile in
         "$DEV_CLUSTER_PROFILE")
-            log_info "Deploying full development stack..."
+            log_info "Deploying full development stack with ArgoCD control plane..."
             # Deploy infrastructure applications via ArgoCD
             log_info "🚀 Deploying GitOps infrastructure via ArgoCD..."
             kubectl apply -f gitops-infra-apps.yaml 2>/dev/null || log_warning "Infrastructure apps will be deployed when ArgoCD syncs"
@@ -177,14 +179,14 @@ deploy_environment_apps() {
             kubectl create namespace kargo --dry-run=client -o yaml | kubectl apply -f -
             ;;
         "$PRE_CLUSTER_PROFILE")
-            log_info "Deploying UAT/testing environment..."
-            # Deploy minimal infrastructure for testing
-            deploy_minimal_stack "$profile"
+            log_info "Preparing UAT/testing environment (managed by ArgoCD from DEV)..."
+            # Pre cluster will be managed by ArgoCD from DEV cluster
+            log_info "✅ Cluster ready for ArgoCD to manage deployments"
             ;;
         "$PROD_CLUSTER_PROFILE")
-            log_info "Deploying production environment..."
-            # Deploy production-grade infrastructure
-            deploy_production_stack "$profile"
+            log_info "Preparing production environment (managed by ArgoCD from DEV)..."
+            # Prod cluster will be managed by ArgoCD from DEV cluster  
+            log_info "✅ Cluster ready for ArgoCD to manage deployments"
             ;;
     esac
     
@@ -243,31 +245,26 @@ deploy_production_stack() {
     # TODO: Add production-specific configurations (resource quotas, network policies, etc.)
 }
 
-# Setup port-forwards for all clusters
-setup_multi_cluster_access() {
-    log_step "Setting up access to all clusters..."
+# Setup port-forward for single ArgoCD
+setup_multi_cluster_access() {  
+    log_step "Setting up access to ArgoCD UI..."
     
     # Stop any existing port-forwards
     pkill -f "kubectl port-forward" 2>/dev/null || true
     sleep 2
     
-    for profile in "${!CLUSTERS[@]}"; do
-        IFS=',' read -r cpus memory disk port <<< "${CLUSTERS[$profile]}"
-        
-        if minikube status --profile="$profile" 2>/dev/null | grep -q "Running"; then
-            log_info "Setting up ArgoCD access for $profile on port $port..."
-            
-            # Switch context and start port-forward in background
-            kubectl config use-context "$profile"
-            nohup kubectl port-forward -n argocd svc/argocd-server $port:80 > /dev/null 2>&1 &
-            
-            log_success "ArgoCD $profile: http://localhost:$port"
-        else
-            log_warning "Cluster $profile not running - skipping port-forward"
-        fi
-    done
+    # Only setup port-forward for DEV cluster (single ArgoCD approach)
+    kubectl config use-context "$DEV_CLUSTER_PROFILE"
+    if minikube status --profile="$DEV_CLUSTER_PROFILE" 2>/dev/null | grep -q "Running"; then
+        log_info "Starting ArgoCD port-forward on localhost:8080..."
+        nohup kubectl port-forward -n argocd svc/argocd-server 8080:80 > /dev/null 2>&1 &
+        sleep 3
+        log_success "ArgoCD UI available at http://localhost:8080"
+    else
+        log_warning "DEV cluster not running - ArgoCD UI not accessible"
+    fi
     
-    log_success "Multi-cluster access configured"
+    log_success "Single ArgoCD access configured"
 }
 
 # Get ArgoCD passwords for all clusters
@@ -296,26 +293,27 @@ print_multi_cluster_status() {
     echo "   🌐 ENTERPRISE MULTI-CLUSTER GITOPS ENVIRONMENT READY"
     echo "   🚧 DEV → 🧪 PRE → 🏭 PROD"
     echo "   🏢 Organization: $ORGANIZATION_NAME"
+    echo "   🎯 Single ArgoCD managing all clusters (GitOps best practice)"
     echo "============================================================="
     echo ""
-    echo "🎯 CONTROL PLANES:"
-    printf "%-10s %-25s %-15s %-20s\n" "CLUSTER" "ARGOCD URL" "STATUS" "PASSWORD"
-    printf "%-10s %-25s %-15s %-20s\n" "-------" "----------" "------" "--------"
+    echo "🎯 ARGOCD CONTROL PLANE (Single Instance):"
+    kubectl config use-context "$DEV_CLUSTER_PROFILE"
+    local argocd_password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null || echo "admin123")
+    printf "%-15s %-25s %-15s %-20s\n" "CONTROL PLANE" "URL" "STATUS" "PASSWORD"
+    printf "%-15s %-25s %-15s %-20s\n" "-------------" "---" "------" "--------"
+    printf "%-15s %-25s %-15s %-20s\n" "ArgoCD (DEV)" "http://localhost:8080" "✅ Running" "$argocd_password"
+    echo ""
+    echo "🌐 MANAGED CLUSTERS:"
+    printf "%-10s %-15s %-25s\n" "CLUSTER" "STATUS" "MANAGED BY"
+    printf "%-10s %-15s %-25s\n" "-------" "------" "----------"
     
     for profile in "$DEV_CLUSTER_PROFILE" "$PRE_CLUSTER_PROFILE" "$PROD_CLUSTER_PROFILE"; do
-        IFS=',' read -r cpus memory disk port <<< "${CLUSTERS[$profile]}"
-        
         if minikube status --profile="$profile" 2>/dev/null | grep -q "Running"; then
-            # Find password for this profile
-            local profile_password="Not available"
-            for pwd_entry in "${passwords[@]}"; do
-                if [[ "$pwd_entry" == "$profile:"* ]]; then
-                    profile_password="${pwd_entry#*:}"
-                    break
-                fi
-            done
-            
-            printf "%-10s %-25s %-15s %-20s\n" "$profile" "http://localhost:$port" "✅ Running" "$profile_password"
+            if [[ "$profile" == "$DEV_CLUSTER_PROFILE" ]]; then
+                printf "%-10s %-15s %-25s\n" "$profile" "✅ Running" "ArgoCD Control Plane"
+            else
+                printf "%-10s %-15s %-25s\n" "$profile" "✅ Running" "ArgoCD from DEV"
+            fi
         else
             printf "%-10s %-25s %-15s %-20s\n" "$profile" "http://localhost:$port" "❌ Stopped" "N/A"
         fi
@@ -379,7 +377,12 @@ main() {
     log_step "Creating enterprise cluster ecosystem..."
     for profile in "$DEV_CLUSTER_PROFILE" "$PRE_CLUSTER_PROFILE" "$PROD_CLUSTER_PROFILE"; do
         create_cluster "$profile" "${CLUSTERS[$profile]}"
-        install_argocd "$profile" "${CLUSTERS[$profile]}"
+        
+        # Install ArgoCD only in DEV cluster (single ArgoCD approach)
+        if [[ "$profile" == "$DEV_CLUSTER_PROFILE" ]]; then
+            install_argocd "$profile" "${CLUSTERS[$profile]}"
+        fi
+        
         deploy_environment_apps "$profile"
         echo ""
     done

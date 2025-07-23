@@ -201,7 +201,12 @@ main() {
     # Phase 5: Verify installations
     verify_installations
     
-    # Phase 6: Make bootstrap executable and run it
+    # Phase 6: Generate configuration
+    log_step "Generating GitOps environment configuration..."
+    chmod +x setup-config.sh
+    ./setup-config.sh --auto
+    
+    # Phase 7: Make bootstrap executable and run it
     log_step "Running GitOps multi-cluster infrastructure bootstrap..."
     chmod +x bootstrap-multi-cluster.sh cleanup-multi-cluster.sh
     chmod +x scripts/*.sh 2>/dev/null || true

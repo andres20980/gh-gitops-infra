@@ -173,7 +173,7 @@ deploy_environment_apps() {
             log_info "Deploying full development stack with ArgoCD control plane..."
             # Deploy infrastructure applications via ArgoCD
             log_info "🚀 Deploying GitOps infrastructure via ArgoCD..."
-            kubectl apply -f gitops-infra-apps.yaml 2>/dev/null || log_warning "Infrastructure apps will be deployed when ArgoCD syncs"
+                    kubectl apply -f aplicaciones-gitops-infra.yaml 2>/dev/null || log_warning "Main GitOps apps not found"
             
             # Create kargo namespace (ArgoCD will install Kargo components)
             kubectl create namespace kargo --dry-run=client -o yaml | kubectl apply -f -
@@ -227,8 +227,8 @@ deploy_minimal_stack_components() {
     done
     
     # Deploy only essential ArgoCD applications for demo project
-    if [[ -f "projects/demo-project/app-of-apps.yaml" ]]; then
-        kubectl apply -f projects/demo-project/app-of-apps.yaml 2>/dev/null || log_warning "Demo project config not found"
+    if [[ -f "proyectos/demo-project/app-of-apps.yaml" ]]; then
+        kubectl apply -f proyectos/demo-project/app-of-apps.yaml 2>/dev/null || log_warning "Demo project config not found"
     fi
 }
 

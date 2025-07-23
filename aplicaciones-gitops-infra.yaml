@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/andres20980/gh-gitops-infra.git
     targetRevision: HEAD
-    path: components
+    path: componentes
     directory:
       recurse: true
   destination:
@@ -30,7 +30,7 @@ spec:
   source:
     repoURL: https://github.com/andres20980/gh-gitops-infra.git
     targetRevision: HEAD
-    path: projects
+    path: proyectos
     directory:
       recurse: true
       include: "**/app-of-apps.yaml"

@@ -97,22 +97,25 @@ setup_all_port_forwards() {
     echo "🏢 ENTERPRISE SERVICE ACCESS SETUP"
     echo "=================================="
     
-    # Core GitOps Services
+    # Core GitOps Services (puertos correlativos desde 8080)
     setup_port_forward "argocd" "argocd-server" "8080" "80" "ArgoCD GitOps Controller" "http"
-    setup_port_forward "kargo" "kargo-api" "3000" "443" "Kargo Promotional Pipelines" "https"
+    setup_port_forward "grafana" "grafana" "8081" "80" "Grafana Dashboards" "http"
+    setup_port_forward "kargo" "kargo-api" "8082" "443" "Kargo Promotional Pipelines" "https"
     
-    # Observability Stack
-    setup_port_forward "monitoring" "grafana" "3001" "80" "Grafana Dashboards" "http"
-    setup_port_forward "monitoring" "prometheus-stack-kube-prom-prometheus" "9090" "9090" "Prometheus Metrics" "http"
-    setup_port_forward "jaeger" "jaeger-query" "16686" "16686" "Jaeger Tracing" "http"
+    # Infrastructure Services (puertos correlativos continuos)
+    setup_port_forward "gitea" "gitea-http" "8083" "3000" "Gitea Git Repository" "http"
+    setup_port_forward "monitoring" "prometheus-server" "8084" "80" "Prometheus Metrics" "http"
+    setup_port_forward "argo-workflows" "argo-workflows-server" "8085" "2746" "Argo Workflows" "http"
+    setup_port_forward "jaeger" "jaeger-query" "8086" "16686" "Jaeger Tracing" "http"
+    setup_port_forward "minio" "minio-console" "8087" "9001" "MinIO Console" "http"
+    setup_port_forward "minio" "minio" "8088" "9000" "MinIO API" "http"
+    
+    # Demo Applications (puertos finales correlativos)
+    setup_port_forward "demo-project" "frontend" "8089" "80" "Demo Frontend App" "http"
+    setup_port_forward "demo-project" "backend" "8090" "3000" "Demo Backend API" "http"
+    
+    # Observability integration (sin puerto dedicado)
     setup_port_forward "loki" "loki-gateway" "9080" "80" "Loki Logs" "http"
-    
-    # Infrastructure Services  
-    setup_port_forward "gitea" "gitea-http" "3002" "3000" "Gitea Git Repository" "http"
-    setup_port_forward "minio" "minio" "9001" "9001" "MinIO Object Storage" "http"
-    
-    # CI/CD Services
-    setup_port_forward "argo-workflows" "argo-workflows-server" "2746" "2746" "Argo Workflows" "http"
     
     echo ""
     log_enterprise "All available services configured for access"
@@ -127,25 +130,31 @@ print_access_info() {
     echo ""
     echo "🎯 CONTROL PLANE:"
     echo "   ArgoCD:          http://localhost:8080"
-    echo "   Kargo:           https://localhost:3000"
+    echo "   Kargo:           http://localhost:8082"
     echo ""
     echo "📊 OBSERVABILITY:"
-    echo "   Grafana:         http://localhost:3001"
-    echo "   Prometheus:      http://localhost:9090"
-    echo "   Jaeger:          http://localhost:16686"
+    echo "   Grafana:         http://localhost:8081"
+    echo "   Prometheus:      http://localhost:8084"
+    echo "   Jaeger:          http://localhost:8086"
     echo "   Loki:            http://localhost:9080"
     echo ""
     echo "🗄️  INFRASTRUCTURE:"
-    echo "   Gitea:           http://localhost:3002"
-    echo "   MinIO:           http://localhost:9001"
-    echo "   Argo Workflows:  http://localhost:2746"
+    echo "   Gitea:           http://localhost:8083"
+    echo "   MinIO Console:   http://localhost:8087"
+    echo "   MinIO API:       http://localhost:8088"
+    echo "   Argo Workflows:  http://localhost:8085"
+    echo ""
+    echo "📱 DEMO APPLICATIONS:"
+    echo "   Frontend:        http://localhost:8089"
+    echo "   Backend API:     http://localhost:8090"
     echo ""
     echo "🔑 DEFAULT CREDENTIALS:"
     echo "   ArgoCD:          admin / (get with: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d)"
-    echo "   Kargo:           admin / admin"
+    echo "   Kargo:           admin / admin123"
     echo "   Grafana:         admin / admin"
     echo "   Gitea:           admin / admin123"
     echo "   MinIO:           admin / admin123"
+    echo "   Workflows/Jaeger: Sin autenticación"
     echo ""
     echo "🛠️  MANAGEMENT:"
     echo "   Minikube Dashboard: minikube dashboard --profile=$MINIKUBE_PROFILE"

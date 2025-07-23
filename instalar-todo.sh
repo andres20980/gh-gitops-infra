@@ -1,8 +1,23 @@
 #!/bin/bash
 
-# 🚀 Complete GitOps Infrastructure Auto-Installer
-# One-command installation: prerequisites + GitOps stack
-# Compatible with: Ubuntu 20.04+, WSL2, Ubuntu Server, Ubuntu Desktop
+# 🚀# Funciones de logging
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} 🔍 $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[ÉXITO]${NC} ✅ $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[ADVERTENCIA]${NC} ⚠️ $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} ❌ $1"
+}mático Completo de Infraestructura GitOps
+# Instalación con un comando: prerrequisitos + stack GitOps
+# Compatible con: Ubuntu 20.04+, WSL2, Ubuntu Server, Ubuntu Desktop
 
 set -e
 
@@ -203,12 +218,12 @@ main() {
     
     # Phase 6: Generate configuration
     log_step "Generating GitOps environment configuration..."
-    chmod +x setup-config.sh
-    ./setup-config.sh --auto
+    chmod +x scripts/configurar-entorno.sh
+    ./scripts/configurar-entorno.sh --auto
     
     # Phase 7: Make bootstrap executable and run it
     log_step "Running GitOps multi-cluster infrastructure bootstrap..."
-    chmod +x bootstrap-multi-cluster.sh cleanup-multi-cluster.sh
+    chmod +x scripts/arrancar-multi-cluster.sh scripts/limpiar-multi-cluster.sh
     chmod +x scripts/*.sh 2>/dev/null || true
     
     echo ""
@@ -219,7 +234,7 @@ main() {
     echo ""
     
     # Run the multi-cluster GitOps bootstrap
-    ./bootstrap-multi-cluster.sh
+    ./scripts/arrancar-multi-cluster.sh
     
     echo ""
     echo "🏆================================================"

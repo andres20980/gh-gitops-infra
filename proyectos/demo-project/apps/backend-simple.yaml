@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/andres20980/gh-gitops-infra.git
     targetRevision: HEAD
-    path: manifests/demo-project/backend
+    path: manifiestos/demo-project/backend
   destination:
     server: https://kubernetes.default.svc
     namespace: demo-project

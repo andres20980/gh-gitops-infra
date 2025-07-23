@@ -1,6 +1,11 @@
 # 🚀 GitOps Infrastructure
 
-A complete GitOps environment with ArgoCD, monitoring, and demo applications.
+A complete GitO## 🚀 Quick Start
+
+### Para usuarios que hicieron Fork
+Si hiciste fork de este repositorio, sigue la [Fork Setup Guide](FORK_SETUP.md) para una configuración personalizada rápida.
+
+### Instalación Automática Completaenvironment with ArgoCD, monitoring, and demo applications.
 
 ## 🏗️ Architecture
 

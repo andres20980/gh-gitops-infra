@@ -22,12 +22,41 @@ log_error() { echo -e "${RED}[ERROR]${NC} ❌ $1"; }
 log_step() { echo -e "${PURPLE}[STEP]${NC} 🚀 $1"; }
 log_enterprise() { echo -e "${CYAN}[ENTERPRISE]${NC} 🏢 $1"; }
 
-# Cluster configurations
-declare -A CLUSTERS=(
-    ["gitops-dev"]="4,8g,50g,8080"      # DEV: Full stack
-    ["gitops-pre"]="3,6g,30g,8081"     # PRE: Testing focused
-    ["gitops-prod"]="6,12g,100g,8082"  # PROD: Production grade
-)
+# Load configuration
+CONFIG_FILE="config/environment.conf"
+
+load_configuration() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        log_info "Loading configuration from $CONFIG_FILE..."
+        source "$CONFIG_FILE"
+        log_success "Configuration loaded successfully"
+    else
+        log_warning "Configuration file not found: $CONFIG_FILE"
+        log_info "Using default configuration. Run ./setup-config.sh to customize."
+        
+        # Default configuration
+        GITHUB_REPO_URL="https://github.com/andres20980/gh-gitops-infra.git"
+        GITHUB_USERNAME="andres20980"
+        DEV_CLUSTER_PROFILE="gitops-dev"
+        PRE_CLUSTER_PROFILE="gitops-pre"
+        PROD_CLUSTER_PROFILE="gitops-prod"
+        DEV_CLUSTER_RESOURCES="4,8g,50g,8080"
+        PRE_CLUSTER_RESOURCES="3,6g,30g,8081"
+        PROD_CLUSTER_RESOURCES="6,12g,100g,8082"
+        ARGOCD_VERSION="v2.12.3"
+        ORGANIZATION_NAME="YourOrg"
+    fi
+}
+
+# Cluster configurations (now loaded from config file)
+declare -A CLUSTERS
+
+# Initialize clusters array from configuration
+initialize_clusters() {
+    CLUSTERS["$DEV_CLUSTER_PROFILE"]="$DEV_CLUSTER_RESOURCES"
+    CLUSTERS["$PRE_CLUSTER_PROFILE"]="$PRE_CLUSTER_RESOURCES"
+    CLUSTERS["$PROD_CLUSTER_PROFILE"]="$PROD_CLUSTER_RESOURCES"
+}
 
 # ArgoCD version
 ARGOCD_VERSION="v2.12.3"
@@ -133,7 +162,7 @@ deploy_environment_apps() {
     kubectl config use-context "$profile"
     
     case $profile in
-        "gitops-dev")
+        "$DEV_CLUSTER_PROFILE")
             log_info "Deploying full development stack..."
             # Deploy complete infrastructure
             kubectl apply -f gitops-infra-apps.yaml 2>/dev/null || log_warning "Main apps config not found"
@@ -141,12 +170,12 @@ deploy_environment_apps() {
             # Deploy Kargo for promotion management (only in DEV)
             kubectl create namespace kargo --dry-run=client -o yaml | kubectl apply -f -
             ;;
-        "gitops-pre")
+        "$PRE_CLUSTER_PROFILE")
             log_info "Deploying UAT/testing environment..."
             # Deploy minimal infrastructure for testing
             deploy_minimal_stack "$profile"
             ;;
-        "gitops-prod")
+        "$PROD_CLUSTER_PROFILE")
             log_info "Deploying production environment..."
             # Deploy production-grade infrastructure
             deploy_production_stack "$profile"
@@ -211,7 +240,7 @@ setup_multi_cluster_access() {
 get_all_argocd_passwords() {
     local passwords=()
     
-    for profile in gitops-dev gitops-pre gitops-prod; do
+    for profile in "$DEV_CLUSTER_PROFILE" "$PRE_CLUSTER_PROFILE" "$PROD_CLUSTER_PROFILE"; do
         if minikube status --profile="$profile" 2>/dev/null | grep -q "Running"; then
             kubectl config use-context "$profile"
             local password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null || echo "Not available")
@@ -238,7 +267,7 @@ print_multi_cluster_status() {
     printf "%-10s %-25s %-15s %-20s\n" "CLUSTER" "ARGOCD URL" "STATUS" "PASSWORD"
     printf "%-10s %-25s %-15s %-20s\n" "-------" "----------" "------" "--------"
     
-    for profile in gitops-dev gitops-pre gitops-prod; do
+    for profile in "$DEV_CLUSTER_PROFILE" "$PRE_CLUSTER_PROFILE" "$PROD_CLUSTER_PROFILE"; do
         IFS=',' read -r cpus memory disk port <<< "${CLUSTERS[$profile]}"
         
         if minikube status --profile="$profile" 2>/dev/null | grep -q "Running"; then
@@ -288,12 +317,16 @@ main() {
     
     log_enterprise "Initializing multi-cluster GitOps environment..."
     
+    # Phase 0: Load configuration
+    load_configuration
+    initialize_clusters
+    
     # Phase 1: Prerequisites
     check_prerequisites
     
     # Phase 2: Create all clusters
     log_step "Creating enterprise cluster ecosystem..."
-    for profile in gitops-dev gitops-pre gitops-prod; do
+    for profile in "$DEV_CLUSTER_PROFILE" "$PRE_CLUSTER_PROFILE" "$PROD_CLUSTER_PROFILE"; do
         create_cluster "$profile" "${CLUSTERS[$profile]}"
         install_argocd "$profile" "${CLUSTERS[$profile]}"
         deploy_environment_apps "$profile"

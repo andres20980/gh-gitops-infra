@@ -2,7 +2,16 @@
 
 ¡Gracias por hacer fork de este proyecto GitOps! Esta guía te ayudará a configurar tu propio entorno multi-cluster.
 
-## 🚀 Configuración Rápida
+## � Requisitos del Sistema
+
+**Mínimos para PoC Local:**
+- 🖥️ **CPU**: 8+ cores (recomendado)
+- 🧠 **RAM**: 16GB+ (mínimo 12GB disponible)
+- 💾 **Disk**: 60GB+ espacio libre
+- 🐳 **Docker**: Instalado y ejecutándose
+- ☸️ **Minikube**: v1.25+ instalado
+
+## �🚀 Configuración Rápida
 
 ### 1. Clona tu fork
 ```bash
@@ -53,11 +62,13 @@ Esto te guiará paso a paso para configurar:
 Después de la configuración tendrás:
 
 ```
-🏢 Tu Organización GitOps
-├── 🚧 DEV Cluster (gitops-dev)   - Puerto 8080
-├── 🧪 PRE Cluster (gitops-pre)   - Puerto 8081  
-└── 🏭 PROD Cluster (gitops-prod) - Puerto 8082
+🏢 Tu Organización GitOps (Optimizado para PoC Local)
+├── 🚧 DEV Cluster (gitops-dev)   - Puerto 8080 (2 CPUs, 4GB RAM, 20GB disk)
+├── 🧪 PRE Cluster (gitops-pre)   - Puerto 8081 (2 CPUs, 3GB RAM, 15GB disk)
+└── 🏭 PROD Cluster (gitops-prod) - Puerto 8082 (2 CPUs, 4GB RAM, 20GB disk)
 ```
+
+**💡 Recursos Totales Requeridos**: ~6 CPUs, ~11GB RAM, ~55GB disk
 
 ## 🎯 Flujo de Promociones
 
@@ -96,8 +107,15 @@ Después de la configuración tendrás:
 - Asegúrate de que el repositorio sea público o tengas acceso
 
 ### Error: "Insufficient resources"
-- Ajusta los recursos en `config/environment.conf`
-- Reduce el número de CPUs/RAM según tu máquina
+- **Recomendado**: Ajusta los recursos en `config/environment.conf`
+- **CPU**: Reduce a 1 CPU por cluster si tienes <8 cores totales
+- **RAM**: Reduce DEV/PROD a 3g y PRE a 2g si tienes <16GB RAM
+- **Disk**: Reduce a 10g por cluster si tienes poco espacio
+
+### Rendimiento lento
+- Cierra aplicaciones innecesarias antes del despliegue
+- Considera desactivar componentes: `ENABLE_GRAFANA="false"`
+- Reduce el número de clusters: comienza solo con DEV
 
 ### Puertos ocupados
 - Cambia los puertos en la sección `NETWORKING` del config

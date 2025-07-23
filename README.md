@@ -113,7 +113,7 @@ Después del bootstrap (espera 5-10 minutos para todos los servicios):
 | **Grafana** | http://localhost:3001 | admin / admin | Dashboards |
 | **Prometheus** | http://localhost:9090 | - | Métricas |
 | **Jaeger** | http://localhost:16686 | - | Tracing |
-| **Gitea** | http://localhost:3002 | admin / admin123 | Git repos |
+| **Gitea** | http://localhost:3002 | admin / admin123 | Git interno (pod) |
 
 ### 3. Verificación del Estado
 

@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-data-pvc
+  namespace: gitea
+  labels:
+    app: gitea
+    component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # Don't specify storageClassName to use default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-shared-storage
+  namespace: gitea
+  labels:
+    app: gitea
+    component: shared-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # Don't specify storageClassName to use default

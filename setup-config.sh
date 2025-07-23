@@ -85,23 +85,23 @@ interactive_setup() {
     
     # Resource allocation
     echo ""
-    log_info "💻 Resource allocation (press Enter for defaults):"
+    log_info "💻 Resource allocation for local PoC (press Enter for defaults):"
     
-    echo -n "   DEV cluster CPUs [4]: "
+    echo -n "   DEV cluster CPUs [2]: "
     read dev_cpus
-    dev_cpus=${dev_cpus:-4}
+    dev_cpus=${dev_cpus:-2}
     
-    echo -n "   DEV cluster Memory [8g]: "
+    echo -n "   DEV cluster Memory [4g]: "
     read dev_memory
-    dev_memory=${dev_memory:-8g}
+    dev_memory=${dev_memory:-4g}
     
-    echo -n "   PROD cluster CPUs [6]: "
+    echo -n "   PROD cluster CPUs [2]: "
     read prod_cpus
-    prod_cpus=${prod_cpus:-6}
+    prod_cpus=${prod_cpus:-2}
     
-    echo -n "   PROD cluster Memory [12g]: "
+    echo -n "   PROD cluster Memory [4g]: "
     read prod_memory
-    prod_memory=${prod_memory:-12g}
+    prod_memory=${prod_memory:-4g}
     
     # Components selection
     echo ""
@@ -177,10 +177,10 @@ PROD_CLUSTER_PROFILE="gitops-prod"
 
 # 💻 RESOURCE ALLOCATION
 # -----------------------
-# Format: "cpus,memory,disk" - ports are defined separately below
-DEV_CLUSTER_RESOURCES="$dev_cpus,${dev_memory},50g"
-PRE_CLUSTER_RESOURCES="3,6g,30g"
-PROD_CLUSTER_RESOURCES="$prod_cpus,${prod_memory},100g"
+# Format: "cpus,memory,disk" - optimized for local development/PoC
+DEV_CLUSTER_RESOURCES="$dev_cpus,${dev_memory},20g"
+PRE_CLUSTER_RESOURCES="2,3g,15g"
+PROD_CLUSTER_RESOURCES="$prod_cpus,${prod_memory},20g"
 
 # 🏷️  VERSION MANAGEMENT
 # -----------------------
@@ -195,6 +195,7 @@ ARGOCD_PRE_PORT="8081"
 ARGOCD_PROD_PORT="8082"
 KARGO_UI_PORT="3000"
 GRAFANA_PORT="3001"
+GITEA_PORT="3002"
 
 # 🏢 ENTERPRISE SETTINGS
 # -----------------------
@@ -209,6 +210,7 @@ ENABLE_GRAFANA="$grafana"
 ENABLE_JAEGER="$jaeger"
 ENABLE_LOKI="true"
 ENABLE_MINIO="$minio"
+ENABLE_GITEA="true"
 ENABLE_CERT_MANAGER="true"
 ENABLE_EXTERNAL_SECRETS="false"
 
@@ -254,7 +256,7 @@ auto_setup() {
     
     log_info "Detected: $username/$repo"
     
-    generate_config_file "$username" "$repo" "$username" "4" "8g" "6" "12g" "true" "true" "true"
+    generate_config_file "$username" "$repo" "$username" "2" "4g" "2" "4g" "true" "true" "true"
     
     log_success "Auto-configuration completed!"
     log_warning "Please review the generated configuration: $CONFIG_FILE"

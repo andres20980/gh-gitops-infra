@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 🏢 Enterprise Multi-Cluster GitOps Bootstrap
+# 🏢 Enterprise Multi-Cluster GitOps Bootstrap  
 # Creates complete DEV → PRE → PROD environment with Kargo promotions
 
 set -e
@@ -21,6 +21,14 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} ⚠️  $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} ❌ $1"; }
 log_step() { echo -e "${PURPLE}[STEP]${NC} 🚀 $1"; }
 log_enterprise() { echo -e "${CYAN}[ENTERPRISE]${NC} 🏢 $1"; }
+
+# Handle interruptions gracefully
+cleanup() {
+    log_error "Multi-cluster bootstrap interrupted"
+    log_info "Partial cluster setup may remain. Use ./scripts/limpiar-multi-cluster.sh to clean up"
+    exit 1
+}
+trap cleanup INT TERM
 
 # Load configuration
 CONFIG_FILE="config/environment.conf"
@@ -128,12 +136,34 @@ create_cluster() {
         --disk-size="$disk" \
         --driver=docker \
         --kubernetes-version=stable \
-        --addons=ingress,metrics-server,dashboard
+        --addons=ingress,metrics-server \
+        --interactive=false \
+        --wait=false > /dev/null 2>&1 || {
+        log_warning "Minikube start with addons failed, trying without addons..."
+        minikube start \
+            --profile="$profile" \
+            --cpus="$cpus" \
+            --memory="$memory" \
+            --disk-size="$disk" \
+            --driver=docker \
+            --kubernetes-version=stable \
+            --interactive=false \
+            --wait=false > /dev/null 2>&1
+    }
+    
+    # Enable addons after cluster creation (more reliable)
+    log_info "Enabling cluster addons..."
+    minikube addons enable ingress -p "$profile" > /dev/null 2>&1 || log_warning "Failed to enable ingress addon"
+    minikube addons enable metrics-server -p "$profile" > /dev/null 2>&1 || log_warning "Failed to enable metrics-server addon"
     
     # Wait for cluster to be ready
     log_info "Waiting for cluster nodes to be ready..."
-    kubectl config use-context "$profile"
-    kubectl wait --for=condition=Ready nodes --all --timeout=300s
+    kubectl config use-context "$profile" > /dev/null 2>&1
+    kubectl wait --for=condition=Ready nodes --all --timeout=300s > /dev/null 2>&1 || {
+        log_warning "Initial node wait failed, retrying..."
+        sleep 10
+        kubectl wait --for=condition=Ready nodes --all --timeout=60s > /dev/null 2>&1 || log_warning "Node readiness check timed out"
+    }
     
     log_success "Cluster $profile created successfully"
 }

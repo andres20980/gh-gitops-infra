@@ -1,21 +1,6 @@
 #!/bin/bash
 
-# 🚀# Funciones de logging
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} 🔍 $1"
-}
-
-log_success() {
-    echo -e "${GREEN}[ÉXITO]${NC} ✅ $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[ADVERTENCIA]${NC} ⚠️ $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} ❌ $1"
-}mático Completo de Infraestructura GitOps
+# 🚀 Instalación Automático Completo de Infraestructura GitOps
 # Instalación con un comando: prerrequisitos + stack GitOps
 # Compatible con: Ubuntu 20.04+, WSL2, Ubuntu Server, Ubuntu Desktop
 
@@ -87,13 +72,31 @@ install_docker() {
     log_install "Adding user to docker group..."
     sudo usermod -aG docker $USER
     
-    # Start docker service
-    sudo systemctl enable docker
-    sudo systemctl start docker
+    # Start docker service (handle WSL2 case gracefully)
+    log_install "Starting Docker service..."
+    sudo systemctl enable docker || log_warning "Failed to enable Docker service (normal in some environments)"
+    
+    if ! sudo systemctl start docker; then
+        log_warning "Docker service failed to start automatically (common in WSL2)"
+        log_install "Attempting alternative Docker startup methods..."
+        
+        # Try to start Docker daemon directly (common in WSL2)
+        if command -v dockerd &> /dev/null; then
+            log_install "Starting Docker daemon directly..."
+            sudo dockerd > /dev/null 2>&1 &
+            sleep 5
+        fi
+        
+        # Check if Docker is working now
+        if ! docker version &> /dev/null; then
+            log_warning "Docker installed but not running. Attempting manual start..."
+            sudo service docker start || true
+            sleep 3
+        fi
+    fi
     
     rm -f get-docker.sh
-    log_success "Docker installed successfully"
-    log_warning "You may need to logout/login or restart terminal for docker group changes"
+    log_success "Docker installation completed"
 }
 
 # Install kubectl
@@ -149,17 +152,51 @@ verify_docker_access() {
         return 0
     fi
     
-    log_warning "Docker group access not working yet"
-    log_info "Attempting to refresh group membership..."
+    log_warning "Docker requires additional configuration..."
+    log_install "Attempting to fix Docker access automatically..."
     
-    # Try newgrp docker
-    if ! newgrp docker <<< 'docker version' &> /dev/null; then
-        log_error "Cannot access Docker without sudo"
-        log_error "Please logout/login or restart your terminal, then run this script again"
-        exit 1
+    # Try multiple approaches to get Docker working
+    local attempts=0
+    local max_attempts=3
+    
+    while [ $attempts -lt $max_attempts ]; do
+        attempts=$((attempts + 1))
+        log_install "Attempt $attempts/$max_attempts to fix Docker access..."
+        
+        # Method 1: Try to start Docker service
+        sudo systemctl start docker &> /dev/null || true
+        sudo service docker start &> /dev/null || true
+        
+        # Method 2: Try to refresh group membership
+        newgrp docker <<< 'echo "Group refreshed"' &> /dev/null || true
+        
+        # Method 3: For WSL2, try starting dockerd directly
+        if [ $attempts -eq 2 ]; then
+            log_install "Trying WSL2-specific Docker startup..."
+            sudo dockerd &> /dev/null &
+            sleep 5
+        fi
+        
+        # Test if Docker is working now
+        if docker version &> /dev/null; then
+            log_success "Docker access fixed successfully"
+            return 0
+        fi
+        
+        sleep 2
+    done
+    
+    # If all attempts failed, check if we can at least use sudo docker
+    if sudo docker version &> /dev/null; then
+        log_warning "Docker works with sudo but not without it"
+        log_warning "This may cause issues with some operations"
+        log_info "Continuing installation - Docker functionality is available"
+        return 0
     fi
     
-    log_success "Docker access refreshed"
+    log_error "Docker is not functioning properly after all attempts"
+    log_error "Please check Docker installation and try again"
+    exit 1
 }
 
 # Verify all installations

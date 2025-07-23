@@ -169,10 +169,11 @@ deploy_environment_apps() {
     case $profile in
         "$DEV_CLUSTER_PROFILE")
             log_info "Deploying full development stack..."
-            # Deploy infrastructure based on enabled components
-            deploy_conditional_apps
+            # Deploy infrastructure applications via ArgoCD
+            log_info "🚀 Deploying GitOps infrastructure via ArgoCD..."
+            kubectl apply -f gitops-infra-apps.yaml 2>/dev/null || log_warning "Infrastructure apps will be deployed when ArgoCD syncs"
             
-            # Deploy Kargo for promotion management (only in DEV)
+            # Create kargo namespace (ArgoCD will install Kargo components)
             kubectl create namespace kargo --dry-run=client -o yaml | kubectl apply -f -
             ;;
         "$PRE_CLUSTER_PROFILE")
@@ -327,19 +328,21 @@ print_multi_cluster_status() {
     echo "   3. 🏭 PROD (gitops-prod)→ Manual promotion from PRE"
     echo ""
     echo "🛠️  CLUSTER MANAGEMENT:"
-    echo "   Switch context: kubectl config use-context <cluster-name>"
-    echo "   Cluster status: ./scripts/cluster-status.sh"
-    echo "   Stop all:       ./cleanup-multi-cluster.sh soft"
+    echo "   Switch context:   kubectl config use-context <cluster-name>"
+    echo "   Cluster status:   ./scripts/cluster-status.sh"
+    echo "   Stop all:         ./cleanup-multi-cluster.sh soft"
+    echo "   Port forwards:    ./scripts/setup-port-forwards.sh"
     echo ""
-    echo "📊 NEXT STEPS FOR KARGO SETUP:"
-    echo "   1. Deploy Kargo:     kubectl apply -f components/kargo/kargo.yaml"
-    echo "   2. Setup projects:   kubectl apply -f examples/kargo-multi-env.yaml"  
-    echo "   3. Access Kargo UI:  kubectl port-forward -n kargo svc/kargo-api 3000:443"
+    echo "� AUTOMATIC DEPLOYMENT STATUS:"
+    echo "   ✅ ArgoCD will automatically deploy all components via GitOps"
+    echo "   ✅ Kargo, Grafana, Gitea, MinIO, Monitoring stack deploying..."
+    echo "   ⏳ Check ArgoCD UI to monitor deployment progress"
     echo ""
-    echo "🔧 GITEA SETUP (Internal Git Server):"
-    echo "   1. Setup Gitea:      ./scripts/setup-gitea.sh"
-    echo "   2. Access Gitea:     http://localhost:3002 (admin/admin123)"
-    echo "   3. Data persists:    Stored in PersistentVolumes"
+    echo "🔧 QUICK ACCESS URLS (after components are ready):"
+    echo "   🎯 ArgoCD UI:        http://localhost:8080 (admin/admin123)"
+    echo "   📊 Grafana:          http://localhost:3000 (admin/admin)"
+    echo "   🔄 Kargo UI:         http://localhost:3002 (admin/admin123)"  
+    echo "   📚 Gitea:            http://localhost:3001 (admin/admin123)"
     echo ""
     echo "🔧 CONFIGURATION SUMMARY:"
     echo "   Repository:      $GITHUB_REPO_URL"

@@ -91,8 +91,8 @@ Asegúrate de tener instalado:
 git clone https://github.com/andres20980/gh-gitops-infra.git
 cd gh-gitops-infra
 
-# Configuración inteligente (no destructiva)
-./bootstrap-gitops.sh
+# Configuración multi-cluster inteligente (no destructiva)
+./bootstrap-multi-cluster.sh
 ```
 
 **El script inteligente:**
@@ -242,7 +242,9 @@ minikube start --profile=gitops-dev
 │   ├── QUICKSTART.md          # Guía de inicio rápido
 │   ├── INFRASTRUCTURE_STATUS.md # Estado de infraestructura
 │   └── VALIDATION_REPORT.md   # Reporte de validación
-├── bootstrap-gitops.sh        # Setup inteligente
+├── bootstrap-multi-cluster.sh   # Setup multi-cluster inteligente
+├── cleanup-multi-cluster.sh    # Limpieza multi-cluster
+├── install-everything.sh       # Instalador completo con prerrequisitos
 ├── cleanup-gitops.sh          # Limpieza completa
 └── gitops-infra-apps.yaml     # App-of-apps principal
 ```

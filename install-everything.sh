@@ -202,19 +202,19 @@ main() {
     verify_installations
     
     # Phase 6: Make bootstrap executable and run it
-    log_step "Running GitOps infrastructure bootstrap..."
-    chmod +x bootstrap-gitops.sh cleanup-gitops.sh
+    log_step "Running GitOps multi-cluster infrastructure bootstrap..."
+    chmod +x bootstrap-multi-cluster.sh cleanup-multi-cluster.sh
     chmod +x scripts/*.sh 2>/dev/null || true
     
     echo ""
     echo "🎯================================================"
     echo "   ✅ PREREQUISITES INSTALLATION COMPLETED!"
-    echo "   🚀 STARTING GITOPS INFRASTRUCTURE DEPLOYMENT..."
+    echo "   🚀 STARTING MULTI-CLUSTER GITOPS DEPLOYMENT..."
     echo "================================================"
     echo ""
     
-    # Run the GitOps bootstrap
-    ./bootstrap-gitops.sh
+    # Run the multi-cluster GitOps bootstrap
+    ./bootstrap-multi-cluster.sh
     
     echo ""
     echo "🏆================================================"

@@ -177,9 +177,10 @@ PROD_CLUSTER_PROFILE="gitops-prod"
 
 # 💻 RESOURCE ALLOCATION
 # -----------------------
-DEV_CLUSTER_RESOURCES="$dev_cpus,${dev_memory},50g,8080"
-PRE_CLUSTER_RESOURCES="3,6g,30g,8081"
-PROD_CLUSTER_RESOURCES="$prod_cpus,${prod_memory},100g,8082"
+# Format: "cpus,memory,disk" - ports are defined separately below
+DEV_CLUSTER_RESOURCES="$dev_cpus,${dev_memory},50g"
+PRE_CLUSTER_RESOURCES="3,6g,30g"
+PROD_CLUSTER_RESOURCES="$prod_cpus,${prod_memory},100g"
 
 # 🏷️  VERSION MANAGEMENT
 # -----------------------

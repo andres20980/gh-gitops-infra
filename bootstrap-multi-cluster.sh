@@ -40,11 +40,20 @@ load_configuration() {
         DEV_CLUSTER_PROFILE="gitops-dev"
         PRE_CLUSTER_PROFILE="gitops-pre"
         PROD_CLUSTER_PROFILE="gitops-prod"
-        DEV_CLUSTER_RESOURCES="4,8g,50g,8080"
-        PRE_CLUSTER_RESOURCES="3,6g,30g,8081"
-        PROD_CLUSTER_RESOURCES="6,12g,100g,8082"
+        DEV_CLUSTER_RESOURCES="4,8g,50g"
+        PRE_CLUSTER_RESOURCES="3,6g,30g"
+        PROD_CLUSTER_RESOURCES="6,12g,100g"
+        ARGOCD_DEV_PORT="8080"
+        ARGOCD_PRE_PORT="8081"
+        ARGOCD_PROD_PORT="8082"
         ARGOCD_VERSION="v2.12.3"
+        KARGO_VERSION="v0.8.4"
         ORGANIZATION_NAME="YourOrg"
+        ENABLE_MONITORING="true"
+        ENABLE_GRAFANA="true"
+        ENABLE_JAEGER="true"
+        ENABLE_LOKI="true"
+        ENABLE_MINIO="true"
     fi
 }
 
@@ -53,14 +62,10 @@ declare -A CLUSTERS
 
 # Initialize clusters array from configuration
 initialize_clusters() {
-    CLUSTERS["$DEV_CLUSTER_PROFILE"]="$DEV_CLUSTER_RESOURCES"
-    CLUSTERS["$PRE_CLUSTER_PROFILE"]="$PRE_CLUSTER_RESOURCES"
-    CLUSTERS["$PROD_CLUSTER_PROFILE"]="$PROD_CLUSTER_RESOURCES"
+    CLUSTERS["$DEV_CLUSTER_PROFILE"]="$DEV_CLUSTER_RESOURCES,$ARGOCD_DEV_PORT"
+    CLUSTERS["$PRE_CLUSTER_PROFILE"]="$PRE_CLUSTER_RESOURCES,$ARGOCD_PRE_PORT"
+    CLUSTERS["$PROD_CLUSTER_PROFILE"]="$PROD_CLUSTER_RESOURCES,$ARGOCD_PROD_PORT"
 }
-
-# ArgoCD version
-ARGOCD_VERSION="v2.12.3"
-GITHUB_REPO_URL="https://github.com/andres20980/gh-gitops-infra.git"
 
 # Check prerequisites
 check_prerequisites() {
@@ -164,8 +169,8 @@ deploy_environment_apps() {
     case $profile in
         "$DEV_CLUSTER_PROFILE")
             log_info "Deploying full development stack..."
-            # Deploy complete infrastructure
-            kubectl apply -f gitops-infra-apps.yaml 2>/dev/null || log_warning "Main apps config not found"
+            # Deploy infrastructure based on enabled components
+            deploy_conditional_apps
             
             # Deploy Kargo for promotion management (only in DEV)
             kubectl create namespace kargo --dry-run=client -o yaml | kubectl apply -f -
@@ -185,6 +190,19 @@ deploy_environment_apps() {
     log_success "Applications deployed for $profile"
 }
 
+# Deploy components based on configuration
+deploy_conditional_apps() {
+    log_info "Deploying components based on configuration..."
+    
+    if [[ "$ENABLE_MONITORING" == "true" ]]; then
+        log_info "✅ Monitoring enabled - deploying full infrastructure"
+        kubectl apply -f gitops-infra-apps.yaml 2>/dev/null || log_warning "Main apps config not found"
+    else
+        log_info "⚠️ Monitoring disabled - deploying minimal stack"
+        deploy_minimal_stack_components
+    fi
+}
+
 # Deploy minimal stack for PRE environment
 deploy_minimal_stack() {
     local profile=$1
@@ -194,6 +212,21 @@ deploy_minimal_stack() {
     for ns in monitoring demo-project; do
         kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
     done
+}
+
+# Deploy minimal components when monitoring is disabled
+deploy_minimal_stack_components() {
+    log_info "Deploying minimal component stack..."
+    
+    # Create basic namespaces
+    for ns in demo-project; do
+        kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
+    done
+    
+    # Deploy only essential ArgoCD applications for demo project
+    if [[ -f "projects/demo-project/app-of-apps.yaml" ]]; then
+        kubectl apply -f projects/demo-project/app-of-apps.yaml 2>/dev/null || log_warning "Demo project config not found"
+    fi
 }
 
 # Deploy production stack
@@ -261,6 +294,7 @@ print_multi_cluster_status() {
     echo "🏢============================================================="
     echo "   🌐 ENTERPRISE MULTI-CLUSTER GITOPS ENVIRONMENT READY"
     echo "   🚧 DEV → 🧪 PRE → 🏭 PROD"
+    echo "   🏢 Organization: $ORGANIZATION_NAME"
     echo "============================================================="
     echo ""
     echo "🎯 CONTROL PLANES:"
@@ -301,6 +335,14 @@ print_multi_cluster_status() {
     echo "   1. Deploy Kargo:     kubectl apply -f components/kargo/kargo.yaml"
     echo "   2. Setup projects:   kubectl apply -f examples/kargo-multi-env.yaml"  
     echo "   3. Access Kargo UI:  kubectl port-forward -n kargo svc/kargo-api 3000:443"
+    echo ""
+    echo "🔧 CONFIGURATION SUMMARY:"
+    echo "   Repository:      $GITHUB_REPO_URL"
+    echo "   ArgoCD Version:  $ARGOCD_VERSION"
+    echo "   Kargo Version:   $KARGO_VERSION"
+    echo "   Monitoring:      $([ "$ENABLE_MONITORING" == "true" ] && echo "✅ Enabled" || echo "❌ Disabled")"
+    echo "   Grafana:         $([ "$ENABLE_GRAFANA" == "true" ] && echo "✅ Enabled" || echo "❌ Disabled")"
+    echo "   Jaeger:          $([ "$ENABLE_JAEGER" == "true" ] && echo "✅ Enabled" || echo "❌ Disabled")"
     echo ""
     log_enterprise "Multi-cluster GitOps environment operational! 🎉"
     echo "============================================================="

@@ -1,6 +1,35 @@
 #!/bin/bash
 
-# 📊 Multi-Cluster Status Check Script
+# 📊 Mullog_step() { echo -e "${PURPLE}[STEP]${NC} 🚀 $1"; }
+log_enterprise() { echo -e "${CYAN}[ENTERPRISE]${NC} 🏢 $1"; }
+
+# Load configuration
+CONFIG_FILE="config/environment.conf"
+
+load_configuration() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+    else
+        # Default configuration
+        DEV_CLUSTER_PROFILE="gitops-dev"
+        PRE_CLUSTER_PROFILE="gitops-pre"
+        PROD_CLUSTER_PROFILE="gitops-prod"
+        ARGOCD_DEV_PORT="8080"
+        ARGOCD_PRE_PORT="8081"
+        ARGOCD_PROD_PORT="8082"
+    fi
+}
+
+# Initialize after loading config
+load_configuration
+CLUSTERS=("$DEV_CLUSTER_PROFILE" "$PRE_CLUSTER_PROFILE" "$PROD_CLUSTER_PROFILE")
+
+# ArgoCD port mapping
+declare -A ARGOCD_PORTS=(
+    ["$DEV_CLUSTER_PROFILE"]="$ARGOCD_DEV_PORT"
+    ["$PRE_CLUSTER_PROFILE"]="$ARGOCD_PRE_PORT"
+    ["$PROD_CLUSTER_PROFILE"]="$ARGOCD_PROD_PORT"
+) Status Check Script
 # Comprehensive health check for multi-cluster GitOps infrastructure
 
 set -e
@@ -205,9 +234,9 @@ print_comprehensive_status() {
     
     echo ""
     echo "🔄 PROMOTION PIPELINE STATUS:"
-    local dev_healthy=$(minikube status --profile="gitops-dev" 2>/dev/null | grep -q "Running" && echo "✅" || echo "❌")
-    local pre_healthy=$(minikube status --profile="gitops-pre" 2>/dev/null | grep -q "Running" && echo "✅" || echo "❌")
-    local prod_healthy=$(minikube status --profile="gitops-prod" 2>/dev/null | grep -q "Running" && echo "✅" || echo "❌")
+    local dev_healthy=$(minikube status --profile="$DEV_CLUSTER_PROFILE" 2>/dev/null | grep -q "Running" && echo "✅" || echo "❌")
+    local pre_healthy=$(minikube status --profile="$PRE_CLUSTER_PROFILE" 2>/dev/null | grep -q "Running" && echo "✅" || echo "❌")
+    local prod_healthy=$(minikube status --profile="$PROD_CLUSTER_PROFILE" 2>/dev/null | grep -q "Running" && echo "✅" || echo "❌")
     
     echo "   🚧 DEV:  $dev_healthy  Development environment"
     echo "   🧪 PRE:  $pre_healthy  Pre-production/UAT"  
@@ -223,7 +252,7 @@ main() {
             if [ -n "$2" ]; then
                 check_cluster_detail "$2"
             else
-                log_error "Please specify cluster name: gitops-dev, gitops-pre, or gitops-prod"
+                log_error "Please specify cluster name: $DEV_CLUSTER_PROFILE, $PRE_CLUSTER_PROFILE, or $PROD_CLUSTER_PROFILE"
                 exit 1
             fi
             ;;
@@ -259,7 +288,7 @@ main() {
             echo "  all            - Run all checks"
             echo "  help           - Show this help message"
             echo ""
-            echo "Available clusters: gitops-dev, gitops-pre, gitops-prod"
+            echo "Available clusters: $DEV_CLUSTER_PROFILE, $PRE_CLUSTER_PROFILE, $PROD_CLUSTER_PROFILE"
             ;;
         *)
             log_error "Unknown command: $1"

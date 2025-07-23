@@ -21,7 +21,23 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} ⚠️  $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} ❌ $1"; }
 log_enterprise() { echo -e "${CYAN}[ENTERPRISE]${NC} 🏢 $1"; }
 
-CLUSTERS=("gitops-dev" "gitops-pre" "gitops-prod")
+# Load configuration
+CONFIG_FILE="config/environment.conf"
+
+load_configuration() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+    else
+        # Default configuration
+        DEV_CLUSTER_PROFILE="gitops-dev"
+        PRE_CLUSTER_PROFILE="gitops-pre"
+        PROD_CLUSTER_PROFILE="gitops-prod"
+    fi
+}
+
+# Initialize after loading config
+load_configuration
+CLUSTERS=("$DEV_CLUSTER_PROFILE" "$PRE_CLUSTER_PROFILE" "$PROD_CLUSTER_PROFILE")
 
 # Check cluster status
 check_multi_cluster_status() {
@@ -138,9 +154,9 @@ partial_cleanup() {
     echo "==================================="
     echo ""
     echo "Select cluster to destroy:"
-    echo "1) gitops-dev  (Development)"
-    echo "2) gitops-pre  (Pre-production/UAT)" 
-    echo "3) gitops-prod (Production)"
+    echo "1) $DEV_CLUSTER_PROFILE  (Development)"
+    echo "2) $PRE_CLUSTER_PROFILE  (Pre-production/UAT)" 
+    echo "3) $PROD_CLUSTER_PROFILE (Production)"
     echo "4) Cancel"
     echo ""
     
@@ -148,9 +164,9 @@ partial_cleanup() {
     echo
     
     case $REPLY in
-        1) target_cluster="gitops-dev" ;;
-        2) target_cluster="gitops-pre" ;;
-        3) target_cluster="gitops-prod" ;;
+        1) target_cluster="$DEV_CLUSTER_PROFILE" ;;
+        2) target_cluster="$PRE_CLUSTER_PROFILE" ;;
+        3) target_cluster="$PROD_CLUSTER_PROFILE" ;;
         4) log_info "Partial cleanup cancelled"; return ;;
         *) log_error "Invalid option: $REPLY"; return ;;
     esac

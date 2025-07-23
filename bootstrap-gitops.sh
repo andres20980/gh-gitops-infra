@@ -20,7 +20,7 @@ MINIKUBE_CPUS=4
 MINIKUBE_MEMORY="8192m"
 MINIKUBE_DISK="50g"
 ARGOCD_VERSION="v2.12.3"
-GITEA_REPO_URL="http://192.168.34.196:3000/andres20980/gitops-infra.git"
+GITHUB_REPO_URL="https://github.com/andres20980/gh-gitops-infra.git"
 
 # Logging functions with emojis
 log_info() {

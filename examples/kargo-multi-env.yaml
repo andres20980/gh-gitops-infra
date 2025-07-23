@@ -28,7 +28,7 @@ spec:
       semverConstraint: "~1.25"
       discoveryLimit: 5
   - git:
-      repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      repoURL: https://github.com/andres20980/gh-gitops-infra.git
       branch: main
 ---
 # DEV Stage - gitops-dev cluster
@@ -42,7 +42,7 @@ spec:
     warehouse: demo-project-warehouse
   promotionMechanisms:
     gitRepoUpdates:
-    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
       writeBranch: dev-branch
       kustomize:
         path: manifests/demo-project/frontend
@@ -53,7 +53,7 @@ spec:
     - appName: demo-project-frontend
       appNamespace: argocd
       sourceUpdates:
-      - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      - repoURL: https://github.com/andres20980/gh-gitops-infra.git
         targetRevision: dev-branch
 ---
 # PRE Stage - gitops-pre cluster  
@@ -68,7 +68,7 @@ spec:
     - name: dev
   promotionMechanisms:
     gitRepoUpdates:
-    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
       writeBranch: pre-branch
       kustomize:
         path: manifests/demo-project/frontend
@@ -93,7 +93,7 @@ spec:
     - name: pre
   promotionMechanisms:
     gitRepoUpdates:
-    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
       writeBranch: prod-branch
       kustomize:
         path: manifests/demo-project/frontend
@@ -205,7 +205,7 @@ spec:
     - name: uat
   promotionMechanisms:
     gitRepoUpdates:
-    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
       writeBranch: prod
       kustomize:
         path: manifests/demo-project-prod
@@ -231,5 +231,5 @@ spec:
       semverConstraint: "^15.0.0"
       discoveryLimit: 5
   - git:
-      repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      repoURL: https://github.com/andres20980/gh-gitops-infra.git
       branch: main

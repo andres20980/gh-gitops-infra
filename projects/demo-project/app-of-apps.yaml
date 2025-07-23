@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+    repoURL: https://github.com/andres20980/gh-gitops-infra.git
     targetRevision: HEAD
     path: projects/demo-project/apps
     directory:

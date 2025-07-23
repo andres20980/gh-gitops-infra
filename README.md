@@ -259,16 +259,96 @@ minikube start --profile=gitops-dev
 2. **Tracing**: Usar Jaeger para troubleshooting
 3. **Secrets**: Gestionar secrets con External Secrets
 
-## 🔧 Configuración Multi-Cluster (Futuro)
+## 🔧 Configuración Multi-Cluster (NUEVO!)
 
-Para simular múltiples clusters empresariales:
+### ⚡ Setup Multi-Cluster Completo (Un Solo Comando)
+
+Para crear el **entorno empresarial completo** con 3 clusters:
 
 ```bash
-# Cluster adicional para staging
-minikube start --profile=gitops-staging --nodes=2 --cpus=2 --memory=4g
+# Crear DEV + PRE + PROD clusters con promociones
+./bootstrap-multi-cluster.sh
+```
 
-# Cluster para producción
-minikube start --profile=gitops-prod --nodes=3 --cpus=4 --memory=8g
+**✨ Qué crea automáticamente:**
+- 🚧 **Cluster DEV** (gitops-dev): 4 CPUs, 8GB RAM - Desarrollo completo
+- 🧪 **Cluster PRE** (gitops-pre): 3 CPUs, 6GB RAM - Testing/UAT  
+- 🏭 **Cluster PROD** (gitops-prod): 6 CPUs, 12GB RAM - Producción
+- 🎯 **ArgoCD en cada cluster** con puertos separados
+- 🔄 **Kargo para promociones** automáticas entre entornos
+- ⏱️ **15-25 minutos** para entorno completo
+
+**🎯 Resultado:** Simulación empresarial completa con promociones DEV → PRE → PROD
+
+### 🌐 Acceso Multi-Cluster
+
+Después del setup, tendrás acceso a:
+
+| Cluster | ArgoCD URL | Propósito | Recursos |
+|---------|------------|-----------|----------|
+| **gitops-dev** | http://localhost:8080 | Desarrollo | 4 CPU, 8GB |
+| **gitops-pre** | http://localhost:8081 | Testing/UAT | 3 CPU, 6GB |
+| **gitops-prod** | http://localhost:8082 | Producción | 6 CPU, 12GB |
+
+### 🎯 Configurar Promociones con Kargo
+
+```bash
+# Configurar pipeline de promociones DEV → PRE → PROD
+./scripts/setup-kargo-promotions.sh
+
+# Acceder a Kargo UI para gestionar promociones
+# URL: https://localhost:3000 (admin/admin)
+```
+
+### 🛠️ Gestión Multi-Cluster
+
+```bash
+# Ver estado de todos los clusters
+./scripts/cluster-status.sh
+
+# Cambiar entre clusters
+kubectl config use-context gitops-dev   # Desarrollo
+kubectl config use-context gitops-pre   # Testing
+kubectl config use-context gitops-prod  # Producción
+
+# Parar todos los clusters (preservando datos)
+./cleanup-multi-cluster.sh soft
+
+# Eliminar cluster específico
+./cleanup-multi-cluster.sh partial
+```
+
+### 🔄 Workflows de Promoción Empresarial
+
+#### Scenario 1: Promoción Automática DEV
+```bash
+# 1. Push a main branch → Auto-deploy a DEV
+git push origin main
+
+# 2. Ver despliegue en ArgoCD DEV
+open http://localhost:8080
+```
+
+#### Scenario 2: Promoción Manual DEV → PRE  
+```bash
+# 1. Acceder a Kargo UI
+open https://localhost:3000
+
+# 2. Seleccionar proyecto demo-project-multicluster
+# 3. Ejecutar promoción DEV → PRE
+# 4. Verificar en ArgoCD PRE
+open http://localhost:8081
+```
+
+#### Scenario 3: Promoción Controlada PRE → PROD
+```bash
+# 1. En Kargo UI, verificar tests en PRE
+# 2. Ejecutar promoción PRE → PROD con aprobación
+# 3. Monitorear despliegue en PROD
+open http://localhost:8082
+
+# 4. Verificar estado de la promoción
+kubectl get stages -n kargo
 ```
 
 ## 🐛 Troubleshooting Empresarial

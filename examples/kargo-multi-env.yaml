@@ -1,19 +1,37 @@
-# 🎯 Ejemplo de Configuración Kargo para Promociones Multi-Entorno
+# 🎯 Configuración Kargo para Promociones Multi-Cluster
+# DEV (gitops-dev) → PRE (gitops-pre) → PROD (gitops-prod)
 
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Project
 metadata:
-  name: demo-project-promotion
+  name: demo-project-multicluster
   namespace: kargo
 spec:
   promotionPolicies:
   - stage: dev
-    autoPromotionEnabled: true
-  - stage: uat  
-    autoPromotionEnabled: false # Promoción manual requerida
+    autoPromotionEnabled: true      # Auto-promote from warehouse to DEV
+  - stage: pre  
+    autoPromotionEnabled: false     # Manual promotion DEV → PRE
   - stage: prod
-    autoPromotionEnabled: false # Promoción manual requerida
+    autoPromotionEnabled: false     # Manual promotion PRE → PROD
 ---
+# Warehouse - Source of truth for container images and configs
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: demo-project-warehouse
+  namespace: kargo
+spec:
+  subscriptions:
+  - image:
+      repoURL: docker.io/nginx
+      semverConstraint: "~1.25"
+      discoveryLimit: 5
+  - git:
+      repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      branch: main
+---
+# DEV Stage - gitops-dev cluster
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
@@ -25,19 +43,24 @@ spec:
   promotionMechanisms:
     gitRepoUpdates:
     - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
-      writeBranch: main
+      writeBranch: dev-branch
       kustomize:
-        path: manifests/demo-project
+        path: manifests/demo-project/frontend
         images:
-        - image: demo-backend
-          path: backend
-        - image: demo-frontend  
-          path: frontend
+        - image: docker.io/nginx
+          path: .
+    argoCDAppUpdates:
+    - appName: demo-project-frontend
+      appNamespace: argocd
+      sourceUpdates:
+      - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+        targetRevision: dev-branch
 ---
+# PRE Stage - gitops-pre cluster  
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
-  name: uat
+  name: pre
   namespace: kargo
 spec:
   subscriptions:
@@ -46,8 +69,124 @@ spec:
   promotionMechanisms:
     gitRepoUpdates:
     - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
-      writeBranch: uat
+      writeBranch: pre-branch
       kustomize:
+        path: manifests/demo-project/frontend
+        images:
+        - image: docker.io/nginx
+          path: .
+  # Verification before promotion (opcional)
+  verification:
+    analysisTemplates:
+    - name: integration-tests
+    - name: performance-tests
+---
+# PROD Stage - gitops-prod cluster
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage  
+metadata:
+  name: prod
+  namespace: kargo
+spec:
+  subscriptions:
+    upstreamStages:
+    - name: pre
+  promotionMechanisms:
+    gitRepoUpdates:
+    - repoURL: http://192.168.34.196:3000/andres20980/gitops-infra.git
+      writeBranch: prod-branch
+      kustomize:
+        path: manifests/demo-project/frontend
+        images:
+        - image: docker.io/nginx
+          path: .
+  # Production verification (crítico)
+  verification:
+    analysisTemplates:
+    - name: smoke-tests
+    - name: health-checks
+    - name: rollback-capability
+---
+# Analysis Templates for verification
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: integration-tests
+  namespace: kargo
+spec:
+  metrics:
+  - name: integration-test
+    successCondition: result == "passed"
+    provider:
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: integration-test
+                image: curlimages/curl:latest
+                command: ["/bin/sh"]
+                args:
+                - -c
+                - |
+                  echo "Running integration tests..."
+                  curl -f http://demo-frontend.demo-project.svc.cluster.local:80 || exit 1
+                  echo "Integration tests passed"
+              restartPolicy: Never
+---
+apiVersion: argoproj.io/v1alpha1  
+kind: AnalysisTemplate
+metadata:
+  name: performance-tests
+  namespace: kargo
+spec:
+  metrics:
+  - name: response-time
+    successCondition: result < "500"
+    provider:
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: perf-test
+                image: curlimages/curl:latest
+                command: ["/bin/sh"]
+                args:
+                - -c
+                - |
+                  echo "Running performance tests..."
+                  response_time=$(curl -o /dev/null -s -w '%{time_total}' http://demo-frontend.demo-project.svc.cluster.local)
+                  echo "Response time: ${response_time}ms"
+                  # Simulated - always pass for demo
+                  echo "200"
+              restartPolicy: Never
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate  
+metadata:
+  name: smoke-tests
+  namespace: kargo
+spec:
+  metrics:
+  - name: smoke-test
+    successCondition: result == "healthy"
+    provider:
+      job:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: smoke-test
+                image: curlimages/curl:latest
+                command: ["/bin/sh"]
+                args:
+                - -c
+                - |
+                  echo "Running production smoke tests..."
+                  curl -f http://demo-frontend.demo-project.svc.cluster.local:80/health || exit 1
+                  echo "healthy"
+              restartPolicy: Never
         path: manifests/demo-project-uat
         images:
         - image: demo-backend

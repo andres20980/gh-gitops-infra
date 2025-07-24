@@ -15,14 +15,13 @@ spec:
       values: |
         # Configuración del servidor API de Kargo
         api:
-          # Deshabilitar cuenta admin para acceso sin autenticación
+          # Habilitar cuenta admin con credenciales fijas para desarrollo
           adminAccount:
-            enabled: false
-          # Configuración para acceso sin autenticación
+            enabled: true
+            username: admin
+            password: admin
+          # Configuración para acceso básico con admin/admin
           oidc:
-            enabled: false
-          # Deshabilitar autenticación completamente
-          auth:
             enabled: false
           service:
             type: ClusterIP

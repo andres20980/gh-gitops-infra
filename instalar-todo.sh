@@ -1,13 +1,26 @@
 #!/bin/bash
 
-# 🚀 Instalador Completo GitOps - Plataforma Empresarial
-# Instala desde Ubuntu limpio: prerrequisitos + infraestructura GitOps completain/bash
-
-# 🚀 Instalador Completo GitOps
-# Instala prerrequisitos + infraestructura GitOps completa
+# 🚀 Instalador Completo GitOps Multi-Cluster - Plataforma Empresarial
+# Instala desde Ubuntu limpio: prerrequisitos + infraestructura GitOps multi-entorno
+# Arquitectura: 3 clusters (dev/pre/pro) con gestión centralizada desde DEV
 
 # Colores para la salida
-RED='\033[0;31m'
+RED='\03    echo "🏗️ ARQUITECTURA MULTI-CLUSTER:"
+    echo "=============================="
+    echo "🏭 Cluster gitops-dev (4GB RAM, 2 CPU, 20GB): Herramientas de gestión y control centralizadas"
+    echo "🏭 Cluster gitops-pre (2GB RAM, 1 CPU, 1GB): Entorno de preproducción para validación"
+    echo "🏭 Cluster gitops-pro (2GB RAM, 1 CPU, 1GB): Entorno de producción empresarial"
+    echo "📊 Stack: ArgoCD + Kargo + Observabilidad + Gestión Multi-Entorno"m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+    echo "- Kargo: Promociones automáticas entre entornos"
+    echo "- Prometheus/Grafana: Monitoreo centralizado multi-cluster"
+    echo "- Gitea, MinIO, Jaeger, Loki: Infraestructura compartida"
+    echo "- Demo-project: Desplegado en los 3 entornos para pruebas"
+    echo ""
+    echo "🔄 Flujo GitOps: Git → ArgoCD-DEV → Deploy dev/pre/pro → Kargo → Promote"1m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
@@ -269,14 +282,21 @@ mostrar_resumen_completo_uis() {
     
     echo "🏗️ ARQUITECTURA DEL SISTEMA:"
     echo "=============================="
-    echo "🏭 Cluster Minikube: Plataforma GitOps completa con todas las herramientas"
-    echo "📊 Stack: ArgoCD + Kargo + Observabilidad + Aplicaciones de demo"
+    echo "�️ ARQUITECTURA MULTI-CLUSTER:"
+    echo "=============================="
+    echo "�🏭 Cluster gitops-dev: Herramientas de gestión y control centralizadas"
+    echo "🏭 Cluster gitops-pre: Entorno de preproducción para validación"
+    echo "🏭 Cluster gitops-pro: Entorno de producción empresarial"
+    echo "📊 Stack: ArgoCD + Kargo + Observabilidad + Gestión Multi-Entorno"
     echo ""
-    echo "📦 Aplicaciones desplegadas por ArgoCD App-of-Apps:"
-    echo "- argo-rollouts, argo-workflows, cert-manager, external-secrets"
-    echo "- grafana, jaeger, kargo, loki, minio"
-    echo "- monitoring (prometheus-stack), gitea, kubernetes-dashboard"
-    echo "- ingress-nginx, demo-project"
+    echo "📦 Herramientas en DEV (controlan todos los clusters):"
+    echo "- ArgoCD: Gestión de aplicaciones en dev/pre/pro"
+    echo "- Kargo: Promociones automáticas entre entornos"
+    echo "- Prometheus/Grafana: Monitoreo centralizado multi-cluster"
+    echo "- Gitea, MinIO, Jaeger, Loki: Infraestructura compartida"
+    echo "- Demo-project: Desplegado en los 3 entornos para pruebas"
+    echo ""
+    echo "🔄 Flujo GitOps: Git → ArgoCD-DEV → Deploy dev/pre/pro → Kargo → Promote"
     echo ""
     
     echo "💡 COMANDOS ÚTILES POST-INSTALACIÓN:"
@@ -286,7 +306,7 @@ mostrar_resumen_completo_uis() {
     echo "💡 Ver aplicaciones ArgoCD: kubectl get applications -n argocd"
     echo "💡 Port-forwards activos PID: $PORTFORWARD_PID"
     echo ""
-    echo "🚀 ¡PLATAFORMA GITOPS COMPLETAMENTE OPERATIVA!"
+    echo "🚀 ¡PLATAFORMA GITOPS MULTI-CLUSTER COMPLETAMENTE OPERATIVA!"
     echo "🔓 ¡TODAS LAS UIS VALIDADAS PARA ACCESO SIN AUTENTICACIÓN!"
 }
 
@@ -317,9 +337,26 @@ main() {
     # Fase 4: Verificar instalaciones
     verify_installations
     
-    # Fase 5: Configurar cluster con aplicaciones GitOps
-    log_step "Iniciando cluster Minikube..."
-    minikube start --memory=4096 --cpus=2 --disk-size=20gb
+    # Fase 5: Configurar clusters multi-entorno GitOps
+    log_step "Creando clusters multi-entorno (dev/pre/pro)..."
+    
+    # Limpiar clusters existentes
+    minikube delete --all
+    
+    # Crear cluster de desarrollo (principal con todas las herramientas - MÁS RECURSOS)
+    log_step "Creando cluster gitops-dev (principal con todas las herramientas)..."
+    minikube start -p gitops-dev --memory=4096 --cpus=2 --disk-size=20gb
+    
+    # Crear cluster de preproducción (solo aplicaciones - RECURSOS MÍNIMOS)
+    log_step "Creando cluster gitops-pre (preproducción)..."
+    minikube start -p gitops-pre --memory=2048 --cpus=1 --disk-size=1gb
+    
+    # Crear cluster de producción (solo aplicaciones - RECURSOS MÍNIMOS)
+    log_step "Creando cluster gitops-pro (producción)..."
+    minikube start -p gitops-pro --memory=2048 --cpus=1 --disk-size=1gb
+    
+    # Establecer contexto en DEV para las instalaciones
+    kubectl config use-context gitops-dev
     
     # Instalar ArgoCD con configuración personalizada
     log_step "Instalando ArgoCD con Helm..."
@@ -378,7 +415,7 @@ main() {
     echo ""
     echo "🏆================================================"
     echo "   🎉 INSTALACIÓN COMPLETA FINALIZADA!"
-    echo "   📊 Plataforma GitOps Desplegada!"
+    echo "   📊 Plataforma GitOps Multi-Cluster Desplegada!"
     echo "   🌐 UIs Validadas y Accesibles Sin Login!"
     echo "================================================"
     echo ""

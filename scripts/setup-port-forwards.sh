@@ -136,26 +136,31 @@ if kubectl get namespace argo-workflows >/dev/null 2>&1; then
     setup_port_forward "argo-workflows-server" "argo-workflows" "8088" "2746" "Argo Workflows UI" || true
 fi
 
-# MinIO API (8089)
-if kubectl get namespace minio >/dev/null 2>&1; then
-    setup_port_forward "minio" "minio" "8089" "9000" "MinIO API" || true
+# Argo Rollouts Dashboard (8089)
+if kubectl get namespace argo-rollouts >/dev/null 2>&1; then
+    setup_port_forward "argo-rollouts-dashboard" "argo-rollouts" "8089" "3100" "Argo Rollouts Dashboard" || true
 fi
 
-# MinIO Console (8090)
+# MinIO API (8090)
 if kubectl get namespace minio >/dev/null 2>&1; then
-    setup_port_forward "minio-console" "minio" "8090" "9001" "MinIO Console UI" || true
+    setup_port_forward "minio" "minio" "8090" "9000" "MinIO API" || true
 fi
 
-# Kubernetes Dashboard (8091)
+# MinIO Console (8091)
+if kubectl get namespace minio >/dev/null 2>&1; then
+    setup_port_forward "minio-console" "minio" "8091" "9001" "MinIO Console UI" || true
+fi
+
+# Kubernetes Dashboard (8092)
 if kubectl get namespace kubernetes-dashboard >/dev/null 2>&1; then
-    setup_port_forward "kubernetes-dashboard" "kubernetes-dashboard" "8091" "443" "Kubernetes Dashboard" || true
+    setup_port_forward "kubernetes-dashboard" "kubernetes-dashboard" "8092" "443" "Kubernetes Dashboard" || true
 fi
 
 echo ""
 echo -e "${GREEN}🎉 PORT-FORWARDS CONFIGURADOS${NC}"
 echo "=============================="
 echo ""
-echo -e "${BLUE}📊 ACCESOS DISPONIBLES (puertos correlativos 8080-8091):${NC}"
+echo -e "${BLUE}📊 ACCESOS DISPONIBLES (puertos correlativos 8080-8092):${NC}"
 echo ""
 echo "🔐 ArgoCD (8080):"
 echo "   URL: http://localhost:8080"
@@ -193,16 +198,20 @@ echo "⚡ Argo Workflows (8088):"
 echo "   URL: http://localhost:8088"
 echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
 echo ""
-echo "🏪 MinIO API (8089):"
+echo "� Argo Rollouts Dashboard (8089):"
 echo "   URL: http://localhost:8089"
-echo "   🔓 Acceso: admin/admin123"
+echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
 echo ""
-echo "🏪 MinIO Console (8090):"
+echo "�🏪 MinIO API (8090):"
 echo "   URL: http://localhost:8090"
 echo "   🔓 Acceso: admin/admin123"
 echo ""
-echo "🔧 Kubernetes Dashboard (8091):"
+echo "🏪 MinIO Console (8091):"
 echo "   URL: http://localhost:8091"
+echo "   🔓 Acceso: admin/admin123"
+echo ""
+echo "🔧 Kubernetes Dashboard (8092):"
+echo "   URL: http://localhost:8092"
 echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
 echo ""
 

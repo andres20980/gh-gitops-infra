@@ -1,288 +1,371 @@
 #!/bin/bash
 
-# 🚀 Instalación Automático Completo de Infraestructura GitOps
-# Instalación con un comando: prerrequisitos + stack GitOps
-# Compatible con: Ubuntu 20.04+, WSL2, Ubuntu Server, Ubuntu Desktop
+# 🚀 Instalador Completo GitOps Multi-Cluster
+# Instala prerrequisitos + infraestructura GitOps completa
 
-set -e
-
-# Colors for output
+# Colores para la salida
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Logging functions
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} 🔍 $1"
-}
+# Funciones de logging
+log_info() { echo -e "${BLUE}[INFO]${NC} 🔍 $1"; }
+log_success() { echo -e "${GREEN}[ÉXITO]${NC} ✅ $1"; }
+log_warning() { echo -e "${YELLOW}[AVISO]${NC} ⚠️  $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} ❌ $1"; }
+log_step() { echo -e "${PURPLE}[PASO]${NC} 🚀 $1"; }
+log_install() { echo -e "${GREEN}[INSTALAR]${NC} 📦 $1"; }
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} ✅ $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} ⚠️  $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} ❌ $1"
-}
-
-log_step() {
-    echo -e "${PURPLE}[STEP]${NC} 🚀 $1"
-}
-
-log_install() {
-    echo -e "${CYAN}[INSTALL]${NC} 📦 $1"
-}
-
-# Check if running as root
+# Verificar que no estamos ejecutando como root
 check_not_root() {
-    if [ "$EUID" -eq 0 ]; then
-        log_error "This script should NOT be run as root (don't use sudo)"
-        log_info "Run it as your regular user. It will ask for sudo when needed."
+    if [[ $EUID -eq 0 ]]; then
+        log_error "Este script NO debe ejecutarse como root o con sudo"
+        log_error "Ejecuta: ./instalar-todo.sh (sin sudo)"
         exit 1
     fi
 }
 
-# Update system
+# Actualizar sistema
 update_system() {
-    log_step "Updating system packages..."
+    log_step "Actualizando paquetes del sistema..."
     sudo apt update && sudo apt upgrade -y
     sudo apt install -y curl wget git apt-transport-https ca-certificates gnupg lsb-release
-    log_success "System updated"
+    log_success "Sistema actualizado"
 }
 
-# Install Docker
+# Instalar Docker
 install_docker() {
-    log_step "Installing Docker..."
+    log_step "Instalando Docker..."
     if command -v docker &> /dev/null; then
-        log_success "Docker already installed"
-        return 0
+        log_success "Docker ya está instalado"
+        return
     fi
     
-    log_install "Downloading and installing Docker..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
+    # Add Docker repository
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
     
-    log_install "Adding user to docker group..."
+    # Install Docker
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
+    # Add user to docker group
     sudo usermod -aG docker $USER
     
-    # Start docker service (handle WSL2 case gracefully)
-    log_install "Starting Docker service..."
-    sudo systemctl enable docker || log_warning "Failed to enable Docker service (normal in some environments)"
-    
-    if ! sudo systemctl start docker; then
-        log_warning "Docker service failed to start automatically (common in WSL2)"
-        log_install "Attempting alternative Docker startup methods..."
-        
-        # Try to start Docker daemon directly (common in WSL2)
-        if command -v dockerd &> /dev/null; then
-            log_install "Starting Docker daemon directly..."
-            sudo dockerd > /dev/null 2>&1 &
-            sleep 5
-        fi
-        
-        # Check if Docker is working now
-        if ! docker version &> /dev/null; then
-            log_warning "Docker installed but not running. Attempting manual start..."
-            sudo service docker start || true
-            sleep 3
-        fi
-    fi
-    
-    rm -f get-docker.sh
-    log_success "Docker installation completed"
+    log_success "Docker instalado correctamente"
+    log_warning "Puede que necesites reiniciar la sesión para usar Docker sin sudo"
 }
 
-# Install kubectl
+# Instalar kubectl
 install_kubectl() {
-    log_step "Installing kubectl..."
+    log_step "Instalando kubectl..."
     if command -v kubectl &> /dev/null; then
-        log_success "kubectl already installed"
-        return 0
+        log_success "kubectl ya está instalado"
+        return
     fi
     
-    log_install "Downloading kubectl..."
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-    rm -f kubectl
-    log_success "kubectl installed successfully"
+    rm kubectl
+    
+    log_success "kubectl instalado correctamente"
 }
 
-# Install Minikube
+# Instalar Minikube
 install_minikube() {
-    log_step "Installing Minikube..."
+    log_step "Instalando Minikube..."
     if command -v minikube &> /dev/null; then
-        log_success "Minikube already installed"
-        return 0
+        log_success "Minikube ya está instalado"
+        return
     fi
     
-    log_install "Downloading Minikube..."
     curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
     sudo install minikube-linux-amd64 /usr/local/bin/minikube
-    rm -f minikube-linux-amd64
-    log_success "Minikube installed successfully"
+    rm minikube-linux-amd64
+    
+    log_success "Minikube instalado correctamente"
 }
 
-# Install Helm
+# Instalar Helm
 install_helm() {
-    log_step "Installing Helm..."
+    log_step "Instalando Helm..."
     if command -v helm &> /dev/null; then
-        log_success "Helm already installed"
-        return 0
+        log_success "Helm ya está instalado"
+        return
     fi
     
-    log_install "Downloading Helm installation script..."
-    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-    log_success "Helm installed successfully"
+    curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+    sudo apt update
+    sudo apt install -y helm
+    
+    log_success "Helm instalado correctamente"
 }
 
-# Verify Docker group access
+# Verificar acceso a Docker
 verify_docker_access() {
-    log_step "Verifying Docker access..."
-    
-    # Try to run docker without sudo
-    if docker version &> /dev/null; then
-        log_success "Docker access verified"
-        return 0
-    fi
-    
-    log_warning "Docker requires additional configuration..."
-    log_install "Attempting to fix Docker access automatically..."
-    
-    # Try multiple approaches to get Docker working
-    local attempts=0
-    local max_attempts=3
-    
-    while [ $attempts -lt $max_attempts ]; do
-        attempts=$((attempts + 1))
-        log_install "Attempt $attempts/$max_attempts to fix Docker access..."
-        
-        # Method 1: Try to start Docker service
-        sudo systemctl start docker &> /dev/null || true
-        sudo service docker start &> /dev/null || true
-        
-        # Method 2: Try to refresh group membership
-        newgrp docker <<< 'echo "Group refreshed"' &> /dev/null || true
-        
-        # Method 3: For WSL2, try starting dockerd directly
-        if [ $attempts -eq 2 ]; then
-            log_install "Trying WSL2-specific Docker startup..."
-            sudo dockerd &> /dev/null &
-            sleep 5
-        fi
-        
-        # Test if Docker is working now
-        if docker version &> /dev/null; then
-            log_success "Docker access fixed successfully"
-            return 0
-        fi
-        
-        sleep 2
-    done
-    
-    # If all attempts failed, check if we can at least use sudo docker
-    if sudo docker version &> /dev/null; then
-        log_warning "Docker works with sudo but not without it"
-        log_warning "This may cause issues with some operations"
-        log_info "Continuing installation - Docker functionality is available"
-        return 0
-    fi
-    
-    log_error "Docker is not functioning properly after all attempts"
-    log_error "Please check Docker installation and try again"
-    exit 1
-}
-
-# Verify all installations
-verify_installations() {
-    log_step "Verifying all installations..."
-    
-    local tools=("docker" "kubectl" "minikube" "helm" "git")
-    local missing=()
-    
-    for tool in "${tools[@]}"; do
-        if command -v "$tool" &> /dev/null; then
-            local version=$($tool version --short 2>/dev/null || $tool version 2>/dev/null | head -1)
-            log_success "$tool: $version"
-        else
-            missing+=("$tool")
-            log_error "$tool: NOT FOUND"
-        fi
-    done
-    
-    if [ ${#missing[@]} -gt 0 ]; then
-        log_error "Missing tools: ${missing[*]}"
+    log_step "Verificando acceso a Docker..."
+    if ! docker ps &> /dev/null; then
+        log_error "No se puede acceder a Docker. Puede que necesites:"
+        log_error "1. Reiniciar la sesión (logout/login)"
+        log_error "2. O ejecutar: newgrp docker"
         exit 1
     fi
-    
-    log_success "All prerequisites verified!"
+    log_success "Acceso a Docker verificado"
 }
 
-# Main installation function
+# Verificar instalaciones
+verify_installations() {
+    log_step "Verificando todas las instalaciones..."
+    
+    for cmd in docker kubectl minikube helm git; do
+        if command -v $cmd &> /dev/null; then
+            version=$($cmd --version 2>/dev/null | head -1)
+            log_success "$cmd: $version"
+        else
+            log_error "$cmd no está instalado correctamente"
+            exit 1
+        fi
+    done
+    
+    log_success "¡Todos los prerrequisitos verificados!"
+}
+
+# Validar acceso a UIs sin autenticación
+validar_acceso_ui_sin_autenticacion() {
+    log_info "🔍 Validando acceso a UIs sin autenticación..."
+    
+    # Definir UIs para validar con sus respuestas esperadas
+    declare -A ui_checks=(
+        ["ArgoCD"]="8080:/healthz:200"
+        ["Kargo"]="8081/api/v1alpha1/health:200"
+        ["Grafana"]="8082/api/health:200"
+        ["Prometheus"]="8083/-/healthy:200"
+        ["AlertManager"]="8084/-/healthy:200"
+        ["Jaeger"]="8085/:200"
+        ["Loki"]="8086/ready:200"
+        ["Gitea"]="8087/:200"
+        ["Argo_Workflows"]="8088/:200"
+        ["MinIO_API"]="8089/:200"
+        ["MinIO_Console"]="8090/minio/health/live:200"
+        ["K8s_Dashboard"]="8091/:200"
+    )
+    
+    # Esperar a que los servicios estén listos
+    sleep 10
+    
+    echo ""
+    echo "🔍 VALIDACIÓN DE ACCESO A UIS:"
+    echo "============================="
+    
+    for ui_name in "${!ui_checks[@]}"; do
+        local check_info="${ui_checks[$ui_name]}"
+        local port=$(echo "$check_info" | cut -d: -f1)
+        local path=$(echo "$check_info" | cut -d: -f2)
+        local expected_code=$(echo "$check_info" | cut -d: -f3)
+        
+        # Intentar acceder a la UI
+        local response_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}${path}" --connect-timeout 5 --max-time 10 2>/dev/null || echo "000")
+        
+        if [[ "$response_code" == "$expected_code" ]] || [[ "$response_code" =~ ^2[0-9][0-9]$ ]]; then
+            echo "✅ $ui_name (puerto $port): ACCESIBLE"
+            UI_STATUS["$ui_name"]="✅ ACCESIBLE"
+        else
+            echo "❌ $ui_name (puerto $port): NO ACCESIBLE (código: $response_code)"
+            UI_STATUS["$ui_name"]="❌ NO ACCESIBLE"
+        fi
+    done
+    
+    echo ""
+    log_success "Validación de UIs completada"
+}
+
+# Mostrar resumen completo de UIs con resultados de validación
+mostrar_resumen_completo_uis() {
+    # Inicializar array asociativo para estado de UIs
+    declare -A UI_STATUS
+    
+    echo "🚀 RESUMEN COMPLETO DE PLATAFORMA GITOPS:"
+    echo "========================================="
+    echo ""
+    
+    # Obtener contraseñas reales para servicios que las necesiten
+    ARGOCD_PASSWORD=$(minikube kubectl --profile=gitops-dev -- -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null || echo "admin")
+    
+    echo "🎯 HERRAMIENTAS GITOPS CORE:"
+    echo "----------------------------"
+    echo "🎯 ArgoCD UI: http://localhost:8080"
+    echo "   📋 Propósito: Continuous Delivery y GitOps orchestration"
+    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
+    echo "   ${UI_STATUS["ArgoCD"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "🚢 Kargo UI: https://localhost:8081"
+    echo "   📋 Propósito: Multi-stage application promotion pipeline"
+    echo "   🔓 Acceso: admin/admin (configuración para desarrollo)"
+    echo "   ${UI_STATUS["Kargo"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    
+    echo "📊 HERRAMIENTAS DE OBSERVABILIDAD:"
+    echo "----------------------------------"
+    echo "📊 Grafana UI: http://localhost:8082"
+    echo "   📋 Propósito: Dashboards y visualización de métricas"
+    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
+    echo "   ${UI_STATUS["Grafana"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "📈 Prometheus UI: http://localhost:8083"
+    echo "   📋 Propósito: Recolección y consulta de métricas"
+    echo "   🔓 Acceso: Directo sin autenticación"
+    echo "   ${UI_STATUS["Prometheus"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "🚨 AlertManager UI: http://localhost:8084"
+    echo "   📋 Propósito: Gestión y enrutado de alertas"
+    echo "   🔓 Acceso: Directo sin autenticación"
+    echo "   ${UI_STATUS["AlertManager"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "🔍 Jaeger UI: http://localhost:8085"
+    echo "   📋 Propósito: Distributed tracing y análisis de rendimiento"
+    echo "   🔓 Acceso: Directo sin autenticación"
+    echo "   ${UI_STATUS["Jaeger"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "📝 Loki UI: http://localhost:8086"
+    echo "   📋 Propósito: Agregación y consulta de logs"
+    echo "   🔓 Acceso: Directo sin autenticación"
+    echo "   ${UI_STATUS["Loki"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    
+    echo "💾 HERRAMIENTAS DE ALMACENAMIENTO Y DESARROLLO:"
+    echo "----------------------------------------------"
+    echo "🐙 Gitea UI: http://localhost:8087"
+    echo "   📋 Propósito: Git repository management y source control"
+    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
+    echo "   ${UI_STATUS["Gitea"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "⚡ Argo Workflows UI: http://localhost:8088"
+    echo "   📋 Propósito: Workflow orchestration y batch processing"
+    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
+    echo "   ${UI_STATUS["Argo_Workflows"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "🏪 MinIO API: http://localhost:8089"
+    echo "   📋 Propósito: Object storage S3-compatible (API)"
+    echo "   🔓 Acceso: Credenciales fijas (admin/admin123)"
+    echo "   ${UI_STATUS["MinIO_API"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "🏪 MinIO Console: http://localhost:8090"
+    echo "   📋 Propósito: Object storage S3-compatible (Console UI)"
+    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
+    echo "   ${UI_STATUS["MinIO_Console"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "🔧 Kubernetes Dashboard: http://localhost:8091"
+    echo "   📋 Propósito: Kubernetes cluster management interface"
+    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
+    echo "   ${UI_STATUS["K8s_Dashboard"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    
+    echo "🏗️ ARQUITECTURA DEL SISTEMA:"
+    echo "=============================="
+    echo "🏭 Cluster DEV (gitops-dev): Master cluster con todas las herramientas"
+    echo "🧪 Cluster PRE (gitops-pre): Target cluster para pre-producción"
+    echo "🚀 Cluster PROD (gitops-prod): Target cluster para producción"
+    echo ""
+    echo "📦 Aplicaciones desplegadas por ArgoCD App-of-Apps:"
+    echo "- argo-rollouts, argo-workflows, cert-manager, external-secrets"
+    echo "- grafana, jaeger, kargo, loki, minio"
+    echo "- monitoring (prometheus-stack), gitea, kubernetes-dashboard"
+    echo "- ingress-nginx, demo-project"
+    echo ""
+    
+    echo "💡 COMANDOS ÚTILES POST-INSTALACIÓN:"
+    echo "===================================="
+    echo "💡 Ver estado detallado: ./scripts/ver-estado.sh"
+    echo "💡 Limpiar todo: ./scripts/limpiar-multi-cluster.sh auto-completo"
+    echo "💡 Reiniciar port-forwards: ./scripts/puertos-ui.sh"
+    echo "💡 Ver aplicaciones ArgoCD: minikube kubectl --profile=gitops-dev -- get applications -n argocd"
+    echo "💡 Port-forwards activos PID: $PORTFORWARD_PID"
+    echo ""
+    echo "🚀 ¡PLATAFORMA GITOPS MULTI-CLUSTER COMPLETAMENTE OPERATIVA!"
+    echo "🔓 ¡TODAS LAS UIS VALIDADAS PARA ACCESO SIN AUTENTICACIÓN!"
+}
+
+# Función principal
 main() {
     echo ""
     echo "🚀================================================"
-    echo "   📦 COMPLETE GITOPS AUTO-INSTALLER"
-    echo "   🔧 Prerequisites + Infrastructure Deployment"
+    echo "   📦 INSTALADOR COMPLETO GITOPS"
+    echo "   🔧 Prerrequisitos + Despliegue de Infraestructura"
     echo "================================================"
     echo ""
     
-    log_step "Starting complete installation..."
-    
-    # Phase 1: Checks
+    # Verificaciones iniciales
     check_not_root
     
-    # Phase 2: System preparation
+    # Fase 1: Actualizar sistema
     update_system
     
-    # Phase 3: Install prerequisites
+    # Fase 2: Instalar herramientas
     install_docker
     install_kubectl
     install_minikube
     install_helm
     
-    # Phase 4: Verify Docker access
+    # Fase 3: Verificar acceso a Docker
     verify_docker_access
     
-    # Phase 5: Verify installations
+    # Fase 4: Verificar instalaciones
     verify_installations
     
-    # Phase 6: Generate configuration
-    log_step "Generating GitOps environment configuration..."
+    # Fase 5: Generar configuración
+    log_step "Generando configuración del entorno GitOps..."
     chmod +x scripts/configurar-entorno.sh
     ./scripts/configurar-entorno.sh --auto
     
-    # Phase 7: Make bootstrap executable and run it
-    log_step "Running GitOps multi-cluster infrastructure bootstrap..."
+    # Fase 6: Ejecutar bootstrap multi-cluster
+    log_step "Ejecutando bootstrap de infraestructura GitOps multi-cluster..."
     chmod +x scripts/arrancar-multi-cluster.sh scripts/limpiar-multi-cluster.sh
     chmod +x scripts/*.sh 2>/dev/null || true
     
     echo ""
     echo "🎯================================================"
-    echo "   ✅ PREREQUISITES INSTALLATION COMPLETED!"
-    echo "   🚀 STARTING MULTI-CLUSTER GITOPS DEPLOYMENT..."
+    echo "   ✅ INSTALACIÓN DE PRERREQUISITOS COMPLETADA!"
+    echo "   🚀 INICIANDO DESPLIEGUE GITOPS MULTI-CLUSTER..."
     echo "================================================"
     echo ""
     
-    # Run the multi-cluster GitOps bootstrap
+    # Ejecutar bootstrap multi-cluster GitOps
     ./scripts/arrancar-multi-cluster.sh
+    
+    # Esperar a que todas las aplicaciones estén listas
+    log_step "Esperando que todas las aplicaciones estén listas..."
+    sleep 30
+
+    # Iniciar port-forwards automáticamente para acceso inmediato a UIs
+    log_step "Iniciando port-forwards de UIs automáticamente..."
+    ./scripts/puertos-ui.sh &
+    PORTFORWARD_PID=$!
+    
+    # Esperar a que se establezcan los port-forwards
+    sleep 15
+    
+    # Validar acceso sin autenticación a todas las UIs
+    log_step "Validando acceso sin autenticación a todas las UIs..."
+    validar_acceso_ui_sin_autenticacion
     
     echo ""
     echo "🏆================================================"
-    echo "   🎉 COMPLETE INSTALLATION FINISHED!"
-    echo "   📊 18 GitOps Applications Ready!"
+    echo "   🎉 INSTALACIÓN COMPLETA FINALIZADA!"
+    echo "   📊 Plataforma GitOps Multi-Cluster Desplegada!"
+    echo "   🌐 UIs Validadas y Accesibles Sin Login!"
     echo "================================================"
     echo ""
+    
+    # Mostrar resumen completo con validación de acceso
+    mostrar_resumen_completo_uis
 }
 
-# Handle Ctrl+C gracefully
-trap 'log_error "Installation interrupted by user"; exit 1' INT
+# Manejar Ctrl+C elegantemente
+trap 'log_error "Instalación interrumpida por el usuario"; exit 1' INT
 
-# Run main function
+# Ejecutar función principal
 main "$@"

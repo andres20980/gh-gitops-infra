@@ -15,10 +15,13 @@ spec:
           enabled: true
           serviceType: ClusterIP
           servicePort: 2746
-          # Enable insecure mode for development
+          # Configuración para acceso sin autenticación
           extraArgs:
           - --auth-mode=server
           - --secure=false
+          - --auth-mode=client
+          sso:
+            enabled: false
         
         controller:
           enabled: true

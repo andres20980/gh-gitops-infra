@@ -13,27 +13,33 @@ spec:
     targetRevision: 1.6.1
     helm:
       values: |
-        # Kargo API Server Configuration
+        # Configuración del servidor API de Kargo
         api:
+          # Deshabilitar cuenta admin para acceso sin autenticación
           adminAccount:
-            passwordHash: '$2a$10$Zrhhie4vLz5ygtVSaif6o.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm'
-            tokenSigningKey: 'iwishtowashmyirishwristwatch'
+            enabled: false
+          # Configuración para acceso sin autenticación
+          oidc:
+            enabled: false
+          # Deshabilitar autenticación completamente
+          auth:
+            enabled: false
           service:
             type: ClusterIP
           
-        # Controller Configuration
+        # Configuración del controlador
         controller:
           replicas: 1
           
-        # Management Controller Configuration  
+        # Configuración del controlador de gestión
         managementController:
           replicas: 1
           
-        # Webhooks Server Configuration
+        # Configuración del servidor de webhooks
         webhooksServer:
           replicas: 1
           
-        # External Webhooks Server Configuration
+        # Configuración del servidor de webhooks externos
         externalWebhooksServer:
           replicas: 1
           service:

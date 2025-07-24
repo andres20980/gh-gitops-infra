@@ -1,0 +1,92 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubernetes-dashboard
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/dashboard/
+    chart: kubernetes-dashboard
+    targetRevision: 7.0.0
+    helm:
+      values: |
+        # Configuración para acceso directo sin token
+        app:
+          # Deshabilitar HTTPS para desarrollo
+          mode: 'http'
+          # Configurar para desarrollo local
+          ingress:
+            enabled: false
+          
+        # Configuración del Service Account con permisos de admin
+        serviceAccount:
+          create: true
+          name: "dashboard-admin"
+        
+        # RBAC con permisos completos para desarrollo
+        rbac:
+          create: true
+          clusterReadOnlyRole: false
+          clusterAdminRole: true
+        
+        # Configuración de seguridad relajada para desarrollo  
+        settings:
+          # Saltar autenticación de login
+          global:
+            # Permite acceso sin token en modo desarrollo
+            enable-skip-login: true
+            disable-settings-authorizer: true
+            enable-insecure-login: true
+            
+        # Configuración del pod
+        app:
+          scaling:
+            replicas: 1
+          settings:
+            # Parámetros de inicio para bypass de autenticación
+            args:
+              - --enable-skip-login
+              - --disable-settings-authorizer
+              - --enable-insecure-login
+              - --insecure-bind-address=0.0.0.0
+              - --system-banner="Entorno de Desarrollo - GitOps PoC"
+        
+        # Servicio
+        service:
+          type: ClusterIP
+          externalPort: 8443
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubernetes-dashboard
+    
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+
+---
+# ServiceAccount con permisos de cluster-admin para bypass completo
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dashboard-admin-user
+  namespace: kubernetes-dashboard
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: dashboard-admin-user
+  namespace: kubernetes-dashboard

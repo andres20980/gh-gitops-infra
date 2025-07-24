@@ -11,16 +11,21 @@ spec:
     targetRevision: 5.2.0
     helm:
       values: |
-        # Development configuration
+        # Configuración para desarrollo
         mode: standalone
         
-        # Credentials (change in production!)
-        rootUser: minioadmin
-        rootPassword: minioadmin123
+        # Credenciales fijas para desarrollo
+        rootUser: admin
+        rootPassword: admin123
         
-        # Storage
+        # Deshabilitar autenticación de consola para desarrollo
+        environment:
+          MINIO_BROWSER_LOGIN_ANIMATION: "off"
+          MINIO_CONSOLE_NO_AUTH: "on"
+        
+        # Almacenamiento
         persistence:
-          enabled: false  # For development
+          enabled: false  # Para desarrollo
         
         # Resources for development
         resources:

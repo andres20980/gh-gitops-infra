@@ -11,9 +11,31 @@ spec:
     targetRevision: 8.5.2
     helm:
       values: |
-        adminPassword: admin123
+        # Configuración para acceso COMPLETAMENTE anónimo (sin login)
+        grafana.ini:
+          auth.anonymous:
+            enabled: true
+            org_name: "Organización Principal"
+            org_role: Admin
+            hide_version: false
+          auth:
+            disable_login_form: true
+            disable_signout_menu: true
+          security:
+            allow_embedding: true
+            disable_initial_admin_creation: true
+          users:
+            allow_sign_up: false
+            allow_org_create: false
+            viewers_can_edit: true
+          dashboards:
+            default_home_dashboard_path: ""
+        
+        # Sin persistencia para desarrollo
         persistence:
           enabled: false
+        
+        # Fuentes de datos
         datasources:
           datasources.yaml:
             apiVersion: 1
@@ -22,9 +44,13 @@ spec:
               type: prometheus
               url: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
               isDefault: true
+              access: proxy
             - name: Loki
               type: loki
               url: http://loki-gateway.monitoring.svc.cluster.local
+              access: proxy
+        
+        # Proveedores de dashboards
         dashboardProviders:
           dashboardproviders.yaml:
             apiVersion: 1
@@ -37,9 +63,12 @@ spec:
               editable: true
               options:
                 path: /var/lib/grafana/dashboards/default
+        
+        # Servicio
         service:
           type: ClusterIP
           port: 80
+          
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

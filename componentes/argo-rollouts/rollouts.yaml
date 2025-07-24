@@ -9,6 +9,24 @@ spec:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-rollouts
     targetRevision: 2.40.1
+    helm:
+      values: |
+        # Configuración del controlador
+        controller:
+          replicas: 1
+          
+        # Habilitar dashboard sin autenticación
+        dashboard:
+          enabled: true
+          readonly: false
+          service:
+            type: ClusterIP
+            port: 3100
+          # Sin autenticación para desarrollo
+          config:
+            auth:
+              enabled: false
+            
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-rollouts

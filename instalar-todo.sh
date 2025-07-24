@@ -1,6 +1,9 @@
 #!/bin/bash
 
-# 🚀 Instalador Completo GitOps Multi-Cluster
+# 🚀 Instalador Completo GitOps - Plataforma Empresarial
+# Instala desde Ubuntu limpio: prerrequisitos + infraestructura GitOps completain/bash
+
+# 🚀 Instalador Completo GitOps
 # Instala prerrequisitos + infraestructura GitOps completa
 
 # Colores para la salida
@@ -193,7 +196,7 @@ mostrar_resumen_completo_uis() {
     echo ""
     
     # Obtener contraseñas reales para servicios que las necesiten
-    ARGOCD_PASSWORD=$(minikube kubectl --profile=gitops-dev -- -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null || echo "admin")
+    ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null || echo "admin")
     
     echo "🎯 HERRAMIENTAS GITOPS CORE:"
     echo "----------------------------"
@@ -266,9 +269,8 @@ mostrar_resumen_completo_uis() {
     
     echo "🏗️ ARQUITECTURA DEL SISTEMA:"
     echo "=============================="
-    echo "🏭 Cluster DEV (gitops-dev): Master cluster con todas las herramientas"
-    echo "🧪 Cluster PRE (gitops-pre): Target cluster para pre-producción"
-    echo "🚀 Cluster PROD (gitops-prod): Target cluster para producción"
+    echo "🏭 Cluster Minikube: Plataforma GitOps completa con todas las herramientas"
+    echo "📊 Stack: ArgoCD + Kargo + Observabilidad + Aplicaciones de demo"
     echo ""
     echo "📦 Aplicaciones desplegadas por ArgoCD App-of-Apps:"
     echo "- argo-rollouts, argo-workflows, cert-manager, external-secrets"
@@ -279,13 +281,12 @@ mostrar_resumen_completo_uis() {
     
     echo "💡 COMANDOS ÚTILES POST-INSTALACIÓN:"
     echo "===================================="
-    echo "💡 Ver estado detallado: ./scripts/ver-estado.sh"
-    echo "💡 Limpiar todo: ./scripts/limpiar-multi-cluster.sh auto-completo"
-    echo "💡 Reiniciar port-forwards: ./scripts/puertos-ui.sh"
-    echo "💡 Ver aplicaciones ArgoCD: minikube kubectl --profile=gitops-dev -- get applications -n argocd"
+    echo "💡 Ver diagnóstico completo: ./scripts/diagnostico-gitops.sh"
+    echo "💡 Reiniciar port-forwards: ./scripts/setup-port-forwards.sh"
+    echo "💡 Ver aplicaciones ArgoCD: kubectl get applications -n argocd"
     echo "💡 Port-forwards activos PID: $PORTFORWARD_PID"
     echo ""
-    echo "🚀 ¡PLATAFORMA GITOPS MULTI-CLUSTER COMPLETAMENTE OPERATIVA!"
+    echo "🚀 ¡PLATAFORMA GITOPS COMPLETAMENTE OPERATIVA!"
     echo "🔓 ¡TODAS LAS UIS VALIDADAS PARA ACCESO SIN AUTENTICACIÓN!"
 }
 
@@ -316,33 +317,55 @@ main() {
     # Fase 4: Verificar instalaciones
     verify_installations
     
-    # Fase 5: Generar configuración
-    log_step "Generando configuración del entorno GitOps..."
-    chmod +x scripts/configurar-entorno.sh
-    ./scripts/configurar-entorno.sh --auto
+    # Fase 5: Configurar cluster con aplicaciones GitOps
+    log_step "Iniciando cluster Minikube..."
+    minikube start --memory=4096 --cpus=2 --disk-size=20gb
     
-    # Fase 6: Ejecutar bootstrap multi-cluster
-    log_step "Ejecutando bootstrap de infraestructura GitOps multi-cluster..."
-    chmod +x scripts/arrancar-multi-cluster.sh scripts/limpiar-multi-cluster.sh
-    chmod +x scripts/*.sh 2>/dev/null || true
+    # Instalar ArgoCD con configuración personalizada
+    log_step "Instalando ArgoCD con Helm..."
+    kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Agregar repositorio de Helm de ArgoCD
+    helm repo add argo https://argoproj.github.io/argo-helm
+    helm repo update
+    
+    # Instalar ArgoCD con configuración sin autenticación para desarrollo
+    helm install argocd argo/argo-cd \
+      --namespace argocd \
+      --set server.service.type=ClusterIP \
+      --set server.extraArgs[0]="--insecure" \
+      --set server.config."users\.anonymous\.enabled"="true" \
+      --set server.config."users\.anonymous\.policies"="p, role:anonymous, applications, *, */*, allow\np, role:anonymous, clusters, *, *, allow\np, role:anonymous, repositories, *, *, allow\ng, argocd:anonymous, role:admin" \
+      --set configs.cm."server\.insecure"="true" \
+      --set configs.cm."url"="http://localhost:8080" \
+      --set configs.cm."policy\.default"="role:admin" \
+      --set dex.enabled=false \
+      --wait --timeout=600s
+    
+    # Esperar a que ArgoCD esté completamente listo
+    log_step "Esperando que ArgoCD esté completamente operativo..."
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=300s
+    
+    # Aplicar app-of-apps principal para desplegar toda la infraestructura
+    log_step "Desplegando infraestructura GitOps completa..."
+    kubectl apply -f aplicaciones-gitops-infra.yaml
     
     echo ""
     echo "🎯================================================"
     echo "   ✅ INSTALACIÓN DE PRERREQUISITOS COMPLETADA!"
-    echo "   🚀 INICIANDO DESPLIEGUE GITOPS MULTI-CLUSTER..."
+    echo "   🚀 INICIANDO DESPLIEGUE GITOPS..."
     echo "================================================"
     echo ""
     
-    # Ejecutar bootstrap multi-cluster GitOps
-    ./scripts/arrancar-multi-cluster.sh
-    
-    # Esperar a que todas las aplicaciones estén listas
-    log_step "Esperando que todas las aplicaciones estén listas..."
-    sleep 30
+    # Esperar a que ArgoCD esté listo y todas las aplicaciones se desplieguen
+    log_step "Esperando que ArgoCD y todas las aplicaciones estén listas..."
+    sleep 60
 
     # Iniciar port-forwards automáticamente para acceso inmediato a UIs
     log_step "Iniciando port-forwards de UIs automáticamente..."
-    ./scripts/puertos-ui.sh &
+    chmod +x scripts/setup-port-forwards.sh
+    ./scripts/setup-port-forwards.sh &
     PORTFORWARD_PID=$!
     
     # Esperar a que se establezcan los port-forwards
@@ -355,7 +378,7 @@ main() {
     echo ""
     echo "🏆================================================"
     echo "   🎉 INSTALACIÓN COMPLETA FINALIZADA!"
-    echo "   📊 Plataforma GitOps Multi-Cluster Desplegada!"
+    echo "   📊 Plataforma GitOps Desplegada!"
     echo "   🌐 UIs Validadas y Accesibles Sin Login!"
     echo "================================================"
     echo ""

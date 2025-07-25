@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     chart: kargo
-    repoURL: ghcr.io/akuity/kargo-charts
+    repoURL: https://charts.akuity.io
     targetRevision: 1.6.1
     helm:
       values: |

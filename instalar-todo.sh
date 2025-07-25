@@ -53,9 +53,10 @@ declare -A UI_URLS=(
     ["Kargo"]="http://localhost:8081"
     ["ArgoCD_Dex"]="http://localhost:8082"
     
-    # Progressive Delivery
+    # Progressive Delivery & Event-Driven GitOps
     ["Argo_Workflows"]="http://localhost:8083"
     ["Argo_Rollouts"]="http://localhost:8084"
+    ["Argo_Events"]="http://localhost:8089"
     
     # Observability
     ["Grafana"]="http://localhost:8085"
@@ -64,7 +65,6 @@ declare -A UI_URLS=(
     ["Jaeger"]="http://localhost:8088"
     
     # Storage & Tools
-    ["MinIO_API"]="http://localhost:8090"
     ["MinIO_Console"]="http://localhost:8091"
     
     # Desarrollo & Gestión
@@ -110,7 +110,8 @@ mostrar_arquitectura() {
     echo "├─ 🏪 MinIO: Object storage S3-compatible"
     echo "├─ 🐙 Gitea: Git repository management"
     echo "├─ ⚡ Argo Rollouts v1.8.3: Progressive delivery"
-    echo "└─ 🌊 Argo Workflows v3.7.0: Workflow orchestration"
+    echo "├─ 🌊 Argo Workflows v3.7.0: Workflow orchestration"
+    echo "└─ 📡 Argo Events v1.9.2: Event-driven GitOps automation"
     echo ""
     echo "🔄 FLUJO GITOPS OPTIMIZADO:"
     echo "Git Push → ArgoCD-DEV → Deploy dev/pre/pro → Kargo → Auto-Promote"
@@ -550,6 +551,7 @@ aplicar_infraestructura() {
             "kargo"
             "argo-rollouts"
             "argo-workflows"
+            "argo-events"
             "grafana"
         )
         
@@ -772,12 +774,13 @@ configurar_port_forwards() {
         ["argocd-dex-server argocd 8082 5556"]=""
         ["argo-workflows-server argo-workflows 8083 2746"]=""
         ["argo-rollouts-dashboard argo-rollouts 8084 3100"]=""
+        ["argo-events-webhook argo-events 8089 12000"]=""
         ["prometheus-stack-grafana monitoring 8085 80"]=""
         ["prometheus-stack-kube-prom-prometheus monitoring 8086 9090"]=""
         ["prometheus-stack-kube-prom-alertmanager monitoring 8087 9093"]=""
         ["jaeger-query monitoring 8088 16686"]=""
         # ["loki-gateway monitoring 8089 80"]=""  # Loki no tiene UI web propia, se consulta via Grafana
-        ["minio minio 8090 9000"]=""
+        # ["minio minio 8090 9000"]=""  # MinIO API no tiene UI web propia, solo API S3-compatible
         ["minio-console minio 8091 9001"]=""
         ["gitea-http gitea 8092 3000"]=""
         ["kubernetes-dashboard-web kubernetes-dashboard 8093 8000"]=""
@@ -875,8 +878,8 @@ mostrar_urls_ui() {
     echo "   🔓 Acceso: Directo sin autenticación"
     echo "   ${UI_STATUS["ArgoCD_Dex"]:-"⏳ VERIFICANDO..."}"
     echo ""
-    echo "🚢 PROGRESSIVE DELIVERY:"
-    echo "------------------------"
+    echo "🚢 PROGRESSIVE DELIVERY & EVENT-DRIVEN GITOPS:"
+    echo "-----------------------------------------------"
     echo "⚡ Argo Workflows UI: http://localhost:8083"
     echo "   📋 Propósito: Workflow orchestration y batch processing"
     echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
@@ -886,6 +889,11 @@ mostrar_urls_ui() {
     echo "   📋 Propósito: Progressive delivery, canary deployments y blue-green"
     echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
     echo "   ${UI_STATUS["Argo_Rollouts"]:-"⏳ VERIFICANDO..."}"
+    echo ""
+    echo "📡 Argo Events Webhook: http://localhost:8089"
+    echo "   📋 Propósito: Event-driven GitOps automation y webhook processing"
+    echo "   🔓 Acceso: Webhooks API endpoint (sin UI web)"
+    echo "   ${UI_STATUS["Argo_Events"]:-"⏳ VERIFICANDO..."}"
     echo ""
     echo "📈 OBSERVABILITY:"
     echo "-----------------"
@@ -916,13 +924,13 @@ mostrar_urls_ui() {
     echo "   🔓 Acceso: Loki NO tiene UI web - se consulta desde Grafana"
     echo "   💡 Instrucciones: Ir a Grafana → Explore → Seleccionar Loki como datasource"
     echo ""
-    echo "🏪 MinIO API: http://localhost:8090"
-    echo "   📋 Propósito: Object storage S3-compatible (API)"
-    echo "   🔓 Acceso: Credenciales fijas (admin/admin123)"
-    echo "   ${UI_STATUS["MinIO_API"]:-"⏳ VERIFICANDO..."}"
+    echo "🏪 MinIO API: Puerto 9000 (solo API S3-compatible)"
+    echo "   📋 Propósito: Object storage S3-compatible (solo API, sin UI web)"
+    echo "   🔓 Acceso: MinIO API NO tiene UI web - usar MinIO Console o clientes S3"
+    echo "   💡 Instrucciones: Usar mc (MinIO Client) o SDK S3-compatible"
     echo ""
     echo "🏪 MinIO Console: http://localhost:8091"
-    echo "   📋 Propósito: Object storage S3-compatible (Console UI)"
+    echo "   📋 Propósito: Object storage S3-compatible (Console Web UI)"
     echo "   🔓 Acceso: admin/admin123"
     echo "   ${UI_STATUS["MinIO_Console"]:-"⏳ VERIFICANDO..."}"
     echo ""
@@ -976,7 +984,7 @@ esperar_servicios() {
     kubectl config use-context "$CLUSTER_DEV"
     
     # Esperar namespaces críticos con timeouts más largos
-    local namespaces=("argocd" "monitoring" "loki" "jaeger" "minio" "gitea" "argo-rollouts" "argo-workflows" "kubernetes-dashboard" "kargo")
+    local namespaces=("argocd" "monitoring" "loki" "jaeger" "minio" "gitea" "argo-rollouts" "argo-workflows" "argo-events" "kubernetes-dashboard" "kargo")
     
     for ns in "${namespaces[@]}"; do
         echo "📦 Esperando namespace: $ns"
@@ -1071,9 +1079,17 @@ instalar_todo() {
     validar_uis
     
     # Verificar si DEV está funcionando correctamente antes de crear PRE y PRO
-    local uis_operativas=$(echo "${!UI_STATUS[@]}" | tr ' ' '\n' | grep -c "OPERATIVA" || echo "0")
+    local uis_operativas=0
+    for ui_name in "${!UI_STATUS[@]}"; do
+        if [[ "${UI_STATUS[$ui_name]}" == *"OPERATIVA"* ]]; then
+            uis_operativas=$((uis_operativas + 1))
+        fi
+    done
     local uis_total=${#UI_URLS[@]}
-    local porcentaje_dev=$((uis_operativas * 100 / uis_total))
+    local porcentaje_dev=0
+    if [ $uis_total -gt 0 ]; then
+        porcentaje_dev=$((uis_operativas * 100 / uis_total))
+    fi
     
     if [ $porcentaje_dev -ge 80 ]; then
         echo -e "${GREEN}✅ Cluster DEV validado ($porcentaje_dev% UIs operativas) - Creando clusters PRE y PRO${NC}"
@@ -1106,8 +1122,8 @@ instalar_todo() {
     echo "║                                                                              ║"
     echo "║  ⏱️  Tiempo total: ${minutos}m ${segundos}s                                                    ║"
     echo "║  🏭 $clusters_texto"
-    echo "║  📦 14+ Herramientas GitOps desplegadas                                     ║"
-    echo "║  🌐 11 UIs web disponibles + Logs via Grafana                              ║"
+    echo "║  📦 15+ Herramientas GitOps desplegadas                                     ║"
+    echo "║  🌐 12 UIs web disponibles + Logs via Grafana                              ║"
     echo "╚══════════════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     

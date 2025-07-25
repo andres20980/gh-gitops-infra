@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-rollouts
-    targetRevision: 1.8.3
+    targetRevision: 2.40.2  # Chart version correcta (app version v1.8.3)
     helm:
       values: |
         # Configuración del controlador

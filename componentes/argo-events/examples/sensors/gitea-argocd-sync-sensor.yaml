@@ -1,0 +1,133 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: gitea-argocd-sync
+  namespace: argo-events
+spec:
+  template:
+    serviceAccount: argo-events
+  dependencies:
+    - name: gitea-push-dep
+      eventSourceName: gitea-webhook
+      eventName: gitea-push
+      
+      # Filtros para procesar solo eventos específicos
+      filters:
+        data:
+          - path: body.repository.name
+            type: string
+            value:
+              - "demo-project"
+              - "gh-gitops-infra"
+          - path: body.ref
+            type: string
+            value:
+              - "refs/heads/main"
+              - "refs/heads/develop"
+      
+      # Transform para extraer datos relevantes
+      transform:
+        jq: |
+          {
+            "repository": .body.repository.name,
+            "branch": (.body.ref | split("/") | .[2]),
+            "commit_sha": .body.after,
+            "pusher": .body.pusher.name,
+            "commits": .body.commits | length
+          }
+  
+  triggers:
+    # Trigger 1: Sync ArgoCD application específica
+    - template:
+        name: argocd-sync-trigger
+        argoWorkflow:
+          # Workflow inline para hacer ArgoCD sync
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: argocd-sync-
+                namespace: argo-events
+              spec:
+                entrypoint: argocd-sync
+                serviceAccount: argo-events
+                templates:
+                  - name: argocd-sync
+                    script:
+                      image: argoproj/argocd:v2.10.0
+                      command: [sh]
+                      source: |
+                        # Extraer datos del evento
+                        REPO_NAME="{{.Input.body.repository.name}}"
+                        BRANCH="{{.Input.body.ref | split('/') | .[2]}}"
+                        
+                        echo "🔄 Procesando push en repo: $REPO_NAME, branch: $BRANCH"
+                        
+                        # Mapear repo a aplicación ArgoCD
+                        case $REPO_NAME in
+                          "demo-project")
+                            if [ "$BRANCH" = "main" ]; then
+                              APP_NAME="demo-project-frontend"
+                            elif [ "$BRANCH" = "develop" ]; then
+                              APP_NAME="demo-project-backend"  
+                            fi
+                            ;;
+                          "gh-gitops-infra")
+                            APP_NAME="argo-rollouts"  # Por ejemplo
+                            ;;
+                        esac
+                        
+                        if [ -n "$APP_NAME" ]; then
+                          echo "🎯 Sincronizando aplicación ArgoCD: $APP_NAME"
+                          
+                          # ArgoCD CLI sync (requiere configuración previa)
+                          # argocd app sync $APP_NAME --server argocd-server.argocd.svc.cluster.local:80
+                          
+                          # Alternativa: kubectl patch para trigger sync
+                          kubectl patch application $APP_NAME -n argocd --type merge -p '{
+                            "operation": {
+                              "initiatedBy": {
+                                "username": "argo-events-gitea-webhook"
+                              },
+                              "sync": {
+                                "revision": "HEAD"
+                              }
+                            }
+                          }'
+                          
+                          echo "✅ Sincronización iniciada para $APP_NAME"
+                        else
+                          echo "⚠️ No se encontró mapeo para repo: $REPO_NAME, branch: $BRANCH"
+                        fi
+          # Parámetros del workflow desde el evento
+          parameters:
+            - src:
+                dependencyName: gitea-push-dep
+                dataTemplate: "{{.Input.body.repository.name}}"
+              dest: spec.arguments.parameters.0.value
+              operation: prepend
+    
+    # Trigger 2: Notification webhook (opcional)
+    - template:
+        name: notification-trigger
+        http:
+          url: http://grafana.monitoring.svc.cluster.local:3000/api/annotations
+          payload:
+            - src:
+                dependencyName: gitea-push-dep
+                dataTemplate: |
+                  {
+                    "text": "Git Push: {{.Input.body.pusher.name}} pushed {{.Input.body.commits | length}} commits to {{.Input.body.repository.name}}/{{.Input.body.ref | split('/') | .[2]}}",
+                    "tags": ["gitops", "git-push", "argo-events"],
+                    "time": "{{.Input.body.head_commit.timestamp}}"
+                  }
+              dest: body
+          method: POST
+          headers:
+            Content-Type: application/json
+  
+  # Error handling
+  errorOnFailedRound: true
+  eventBusName: default

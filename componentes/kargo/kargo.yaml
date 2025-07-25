@@ -8,7 +8,8 @@ metadata:
 spec:
   project: default
   source:
-    chart: oci://ghcr.io/akuity/kargo-charts/kargo
+    repoURL: oci://ghcr.io/akuity/kargo-charts
+    chart: kargo
     targetRevision: 1.6.1
     helm:
       values: |

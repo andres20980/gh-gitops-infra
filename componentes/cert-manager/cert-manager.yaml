@@ -24,10 +24,24 @@ spec:
         # Enable webhook for validation
         webhook:
           enabled: true
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 64Mi
         
         # Enable cainjector for CA injection
         cainjector:
           enabled: true
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
         
         # Resources for development
         resources:
@@ -37,26 +51,6 @@ spec:
           requests:
             cpu: 50m
             memory: 128Mi
-        
-        # Webhook resources
-        webhook:
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 25m
-              memory: 64Mi
-        
-        # CA Injector resources  
-        cainjector:
-          resources:
-            limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 50m
-              memory: 128Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager

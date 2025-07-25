@@ -302,15 +302,27 @@ limpiar_clusters_existentes() {
     echo -e "${YELLOW}🧹 Limpiando clusters existentes...${NC}"
     
     local clusters=("$CLUSTER_DEV" "$CLUSTER_PRE" "$CLUSTER_PRO")
+    local clusters_eliminados=0
     
     for cluster in "${clusters[@]}"; do
-        if minikube status -p "$cluster" &> /dev/null; then
-            echo "🗑️ Eliminando cluster existente: $cluster"
-            minikube delete -p "$cluster" --purge 2>/dev/null || true
+        if minikube status -p "$cluster" >&/dev/null; then
+            echo "🗑️ Eliminando cluster: $cluster"
+            if minikube delete -p "$cluster" --purge >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ Cluster $cluster eliminado exitosamente${NC}"
+                clusters_eliminados=$((clusters_eliminados + 1))
+            else
+                echo -e "${YELLOW}⚠️ Error al eliminar cluster $cluster (puede no existir)${NC}"
+            fi
+        else
+            echo "ℹ️ Cluster $cluster no existe - saltando"
         fi
     done
     
-    echo -e "${GREEN}✅ Limpieza completada${NC}"
+    if [ $clusters_eliminados -gt 0 ]; then
+        echo -e "${GREEN}✅ Limpieza completada: $clusters_eliminados clusters eliminados${NC}"
+    else
+        echo -e "${GREEN}✅ Limpieza completada: no había clusters que eliminar${NC}"
+    fi
 }
 
 crear_clusters() {
@@ -1161,22 +1173,54 @@ limpiar() {
     echo -e "${YELLOW}🧹 Limpiando entorno completo...${NC}"
     
     # Matar todos los port-forwards
-    echo "🔌 Cerrando port-forwards..."
-    pkill -f "kubectl.*port-forward" 2>/dev/null || true
+    echo "🔌 Cerrando port-forwards activos..."
+    if pgrep -f "kubectl.*port-forward" >/dev/null 2>&1; then
+        local pf_count=$(pgrep -cf "kubectl.*port-forward" 2>/dev/null || echo "0")
+        pkill -f "kubectl.*port-forward" 2>/dev/null || true
+        echo -e "${GREEN}✅ $pf_count port-forwards cerrados${NC}"
+    else
+        echo "ℹ️ No hay port-forwards activos"
+    fi
     
     # Limpiar clusters
     limpiar_clusters_existentes
     
     # Limpiar configuraciones de kubectl
     echo "🗑️ Limpiando contextos de kubectl..."
-    kubectl config delete-context "$CLUSTER_DEV" 2>/dev/null || true
-    kubectl config delete-context "$CLUSTER_PRE" 2>/dev/null || true
-    kubectl config delete-context "$CLUSTER_PRO" 2>/dev/null || true
+    local contextos_eliminados=0
+    for cluster in "$CLUSTER_DEV" "$CLUSTER_PRE" "$CLUSTER_PRO"; do
+        if kubectl config get-contexts -o name | grep -q "^$cluster$" 2>/dev/null; then
+            if kubectl config delete-context "$cluster" >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ Contexto $cluster eliminado${NC}"
+                contextos_eliminados=$((contextos_eliminados + 1))
+            fi
+        fi
+    done
+    
+    if [ $contextos_eliminados -eq 0 ]; then
+        echo "ℹ️ No había contextos de kubectl que eliminar"
+    fi
     
     # Limpiar archivos temporales
-    sudo rm -f /tmp/yq 2>/dev/null || true
+    echo "🗑️ Limpiando archivos temporales..."
+    local archivos_temp=("/tmp/yq")
+    local archivos_eliminados=0
     
-    echo -e "${GREEN}✅ Limpieza completa realizada${NC}"
+    for archivo in "${archivos_temp[@]}"; do
+        if [ -f "$archivo" ]; then
+            sudo rm -f "$archivo" 2>/dev/null && archivos_eliminados=$((archivos_eliminados + 1))
+        fi
+    done
+    
+    if [ $archivos_eliminados -gt 0 ]; then
+        echo -e "${GREEN}✅ $archivos_eliminados archivos temporales eliminados${NC}"
+    else
+        echo "ℹ️ No había archivos temporales que eliminar"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}🎉 Limpieza completa realizada exitosamente${NC}"
+    echo "💡 El entorno está listo para una instalación limpia con: $0"
 }
 
 solo_clusters() {

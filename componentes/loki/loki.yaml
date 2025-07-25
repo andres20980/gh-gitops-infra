@@ -20,8 +20,19 @@ spec:
             type: filesystem
           memberlist:
             join_members: []
+        
+        # Configurar para single binary deployment
+        deploymentMode: SingleBinary
         singleBinary:
           replicas: 1
+        
+        # Deshabilitar otros modos
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        backend:
+          replicas: 0
         
         test:
           enabled: false

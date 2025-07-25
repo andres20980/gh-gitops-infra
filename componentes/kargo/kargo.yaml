@@ -8,43 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: oci://ghcr.io/akuity/kargo-charts
-    chart: kargo
-    targetRevision: 1.6.1
-    helm:
-      values: |
-        # Configuración del servidor API de Kargo
-        api:
-          # Habilitar cuenta admin con credenciales fijas para desarrollo
-          adminAccount:
-            enabled: true
-            username: admin
-            password: admin
-            # Hash del password "admin" (bcrypt)
-            passwordHash: "$2a$10$Ak6eS6.o2cUU7TSjdF.EM.WRb/QhxhT6d4v9kP2GXW6YjGYd4/uTC"
-          # Configuración para acceso básico con admin/admin
-          oidc:
-            enabled: false
-          service:
-            type: ClusterIP
-          
-        # Configuración del controlador
-        controller:
-          replicas: 1
-          
-        # Configuración del controlador de gestión
-        managementController:
-          replicas: 1
-          
-        # Configuración del servidor de webhooks
-        webhooksServer:
-          replicas: 1
-          
-        # Configuración del servidor de webhooks externos
-        externalWebhooksServer:
-          replicas: 1
-          service:
-            type: ClusterIP
+    repoURL: https://github.com/andres20980/gh-gitops-infra.git
+    path: componentes/kargo
+    targetRevision: main
 
   destination:
     server: https://kubernetes.default.svc

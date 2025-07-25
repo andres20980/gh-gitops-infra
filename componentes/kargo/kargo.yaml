@@ -8,9 +8,16 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/andres20980/gh-gitops-infra.git
-    path: componentes/kargo
-    targetRevision: main
+    chart: kargo
+    repoURL: ghcr.io/akuity/kargo-charts
+    targetRevision: 1.6.1
+    helm:
+      releaseName: kargo
+      parameters:
+        - name: "api.adminAccount.passwordHash"
+          value: "$2a$10$Zrhhie4vLz5ygtVSaif6e.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"  # admin123
+        - name: "api.adminAccount.tokenSigningKey"
+          value: "1uyxpL0en7D1cqakaYhE1NhN23CkY16F"
 
   destination:
     server: https://kubernetes.default.svc

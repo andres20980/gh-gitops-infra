@@ -1,0 +1,151 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-applicationset
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argocd-applicationset
+    targetRevision: 1.12.7
+    helm:
+      parameters:
+        # Controller configuration
+        - name: replicaCount
+          value: "1"
+        
+        # Resource limits optimized for multi-cluster
+        - name: resources.requests.cpu
+          value: "100m"
+        - name: resources.requests.memory
+          value: "128Mi"
+        - name: resources.limits.cpu
+          value: "200m"
+        - name: resources.limits.memory
+          value: "256Mi"
+        
+        # Metrics and monitoring
+        - name: metrics.enabled
+          value: "true"
+        - name: metrics.serviceMonitor.enabled
+          value: "true"
+        
+      values: |
+        # Global settings
+        global:
+          image:
+            tag: "v0.4.5"
+        
+        # Controller specific configuration
+        image:
+          repository: quay.io/argoproj/argocd-applicationset
+          tag: v0.4.5
+          pullPolicy: IfNotPresent
+        
+        # Security context
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 1000
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+        
+        # Service configuration
+        service:
+          type: ClusterIP
+          port: 7000
+          targetPort: 7000
+          protocol: TCP
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: probe
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: probe
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # RBAC permissions for multi-cluster management
+        serviceAccount:
+          create: true
+          name: argocd-applicationset-controller
+          annotations:
+            argocd.argoproj.io/sync-wave: "1"
+        
+        # Pod anti-affinity for high availability (when scaling > 1)
+        affinity: {}
+        
+        # Node selector for scheduling
+        nodeSelector: {}
+        
+        # Tolerations for scheduling
+        tolerations: []
+        
+        # Extra arguments for the controller
+        extraArgs:
+          - --metrics-addr=0.0.0.0:8080
+          - --probe-addr=0.0.0.0:8081
+          - --enable-leader-election
+          - --leader-election-id=argocd-applicationset-controller
+        
+        # Environment variables
+        env:
+          - name: ARGOCD_APPLICATIONSET_CONTROLLER_ENABLE_LEADER_ELECTION
+            value: "true"
+          - name: ARGOCD_APPLICATIONSET_CONTROLLER_REPO_SERVER
+            value: "argocd-repo-server.argocd.svc.cluster.local:8081"
+          - name: ARGOCD_APPLICATIONSET_CONTROLLER_POLICY
+            value: "sync"
+          - name: ARGOCD_APPLICATIONSET_CONTROLLER_DEBUG
+            value: "false"
+          - name: ARGOCD_APPLICATIONSET_CONTROLLER_CONCURRENT_RECONCILIATIONS
+            value: "10"
+        
+        # Volume mounts for certificates and config
+        volumeMounts: []
+        volumes: []
+        
+        # Additional labels and annotations
+        podLabels: {}
+        podAnnotations:
+          argocd.argoproj.io/sync-wave: "2"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  revisionHistoryLimit: 3

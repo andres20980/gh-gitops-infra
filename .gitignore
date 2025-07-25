@@ -35,5 +35,8 @@ kubeconfig*
 charts/*.tgz
 *.lock
 
-# ArgoCD temporary files
-argocd-*
+# ArgoCD temporary files (but not our components)
+argocd-cli*
+argocd-config*
+argocd-*.log
+argocd-*.tmp

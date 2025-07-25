@@ -10,7 +10,7 @@ spec:
   source:
     chart: kargo
     repoURL: https://charts.akuity.io
-    targetRevision: 1.6.2
+    targetRevision: 1.6.1
     helm:
       values: |
         # Configuración del servidor API de Kargo
@@ -20,6 +20,8 @@ spec:
             enabled: true
             username: admin
             password: admin
+            # Hash del password "admin" (bcrypt)
+            passwordHash: "$2a$10$Ak6eS6.o2cUU7TSjdF.EM.WRb/QhxhT6d4v9kP2GXW6YjGYd4/uTC"
           # Configuración para acceso básico con admin/admin
           oidc:
             enabled: false

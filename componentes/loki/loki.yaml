@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://grafana.github.io/helm-charts
     chart: loki
-    targetRevision: 6.50.0
+    targetRevision: 6.8.0
     helm:
       skipCrds: true
       values: |

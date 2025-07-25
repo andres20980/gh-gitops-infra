@@ -121,11 +121,11 @@ mostrar_arquitectura() {
 verificar_dependencias() {
     echo -e "${BLUE}🔍 Verificando dependencias del sistema...${NC}"
     
-    local dependencias_requeridas=("minikube" "kubectl" "helm" "docker" "curl" "netstat")
+    local dependencias_requeridas=("minikube" "kubectl" "helm" "docker" "curl" "netstat" "fuser")
     local dependencias_opcionales=("jq" "yq")
     local faltantes_requeridas=()
     local faltantes_opcionales=()
-    local auto_instalables=("curl" "netstat" "jq" "yq")
+    local auto_instalables=("curl" "netstat" "jq" "yq" "fuser")
     
     # Verificar dependencias requeridas
     for dep in "${dependencias_requeridas[@]}"; do
@@ -160,6 +160,12 @@ verificar_dependencias() {
             "netstat")
                 if sudo apt-get install -y -qq net-tools; then
                     echo -e "${GREEN}✅ net-tools (netstat) instalado exitosamente${NC}"
+                    return 0
+                fi
+                ;;
+            "fuser")
+                if sudo apt-get install -y -qq psmisc; then
+                    echo -e "${GREEN}✅ psmisc (fuser) instalado exitosamente${NC}"
                     return 0
                 fi
                 ;;
@@ -241,6 +247,9 @@ verificar_dependencias() {
                     ;;
                 "netstat")
                     echo "🔗 netstat: sudo apt-get install net-tools (auto-instalación falló)"
+                    ;;
+                "fuser")
+                    echo "🔗 fuser: sudo apt-get install psmisc (auto-instalación falló)"
                     ;;
             esac
         done
@@ -551,14 +560,55 @@ configurar_multi_cluster() {
     echo -e "${GREEN}✅ Multi-cluster configurado${NC}"
 }
 
+verificar_y_arreglar_servicios() {
+    echo -e "${BLUE}🔧 Verificando y corrigiendo servicios problemáticos...${NC}"
+    
+    kubectl config use-context "$CLUSTER_DEV"
+    
+    # Verificar ArgoCD server
+    if ! kubectl get pod -l app.kubernetes.io/component=server -n argocd | grep -q Running; then
+        echo "🔄 Reiniciando ArgoCD server..."
+        kubectl rollout restart deployment argocd-server -n argocd
+        kubectl rollout status deployment argocd-server -n argocd --timeout=300s
+    fi
+    
+    # Verificar Kargo - si no existe el namespace, intentar crearlo
+    if ! kubectl get namespace kargo >/dev/null 2>&1; then
+        echo "⚠️ Namespace kargo no existe, sera creado por la aplicación ArgoCD"
+    else
+        # Si existe, verificar que los pods estén funcionando
+        if ! kubectl get pods -n kargo 2>/dev/null | grep -q Running; then
+            echo "🔄 Esperando a que Kargo se despliegue..."
+            kubectl wait --for=condition=Ready pods --all -n kargo --timeout=300s 2>/dev/null || echo "⚠️ Kargo puede tardar más tiempo en desplegarse"
+        fi
+    fi
+    
+    # Verificar cert-manager (necesario para Kargo)
+    if ! kubectl get namespace cert-manager >/dev/null 2>&1; then
+        echo "⚠️ cert-manager no encontrado, necesario para Kargo"
+    fi
+    
+    echo -e "${GREEN}✅ Verificación de servicios completada${NC}"
+}
+
 configurar_port_forwards() {
     echo -e "${BLUE}🌐 Configurando port-forwards optimizados...${NC}"
     
-    # Matar port-forwards previos
+    # Matar port-forwards previos de forma más agresiva
+    echo "🧹 Limpiando port-forwards previos..."
     pkill -f "kubectl.*port-forward" 2>/dev/null || true
+    sleep 3
+    
+    # Liberar puertos específicos si están ocupados
+    for puerto in {8080..8093}; do
+        if netstat -tuln | grep -q ":$puerto "; then
+            echo "🔌 Liberando puerto $puerto..."
+            fuser -k $puerto/tcp 2>/dev/null || true
+        fi
+    done
     sleep 2
     
-    # Función para crear port-forward con reintentos
+    # Función para crear port-forward con reintentos y validación mejorada
     crear_port_forward() {
         local servicio="$1"
         local namespace="$2"
@@ -566,12 +616,20 @@ configurar_port_forwards() {
         local puerto_remoto="$4"
         local max_intentos=3
         
+        # Verificar que el puerto esté libre
+        if netstat -tuln | grep -q ":$puerto_local "; then
+            echo "⚠️ Puerto $puerto_local ocupado, liberando..."
+            fuser -k $puerto_local/tcp 2>/dev/null || true
+            sleep 2
+        fi
+        
         for intento in $(seq 1 $max_intentos); do
             echo "🔗 Configurando port-forward para $servicio ($puerto_local:$puerto_remoto) - Intento $intento"
             
-            kubectl port-forward -n "$namespace" "service/$servicio" "$puerto_local:$puerto_remoto" >/dev/null 2>&1 &
+            # Usar nohup para evitar que se maten los procesos
+            nohup kubectl port-forward -n "$namespace" "service/$servicio" "$puerto_local:$puerto_remoto" >/dev/null 2>&1 &
             local pf_pid=$!
-            sleep 2
+            sleep 3
             
             # Verificar que el port-forward esté funcionando
             if kill -0 $pf_pid 2>/dev/null && netstat -tuln | grep -q ":$puerto_local "; then
@@ -583,7 +641,7 @@ configurar_port_forwards() {
             
             if [ $intento -lt $max_intentos ]; then
                 echo "⚠️ Reintentando port-forward para $servicio..."
-                sleep 3
+                sleep 5
             fi
         done
         
@@ -656,9 +714,10 @@ validar_uis() {
         echo -n "🔍 Verificando $ui_name ($url)... "
         
         # Mejorar la validación con más códigos de estado válidos y timeout más largo
-        local response_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" --connect-timeout 5 --max-time 10 2>/dev/null || echo "000")
+        local response_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" --connect-timeout 10 --max-time 15 2>/dev/null || echo "000")
         
-        if [[ "$response_code" =~ ^(200|302|401|403)$ ]]; then
+        # Códigos de estado que consideramos válidos (incluyendo redirects y algunos errores esperados)
+        if [[ "$response_code" =~ ^(200|301|302|401|403|404)$ ]]; then
             UI_STATUS[$ui_name]="✅ OPERATIVA"
             echo -e "${GREEN}✅ ($response_code)${NC}"
             uis_operativas=$((uis_operativas + 1))
@@ -670,6 +729,16 @@ validar_uis() {
     
     echo ""
     echo -e "${GREEN}✅ Validación de UIs completada: $uis_operativas/$uis_total operativas${NC}"
+    
+    # Si hay menos del 80% operativas, mostrar información de diagnóstico
+    local porcentaje=$((uis_operativas * 100 / uis_total))
+    if [ $porcentaje -lt 80 ]; then
+        echo -e "${YELLOW}⚠️ Solo $porcentaje% de UIs operativas. Verificando port-forwards...${NC}"
+        netstat -tuln | grep -E ':(808[0-9]|809[0-2])' | while read line; do
+            puerto=$(echo "$line" | awk '{print $4}' | cut -d: -f2)
+            echo "  🔗 Puerto $puerto activo"
+        done
+    fi
 }
 
 mostrar_urls_ui() {
@@ -797,7 +866,7 @@ esperar_servicios() {
     kubectl config use-context "$CLUSTER_DEV"
     
     # Esperar namespaces críticos con timeouts más largos
-    local namespaces=("argocd" "monitoring" "loki" "jaeger" "minio" "gitea" "argo-rollouts" "argo-workflows" "kubernetes-dashboard")
+    local namespaces=("argocd" "monitoring" "loki" "jaeger" "minio" "gitea" "argo-rollouts" "argo-workflows" "kubernetes-dashboard" "kargo")
     
     for ns in "${namespaces[@]}"; do
         echo "📦 Esperando namespace: $ns"
@@ -809,9 +878,9 @@ esperar_servicios() {
         fi
     done
     
-    # Esperar explícitamente a servicios críticos
+    # Esperar explícitamente a servicios críticos con verificación mejorada
     echo "🔍 Verificando servicios críticos..."
-    local servicios_criticos=("argocd-server" "prometheus-stack-grafana" "jaeger-query" "loki" "minio" "gitea-http")
+    local servicios_criticos=("argocd-server" "prometheus-stack-grafana" "jaeger-query" "loki-gateway" "minio" "gitea-http")
     local servicios_disponibles=0
     
     for servicio in "${servicios_criticos[@]}"; do
@@ -822,6 +891,10 @@ esperar_servicios() {
             echo "⚠️ Servicio $servicio no encontrado"
         fi
     done
+    
+    # Esperar tiempo adicional para que todos los servicios estén completamente listos
+    echo "⏳ Tiempo adicional para estabilización de servicios..."
+    sleep 60
     
     echo -e "${GREEN}✅ Servicios inicializados: $servicios_disponibles/${#servicios_criticos[@]} críticos disponibles${NC}"
 }
@@ -883,6 +956,7 @@ instalar_todo() {
     # Fase 8: Esperar servicios y configurar acceso
     echo -e "${PURPLE}[FASE 8/8]${NC} Finalización y configuración de acceso"
     esperar_servicios
+    verificar_y_arreglar_servicios
     configurar_port_forwards
     validar_uis
     

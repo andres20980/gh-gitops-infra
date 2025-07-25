@@ -363,16 +363,73 @@ crear_clusters() {
         return 1
     }
     
-    # Crear cluster DEV - Recursos principales para todas las herramientas
+    # Crear solo cluster DEV inicialmente - Optimización secuencial
+    echo "🎯 Creando cluster DEV primero para validación..."
     crear_cluster_con_reintentos "$CLUSTER_DEV" "$DEV_MEMORY" "$DEV_CPUS" "$DEV_DISK"
+    
+    echo -e "${GREEN}✅ Cluster DEV creado exitosamente${NC}"
+}
+
+crear_clusters_adicionales() {
+    echo -e "${BLUE}🏗️ Creando clusters PRE y PRO después de validar DEV...${NC}"
+    
+    # Verificar que Docker esté ejecutándose
+    if ! docker info >&/dev/null; then
+        echo -e "${RED}❌ Docker no está ejecutándose. Por favor, inicia Docker primero.${NC}"
+        exit 1
+    fi
+    
+    # Función auxiliar para crear un cluster con reintentos (reutilizada)
+    crear_cluster_con_reintentos() {
+        local cluster_name="$1"
+        local memory="$2"
+        local cpus="$3"
+        local disk="$4"
+        local max_intentos=3
+        local intento=1
+        
+        while [ $intento -le $max_intentos ]; do
+            echo "🏭 Creando cluster $cluster_name (${memory}MB RAM, ${cpus} CPU, ${disk}) - Intento $intento/$max_intentos"
+            
+            if minikube start -p "$cluster_name" \
+                --memory="$memory" \
+                --cpus="$cpus" \
+                --disk-size="$disk" \
+                --driver=docker \
+                --kubernetes-version="$KUBERNETES_VERSION" \
+                --wait=true \
+                --wait-timeout=600s; then
+                
+                echo -e "${GREEN}✅ Cluster $cluster_name creado exitosamente${NC}"
+                
+                # Habilitar addons necesarios
+                minikube addons enable ingress -p "$cluster_name" || echo "⚠️ Warning: No se pudo habilitar ingress addon"
+                minikube addons enable metrics-server -p "$cluster_name" || echo "⚠️ Warning: No se pudo habilitar metrics-server addon"
+                
+                return 0
+            else
+                echo -e "${YELLOW}⚠️ Falló el intento $intento para crear $cluster_name${NC}"
+                intento=$((intento + 1))
+                
+                if [ $intento -le $max_intentos ]; then
+                    echo "🔄 Limpiando y reintentando en 10 segundos..."
+                    minikube delete -p "$cluster_name" >/dev/null 2>&1 || true
+                    sleep 10
+                fi
+            fi
+        done
+        
+        echo -e "${RED}❌ No se pudo crear el cluster $cluster_name después de $max_intentos intentos${NC}"
+        return 1
+    }
     
     # Crear cluster PRE - Recursos para testing
     crear_cluster_con_reintentos "$CLUSTER_PRE" "$PRE_MEMORY" "$PRE_CPUS" "$PRE_DISK"
     
-    # Crear cluster PRO - Recursos para simulación de producción
+    # Crear cluster PRE - Recursos para simulación de producción
     crear_cluster_con_reintentos "$CLUSTER_PRO" "$PRO_MEMORY" "$PRO_CPUS" "$PRO_DISK"
     
-    echo -e "${GREEN}✅ Todos los clusters creados exitosamente${NC}"
+    echo -e "${GREEN}✅ Clusters PRE y PRO creados exitosamente${NC}"
 }
 
 configurar_contextos() {
@@ -540,15 +597,22 @@ configurar_multi_cluster() {
     local pf_pid=$!
     sleep 15
     
-    # Configurar cluster PRE con respuesta automática
-    echo "🔗 Agregando cluster PRE a ArgoCD..."
-    kubectl config use-context "$CLUSTER_PRE"
-    yes y | timeout 30 argocd cluster add "$CLUSTER_PRE" --server localhost:8080 --insecure --grpc-web 2>/dev/null || true
+    # Solo agregar clusters que existan
+    if minikube status -p "$CLUSTER_PRE" &> /dev/null; then
+        echo "🔗 Agregando cluster PRE a ArgoCD..."
+        kubectl config use-context "$CLUSTER_PRE"
+        yes y | timeout 30 argocd cluster add "$CLUSTER_PRE" --server localhost:8080 --insecure --grpc-web 2>/dev/null || true
+    else
+        echo "⚠️ Cluster PRE no existe - saltando configuración"
+    fi
     
-    # Configurar cluster PRO con respuesta automática
-    echo "🔗 Agregando cluster PRO a ArgoCD..."
-    kubectl config use-context "$CLUSTER_PRO"
-    yes y | timeout 30 argocd cluster add "$CLUSTER_PRO" --server localhost:8080 --insecure --grpc-web 2>/dev/null || true
+    if minikube status -p "$CLUSTER_PRO" &> /dev/null; then
+        echo "🔗 Agregando cluster PRO a ArgoCD..."
+        kubectl config use-context "$CLUSTER_PRO"
+        yes y | timeout 30 argocd cluster add "$CLUSTER_PRO" --server localhost:8080 --insecure --grpc-web 2>/dev/null || true
+    else
+        echo "⚠️ Cluster PRO no existe - saltando configuración"
+    fi
     
     # Limpiar port-forward temporal
     kill $pf_pid 2>/dev/null || true
@@ -966,9 +1030,9 @@ instalar_todo() {
     echo -e "${PURPLE}[FASE 1/8]${NC} Verificaciones del sistema"
     verificar_dependencias
     
-    # Fase 2: Limpieza y preparación
+    # Fase 2: Preparación del entorno (sin limpieza redundante)
     echo -e "${PURPLE}[FASE 2/8]${NC} Preparación del entorno"
-    limpiar_clusters_existentes
+    echo "✅ Entorno ya limpio - continuando con creación de clusters"
     
     # Fase 3: Creación de clusters
     echo -e "${PURPLE}[FASE 3/8]${NC} Creación de clusters"
@@ -989,22 +1053,46 @@ instalar_todo() {
     fi
     
     # Fase 6: Aplicación de infraestructura
-    echo -e "${PURPLE}[FASE 6/8]${NC} Despliegue de infraestructura GitOps"
+    echo -e "${PURPLE}[FASE 6/10]${NC} Despliegue de infraestructura GitOps"
     if ! aplicar_infraestructura; then
         echo -e "${RED}❌ Error en la aplicación de infraestructura${NC}"
         exit 1
     fi
     
-    # Fase 7: Configuración multi-cluster
-    echo -e "${PURPLE}[FASE 7/8]${NC} Configuración multi-cluster"
-    configurar_multi_cluster
+    # Fase 7: Configuración inicial de ArgoCD
+    echo -e "${PURPLE}[FASE 7/10]${NC} Configuración inicial de ArgoCD"
+    echo "⚙️ ArgoCD configurado para cluster DEV (clusters adicionales se agregarán después)"
     
-    # Fase 8: Esperar servicios y configurar acceso
-    echo -e "${PURPLE}[FASE 8/8]${NC} Finalización y configuración de acceso"
+    # Fase 8: Esperar servicios y configurar acceso DEV
+    echo -e "${PURPLE}[FASE 8/10]${NC} Finalización y configuración de acceso DEV"
     esperar_servicios
     verificar_y_arreglar_servicios
     configurar_port_forwards
     validar_uis
+    
+    # Verificar si DEV está funcionando correctamente antes de crear PRE y PRO
+    local uis_operativas=$(echo "${!UI_STATUS[@]}" | tr ' ' '\n' | grep -c "OPERATIVA" || echo "0")
+    local uis_total=${#UI_URLS[@]}
+    local porcentaje_dev=$((uis_operativas * 100 / uis_total))
+    
+    if [ $porcentaje_dev -ge 80 ]; then
+        echo -e "${GREEN}✅ Cluster DEV validado ($porcentaje_dev% UIs operativas) - Creando clusters PRE y PRO${NC}"
+        
+        # Fase 9: Crear clusters adicionales
+        echo -e "${PURPLE}[FASE 9/10]${NC} Creación de clusters PRE y PRO"
+        crear_clusters_adicionales
+        
+        # Fase 10: Configuración multi-cluster completa
+        echo -e "${PURPLE}[FASE 10/10]${NC} Configuración multi-cluster completa"
+        configurar_multi_cluster
+        
+        echo -e "${GREEN}✅ Arquitectura multi-cluster completa${NC}"
+        local clusters_texto="3 Clusters creados y configurados"
+    else
+        echo -e "${YELLOW}⚠️ Cluster DEV no está completamente funcional ($porcentaje_dev% UIs). No creando PRE y PRO.${NC}"
+        echo -e "${YELLOW}💡 Puedes crear PRE y PRO manualmente más tarde con: $0 clusters${NC}"
+        local clusters_texto="1 Cluster DEV creado (PRE/PRO pendientes)"
+    fi
     
     # Calcular tiempo total
     local fin=$(date +%s)
@@ -1017,7 +1105,7 @@ instalar_todo() {
     echo "║                          🎉 ¡INSTALACIÓN COMPLETADA! 🎉                     ║"  
     echo "║                                                                              ║"
     echo "║  ⏱️  Tiempo total: ${minutos}m ${segundos}s                                                    ║"
-    echo "║  🏭 3 Clusters creados y configurados                                       ║"
+    echo "║  🏭 $clusters_texto"
     echo "║  📦 14+ Herramientas GitOps desplegadas                                     ║"
     echo "║  🌐 11 UIs web disponibles + Logs via Grafana                              ║"
     echo "╚══════════════════════════════════════════════════════════════════════════════╝"

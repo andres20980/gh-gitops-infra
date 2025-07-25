@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: gitops-infra-components
+  name: gitops-aplicaciones
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,11 +10,11 @@ spec:
   - git:
       repoURL: https://github.com/andres20980/gh-gitops-infra.git
       revision: HEAD
-      directories:
-      - path: componentes/*
+      files:
+      - path: "aplicaciones/*/app-of-apps.yaml"
   template:
     metadata:
-      name: '{{path.basename}}'
+      name: '{{path[1]}}'
       namespace: argocd
       finalizers:
         - resources-finalizer.argocd.argoproj.io
@@ -23,7 +23,7 @@ spec:
       source:
         repoURL: https://github.com/andres20980/gh-gitops-infra.git
         targetRevision: HEAD
-        path: '{{path}}'
+        path: '{{path[0]}}/{{path[1]}}'
       destination:
         server: https://kubernetes.default.svc
         namespace: argocd
@@ -40,4 +40,3 @@ spec:
             duration: 5s
             factor: 2
             maxDuration: 3m
-

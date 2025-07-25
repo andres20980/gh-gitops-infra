@@ -3,7 +3,7 @@
 # GitOps Multi-Cluster Infrastructure - Instalación Completa
 # Arquitectura: 3 clusters (dev/pre/pro) con gestión centralizada desde DEV
 # Autor: GitOps Infrastructure Team
-# Versión: 2.0 Optimizada - Corregida
+# Versión: 2.0 Optimizada
 
 set -euo pipefail  # Modo estricto: salir en errores, variables no definidas, errores en pipes
 
@@ -94,8 +94,8 @@ mostrar_arquitectura() {
     echo "🏭 Cluster gitops-dev (${DEV_MEMORY}MB RAM, ${DEV_CPUS} CPU, ${DEV_DISK}): Gestión centralizada y herramientas"
     echo "🏭 Cluster gitops-pre (${PRE_MEMORY}MB RAM, ${PRE_CPUS} CPU, ${PRE_DISK}): Entorno de preproducción"
     echo "🏭 Cluster gitops-pro (${PRO_MEMORY}MB RAM, ${PRO_CPUS} CPU, ${PRO_DISK}): Entorno de producción"
-    echo "🛠 Configuración: RECURSOS OPTIMIZADOS por componente real"
-    echo "📟 Kubernetes Version: $KUBERNETES_VERSION"
+    echo "� Configuración: RECURSOS ROBUSTOS - Todos los clusters con 6GB RAM, 6 CPU, 40GB disk"
+    echo "� Kubernetes Version: $KUBERNETES_VERSION"
     echo ""
     echo "📦 HERRAMIENTAS EN DEV (controlan todos los clusters):"
     echo "├─ 🔄 ArgoCD v3.0.11: Gestión GitOps multi-cluster"
@@ -339,7 +339,7 @@ crear_clusters() {
                 
                 return 0
             else
-                echo -e "${YELLOW}⚠️ Falló el intento $intento para crear $cluster_name${NC}"
+                echo -e "${YELLOW}⚠️ Faliló el intento $intento para crear $cluster_name${NC}"
                 intento=$((intento + 1))
                 
                 if [ $intento -le $max_intentos ]; then
@@ -452,7 +452,7 @@ aplicar_infraestructura() {
         # Primero aplicar componentes en orden
         for componente in "${orden_componentes[@]}"; do
             if [[ -f "$SCRIPT_DIR/componentes/$componente"/*.yaml ]]; then
-                echo "📦 Aplicando componente: $componente"
+                echo "� Aplicando componente: $componente"
                 if kubectl apply -f "$SCRIPT_DIR/componentes/$componente"/*.yaml; then
                     componentes_aplicados=$((componentes_aplicados + 1))
                     echo -e "${GREEN}✅ Componente $componente aplicado${NC}"
@@ -847,7 +847,7 @@ limpiar_en_error() {
     echo -e "${YELLOW}💡 Para limpiar completamente, ejecuta: $0 limpiar${NC}"
 }
 
-# Funciones para ejecución individual
+# Funciones de utilidad mejoradas para ejecución individual
 limpiar() {
     echo -e "${YELLOW}🧹 Limpiando entorno completo...${NC}"
     
@@ -947,26 +947,26 @@ mostrar_help() {
     echo ""
     echo "📖 COMANDOS DISPONIBLES:"
     echo "  $0                    # Instalación completa (recomendado)"
-    echo "  $0 limpiar            # Limpiar todo el entorno"
-    echo "  $0 clusters           # Crear solo los clusters"
-    echo "  $0 argocd             # Instalar solo ArgoCD"
-    echo "  $0 infra              # Aplicar solo infraestructura"
-    echo "  $0 port-forwards      # Configurar solo port-forwards"
-    echo "  $0 urls               # Mostrar URLs de interfaces"
-    echo "  $0 estado             # Mostrar estado actual"
-    echo "  $0 help               # Mostrar esta ayuda"
+    echo "  $0 limpiar           # Limpiar todo el entorno"
+    echo "  $0 clusters          # Crear solo los clusters"
+    echo "  $0 argocd            # Instalar solo ArgoCD"
+    echo "  $0 infra             # Aplicar solo infraestructura"
+    echo "  $0 port-forwards     # Configurar solo port-forwards"
+    echo "  $0 urls              # Mostrar URLs de interfaces"
+    echo "  $0 estado            # Mostrar estado actual"
+    echo "  $0 help              # Mostrar esta ayuda"
     echo ""
     echo "🚀 INSTALACIÓN RECOMENDADA:"
-    echo "  1. $0                 # Instalación completa automática"
+    echo "  1. $0                # Instalación completa automática"
     echo ""
     echo "🔧 INSTALACIÓN PASO A PASO:"
-    echo "  1. $0 clusters        # Crear clusters"
-    echo "  2. $0 argocd          # Instalar ArgoCD"
-    echo "  3. $0 infra           # Aplicar infraestructura"
-    echo "  4. $0 port-forwards   # Configurar acceso"
+    echo "  1. $0 clusters       # Crear clusters"
+    echo "  2. $0 argocd         # Instalar ArgoCD"
+    echo "  3. $0 infra          # Aplicar infraestructura"
+    echo "  4. $0 port-forwards  # Configurar acceso"
 }
 
-# Manejo de argumentos
+# Manejo de argumentos mejorado
 case "${1:-}" in
     "limpiar"|"clean")
         limpiar

@@ -91,67 +91,50 @@ echo "🧹 Limpiando port-forwards previos..."
 pkill -f "kubectl port-forward" 2>/dev/null || true
 sleep 2
 
-# Configurar port-forwards principales
-echo "🚀 Configurando accesos a las UIs..."
+# Configurar port-forwards principales organizados por tipo
+echo "🚀 Configurando accesos a las UIs organizadas por categorías..."
 echo ""
 
-# ArgoCD (8080)
+# 🎯 GITOPS CORE (8080-8082)
+echo "🎯 Configurando GitOps Core..."
 setup_port_forward "argocd-server" "argocd" "8080" "80" "ArgoCD UI"
-
-# Kargo (8081)
 setup_port_forward "kargo-api" "kargo" "8081" "8080" "Kargo UI"
-
-# Grafana (8082)
-if kubectl get namespace monitoring >/dev/null 2>&1; then
-    setup_port_forward "grafana" "monitoring" "8082" "80" "Grafana Dashboard" || true
-fi
-
-# Prometheus (8083)
-if kubectl get namespace monitoring >/dev/null 2>&1; then
-    setup_port_forward "prometheus-server" "monitoring" "8083" "80" "Prometheus Server" || true
-fi
-
-# AlertManager (8084)
-if kubectl get namespace monitoring >/dev/null 2>&1; then
-    setup_port_forward "alertmanager" "monitoring" "8084" "9093" "AlertManager UI" || true
-fi
-
-# Jaeger (8085)
-if kubectl get namespace jaeger >/dev/null 2>&1; then
-    setup_port_forward "jaeger-query" "jaeger" "8085" "16686" "Jaeger Tracing" || true
-fi
-
-# Loki (8086)
-if kubectl get namespace loki >/dev/null 2>&1; then
-    setup_port_forward "loki" "loki" "8086" "3100" "Loki Logs" || true
-fi
-
-# Gitea (8087)
-if kubectl get namespace gitea >/dev/null 2>&1; then
-    setup_port_forward "gitea-http" "gitea" "8087" "3000" "Gitea Git Server" || true
-fi
-
-# Argo Workflows (8088)
 if kubectl get namespace argo-workflows >/dev/null 2>&1; then
-    setup_port_forward "argo-workflows-server" "argo-workflows" "8088" "2746" "Argo Workflows UI" || true
+    setup_port_forward "argo-workflows-server" "argo-workflows" "8082" "2746" "Argo Workflows UI" || true
 fi
 
-# Argo Rollouts Dashboard (8089)
+# 🚀 PROGRESSIVE DELIVERY (8083)
+echo "🚀 Configurando Progressive Delivery..."
 if kubectl get namespace argo-rollouts >/dev/null 2>&1; then
-    setup_port_forward "argo-rollouts-dashboard" "argo-rollouts" "8089" "3100" "Argo Rollouts Dashboard" || true
+    setup_port_forward "argo-rollouts-dashboard" "argo-rollouts" "8083" "3100" "Argo Rollouts Dashboard" || true
 fi
 
-# MinIO API (8090)
+# 📊 OBSERVABILIDAD (8084-8087)
+echo "📊 Configurando Observabilidad..."
+if kubectl get namespace monitoring >/dev/null 2>&1; then
+    setup_port_forward "grafana" "monitoring" "8084" "80" "Grafana Dashboard" || true
+    setup_port_forward "prometheus-server" "monitoring" "8085" "80" "Prometheus Server" || true
+    setup_port_forward "alertmanager" "monitoring" "8086" "9093" "AlertManager UI" || true
+fi
+if kubectl get namespace jaeger >/dev/null 2>&1; then
+    setup_port_forward "jaeger-query" "jaeger" "8087" "16686" "Jaeger Tracing" || true
+fi
+
+# 📝 LOGS & STORAGE (8088-8090) 
+echo "📝 Configurando Logs & Storage..."
+if kubectl get namespace loki >/dev/null 2>&1; then
+    setup_port_forward "loki" "loki" "8088" "3100" "Loki Logs" || true
+fi
 if kubectl get namespace minio >/dev/null 2>&1; then
-    setup_port_forward "minio" "minio" "8090" "9000" "MinIO API" || true
+    setup_port_forward "minio" "minio" "8089" "9000" "MinIO API" || true
+    setup_port_forward "minio-console" "minio" "8090" "9001" "MinIO Console UI" || true
 fi
 
-# MinIO Console (8091)
-if kubectl get namespace minio >/dev/null 2>&1; then
-    setup_port_forward "minio-console" "minio" "8091" "9001" "MinIO Console UI" || true
+# 🔧 DESARROLLO & GESTIÓN (8091-8092)
+echo "🔧 Configurando Desarrollo & Gestión..."
+if kubectl get namespace gitea >/dev/null 2>&1; then
+    setup_port_forward "gitea-http" "gitea" "8091" "3000" "Gitea Git Server" || true
 fi
-
-# Kubernetes Dashboard (8092)
 if kubectl get namespace kubernetes-dashboard >/dev/null 2>&1; then
     setup_port_forward "kubernetes-dashboard" "kubernetes-dashboard" "8092" "443" "Kubernetes Dashboard" || true
 fi
@@ -160,7 +143,7 @@ echo ""
 echo -e "${GREEN}🎉 PORT-FORWARDS CONFIGURADOS${NC}"
 echo "=============================="
 echo ""
-echo -e "${BLUE}📊 ACCESOS DISPONIBLES (puertos correlativos 8080-8092):${NC}"
+echo -e "${BLUE}📊 ACCESOS DISPONIBLES ORGANIZADOS POR TIPO (8080-8092):${NC}"
 echo ""
 echo "🔐 ArgoCD (8080):"
 echo "   URL: http://localhost:8080"

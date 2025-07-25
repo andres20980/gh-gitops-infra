@@ -648,20 +648,28 @@ configurar_port_forwards() {
 validar_uis() {
     echo -e "${BLUE}🔍 Validando acceso a UIs...${NC}"
     
+    local uis_operativas=0
+    local uis_total=${#UI_URLS[@]}
+    
     for ui_name in "${!UI_URLS[@]}"; do
         url="${UI_URLS[$ui_name]}"
         echo -n "🔍 Verificando $ui_name ($url)... "
         
-        if curl -s -o /dev/null -w "%{http_code}" "$url" | grep -q "200\|302\|401"; then
+        # Mejorar la validación con más códigos de estado válidos y timeout más largo
+        local response_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" --connect-timeout 5 --max-time 10 2>/dev/null || echo "000")
+        
+        if [[ "$response_code" =~ ^(200|302|401|403)$ ]]; then
             UI_STATUS[$ui_name]="✅ OPERATIVA"
-            echo -e "${GREEN}✅${NC}"
+            echo -e "${GREEN}✅ ($response_code)${NC}"
+            uis_operativas=$((uis_operativas + 1))
         else
             UI_STATUS[$ui_name]="❌ NO DISPONIBLE"
-            echo -e "${RED}❌${NC}"
+            echo -e "${RED}❌ ($response_code)${NC}"
         fi
     done
     
-    echo -e "${GREEN}✅ Validación de UIs completada${NC}"
+    echo ""
+    echo -e "${GREEN}✅ Validación de UIs completada: $uis_operativas/$uis_total operativas${NC}"
 }
 
 mostrar_urls_ui() {

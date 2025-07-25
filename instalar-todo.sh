@@ -38,13 +38,13 @@ DEV_MEMORY="8192"  # 8GB: 5.6GB componentes + 2.4GB overhead/buffers
 DEV_CPUS="4"       # 4 CPUs: 2.6 componentes + 1.4 overhead/picos
 DEV_DISK="50g"     # 50GB: imágenes, logs, datos persistentes
 
-PRE_MEMORY="2048"  # 2GB: solo aplicaciones de negocio para testing
-PRE_CPUS="2"       # 2 CPUs: suficiente para carga de testing
-PRE_DISK="20g"     # 20GB: datos de testing
+PRE_MEMORY="2048"  # 2GB: solo aplicaciones sencillas para GitOps promotion testing
+PRE_CPUS="2"       # 2 CPUs: recursos mínimos para apps sencillas
+PRE_DISK="2g"      # 2GB: solo para apps sencillas, sin herramientas de infra
 
-PRO_MEMORY="2048"  # 2GB: solo aplicaciones de negocio para demos
-PRO_CPUS="2"       # 2 CPUs: suficiente para simulación de producción
-PRO_DISK="20g"     # 20GB: datos de producción simulada
+PRO_MEMORY="2048"  # 2GB: solo aplicaciones sencillas para GitOps promotion demos
+PRO_CPUS="2"       # 2 CPUs: recursos mínimos para apps sencillas  
+PRO_DISK="2g"      # 2GB: solo para apps sencillas, sin herramientas de infra
 
 # Array de validación de UIs organizadas por tipo
 declare -A UI_URLS=(
@@ -530,8 +530,8 @@ aplicar_infraestructura() {
     kubectl config use-context "$CLUSTER_DEV"
     
     # Verificar que estamos en el directorio correcto
-    if [[ ! -f "$SCRIPT_DIR/aplicaciones-gitops-infra.yaml" ]]; then
-        echo -e "${RED}❌ Archivo aplicaciones-gitops-infra.yaml no encontrado en $SCRIPT_DIR${NC}"
+    if [[ ! -f "$SCRIPT_DIR/appset-gitops-infra.yaml" ]]; then
+        echo -e "${RED}❌ Archivo appset-gitops-infra.yaml no encontrado en $SCRIPT_DIR${NC}"
         echo "📁 Archivos disponibles:"
         ls -la "$SCRIPT_DIR"/*.yaml 2>/dev/null || echo "❌ No se encontraron archivos YAML"
         return 1
@@ -539,7 +539,15 @@ aplicar_infraestructura() {
     
     # Aplicar las aplicaciones de infraestructura principal
     echo "📦 Aplicando aplicaciones de infraestructura principal..."
-    if kubectl apply -f "$SCRIPT_DIR/aplicaciones-gitops-infra.yaml"; then
+    
+    # Eliminar ApplicationSets existentes para evitar conflictos de resourceVersion
+    kubectl delete applicationset gitops-infra-components -n argocd --ignore-not-found=true
+    kubectl delete applicationset gitops-aplicaciones -n argocd --ignore-not-found=true
+    
+    # Esperar un momento para la limpieza
+    sleep 3
+    
+    if kubectl apply -f "$SCRIPT_DIR/appset-gitops-infra.yaml" && kubectl apply -f "$SCRIPT_DIR/appset-aplicaciones.yaml"; then
         echo -e "${GREEN}✅ Aplicaciones de infraestructura creadas${NC}"
     else
         echo -e "${RED}❌ Error al aplicar aplicaciones de infraestructura${NC}"
@@ -869,6 +877,115 @@ validar_uis() {
     fi
 }
 
+# Función de validación estricta para verificar que DEV está completamente funcional
+validar_dev_completo() {
+    echo -e "${BLUE}🔍 Validación estricta de DEV antes de crear PRE/PRO...${NC}"
+    
+    local errores=0
+    local advertencias=0
+    
+    # 1. Verificar que ArgoCD está ejecutándose
+    echo "📋 Verificando ArgoCD..."
+    if ! kubectl get pods -n argocd | grep -q "argocd-server.*Running"; then
+        echo -e "${RED}❌ ArgoCD server no está ejecutándose${NC}"
+        errores=$((errores + 1))
+    else
+        echo -e "${GREEN}✅ ArgoCD server ejecutándose${NC}"
+    fi
+    
+    # 2. Verificar ApplicationSets
+    echo "📋 Verificando ApplicationSets..."
+    local appsets=$(kubectl get applicationset -n argocd 2>/dev/null | wc -l)
+    if [ $appsets -lt 2 ]; then
+        echo -e "${RED}❌ ApplicationSets no encontrados o incompletos${NC}"
+        errores=$((errores + 1))
+    else
+        echo -e "${GREEN}✅ ApplicationSets detectados${NC}"
+    fi
+    
+    # 3. Verificar aplicaciones de infraestructura críticas
+    echo "📋 Verificando aplicaciones de infraestructura..."
+    local apps_criticas=("cert-manager" "external-secrets" "ingress-nginx" "monitoring" "loki" "grafana" "kargo")
+    local apps_sincronizadas=0
+    
+    for app in "${apps_criticas[@]}"; do
+        local sync_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
+        local health_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "NotFound")
+        
+        if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
+            echo -e "${GREEN}✅ $app: Synced & Healthy${NC}"
+            apps_sincronizadas=$((apps_sincronizadas + 1))
+        elif [ "$sync_status" = "NotFound" ]; then
+            echo -e "${RED}❌ $app: Aplicación no encontrada${NC}"
+            errores=$((errores + 1))
+        else
+            echo -e "${YELLOW}⚠️  $app: $sync_status / $health_status${NC}"
+            advertencias=$((advertencias + 1))
+        fi
+    done
+    
+    # 4. Verificar pods críticos ejecutándose
+    echo "📋 Verificando pods críticos..."
+    local namespaces_criticos=("cert-manager" "external-secrets-system" "ingress-nginx" "monitoring" "loki" "grafana" "kargo")
+    local namespaces_ok=0
+    
+    for ns in "${namespaces_criticos[@]}"; do
+        local pods_running=$(kubectl get pods -n "$ns" 2>/dev/null | grep -c "Running" || echo "0")
+        local pods_total=$(kubectl get pods -n "$ns" 2>/dev/null | tail -n +2 | wc -l || echo "0")
+        
+        if [ "$pods_total" -eq 0 ]; then
+            echo -e "${RED}❌ Namespace $ns: Sin pods desplegados${NC}"
+            errores=$((errores + 1))
+        elif [ "$pods_running" -eq "$pods_total" ]; then
+            echo -e "${GREEN}✅ Namespace $ns: $pods_running/$pods_total pods ejecutándose${NC}"
+            namespaces_ok=$((namespaces_ok + 1))
+        else
+            echo -e "${YELLOW}⚠️  Namespace $ns: $pods_running/$pods_total pods ejecutándose${NC}"
+            advertencias=$((advertencias + 1))
+        fi
+    done
+    
+    # 5. Verificar UIs (reutilizar validación existente)
+    validar_uis
+    local uis_operativas=0
+    for ui_name in "${!UI_STATUS[@]}"; do
+        if [[ "${UI_STATUS[$ui_name]}" == *"OPERATIVA"* ]]; then
+            uis_operativas=$((uis_operativas + 1))
+        fi
+    done
+    local uis_total=${#UI_URLS[@]}
+    local porcentaje_uis=$((uis_operativas * 100 / uis_total))
+    
+    # Resumen de validación
+    echo ""
+    echo -e "${BLUE}📊 RESUMEN DE VALIDACIÓN DEV:${NC}"
+    echo "================================="
+    echo "🔴 Errores críticos: $errores"
+    echo "🟡 Advertencias: $advertencias"  
+    echo "📱 UIs operativas: $uis_operativas/$uis_total ($porcentaje_uis%)"
+    echo "🏗️ Apps críticas sincronizadas: $apps_sincronizadas/${#apps_criticas[@]}"
+    echo "🛠️ Namespaces OK: $namespaces_ok/${#namespaces_criticos[@]}"
+    echo ""
+    
+    # Criterios para continuar con PRE/PRO
+    if [ $errores -eq 0 ] && [ $apps_sincronizadas -ge 5 ] && [ $porcentaje_uis -ge 60 ]; then
+        echo -e "${GREEN}✅ DEV VALIDADO: Criterios cumplidos para crear PRE/PRO${NC}"
+        echo -e "${GREEN}   ► Sin errores críticos${NC}"
+        echo -e "${GREEN}   ► $apps_sincronizadas/${#apps_criticas[@]} apps críticas funcionando${NC}"
+        echo -e "${GREEN}   ► $porcentaje_uis% UIs operativas${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ DEV NO VALIDADO: No se crearán PRE/PRO${NC}"
+        echo -e "${RED}   ► Errores críticos: $errores (requerido: 0)${NC}"
+        echo -e "${RED}   ► Apps críticas: $apps_sincronizadas/${#apps_criticas[@]} (requerido: ≥5)${NC}"
+        echo -e "${RED}   ► UIs operativas: $porcentaje_uis% (requerido: ≥60%)${NC}"
+        echo ""
+        echo -e "${YELLOW}💡 Para crear PRE/PRO manualmente después de arreglar los problemas:${NC}"
+        echo -e "${YELLOW}   $0 clusters${NC}"
+        return 1
+    fi
+}
+
 mostrar_urls_ui() {
     # Ejecutar validación primero
     validar_uis
@@ -1098,23 +1215,13 @@ instalar_todo() {
     esperar_servicios
     verificar_y_arreglar_servicios
     configurar_port_forwards
-    validar_uis
     
-    # Verificar si DEV está funcionando correctamente antes de crear PRE y PRO
-    local uis_operativas=0
-    for ui_name in "${!UI_STATUS[@]}"; do
-        if [[ "${UI_STATUS[$ui_name]}" == *"OPERATIVA"* ]]; then
-            uis_operativas=$((uis_operativas + 1))
-        fi
-    done
-    local uis_total=${#UI_URLS[@]}
-    local porcentaje_dev=0
-    if [ $uis_total -gt 0 ]; then
-        porcentaje_dev=$((uis_operativas * 100 / uis_total))
-    fi
+    # VALIDACIÓN ESTRICTA: Verificar si DEV está completamente funcional antes de crear PRE y PRO
+    echo -e "${PURPLE}[VALIDACIÓN CRÍTICA]${NC} Verificando estado completo de DEV"
     
-    if [ $porcentaje_dev -ge 80 ]; then
-        echo -e "${GREEN}✅ Cluster DEV validado ($porcentaje_dev% UIs operativas) - Creando clusters PRE y PRO${NC}"
+    if validar_dev_completo; then
+        echo -e "${GREEN}✅ VALIDACIÓN EXITOSA: DEV completamente funcional${NC}"
+        echo -e "${GREEN}🚀 Procediendo a crear clusters PRE y PRO${NC}"
         
         # Fase 9: Crear clusters adicionales
         echo -e "${PURPLE}[FASE 9/10]${NC} Creación de clusters PRE y PRO"
@@ -1127,9 +1234,10 @@ instalar_todo() {
         echo -e "${GREEN}✅ Arquitectura multi-cluster completa${NC}"
         local clusters_texto="3 Clusters creados y configurados"
     else
-        echo -e "${YELLOW}⚠️ Cluster DEV no está completamente funcional ($porcentaje_dev% UIs). No creando PRE y PRO.${NC}"
-        echo -e "${YELLOW}💡 Puedes crear PRE y PRO manualmente más tarde con: $0 clusters${NC}"
-        local clusters_texto="1 Cluster DEV creado (PRE/PRO pendientes)"
+        echo -e "${RED}❌ VALIDACIÓN FALLIDA: DEV no está completamente funcional${NC}"
+        echo -e "${YELLOW}⚠️ PRE y PRO no serán creados por problemas en DEV${NC}"
+        echo -e "${YELLOW}💡 Soluciona los problemas de DEV y ejecuta: $0 clusters${NC}"
+        local clusters_texto="1 Cluster DEV creado (PRE/PRO pendientes por errores)"
     fi
     
     # Calcular tiempo total

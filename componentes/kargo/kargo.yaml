@@ -15,7 +15,7 @@ spec:
       releaseName: kargo
       parameters:
         - name: "api.adminAccount.passwordHash"
-          value: "$2a$10$Zrhhie4vLz5ygtVSaif6e.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"  # admin123
+          value: "$$2a$$10$$Zrhhie4vLz5ygtVSaif6e.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"  # admin123 (escaped)
         - name: "api.adminAccount.tokenSigningKey"
           value: "1uyxpL0en7D1cqakaYhE1NhN23CkY16F"
         - name: "controller.serviceAccount.create"

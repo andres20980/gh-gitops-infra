@@ -572,6 +572,38 @@ verificar_y_arreglar_servicios() {
         kubectl rollout status deployment argocd-server -n argocd --timeout=300s
     fi
     
+    # Sincronizar aplicaciones pendientes automáticamente
+    echo "🔄 Sincronizando aplicaciones ArgoCD pendientes..."
+    local apps_pendientes=$(kubectl get applications -n argocd --no-headers | grep -E "(Unknown|OutOfSync)" | awk '{print $1}' || true)
+    
+    if [[ -n "$apps_pendientes" ]]; then
+        echo "📋 Aplicaciones a sincronizar: $apps_pendientes"
+        for app in $apps_pendientes; do
+            echo "🔄 Habilitando auto-sync para: $app"
+            kubectl patch application "$app" -n argocd --type merge -p '{
+                "spec": {
+                    "syncPolicy": {
+                        "automated": {
+                            "prune": true,
+                            "selfHeal": true
+                        }
+                    }
+                }
+            }' 2>/dev/null || true
+            
+            echo "🔄 Forzando sincronización de: $app"
+            kubectl patch application "$app" -n argocd --type merge -p '{
+                "operation": {
+                    "sync": {}
+                }
+            }' 2>/dev/null || true
+        done
+        echo "⏳ Esperando 30s para que las aplicaciones se sincronicen..."
+        sleep 30
+    else
+        echo "✅ Todas las aplicaciones están sincronizadas"
+    fi
+    
     # Verificar Kargo - si no existe el namespace, intentar crearlo
     if ! kubectl get namespace kargo >/dev/null 2>&1; then
         echo "⚠️ Namespace kargo no existe, sera creado por la aplicación ArgoCD"
@@ -1057,6 +1089,60 @@ solo_port_forwards() {
     echo -e "${GREEN}✅ Port-forwards configurados${NC}"
 }
 
+sincronizar_aplicaciones() {
+    echo -e "${BLUE}🔄 Sincronizando aplicaciones ArgoCD...${NC}"
+    kubectl config use-context "$CLUSTER_DEV" || {
+        echo -e "${RED}❌ Cluster DEV no disponible${NC}"
+        exit 1
+    }
+    
+    # Mostrar estado actual
+    echo "📊 Estado actual de aplicaciones:"
+    kubectl get applications -n argocd -o wide
+    
+    # Obtener aplicaciones pendientes
+    local apps_pendientes=$(kubectl get applications -n argocd --no-headers | grep -E "(Unknown|OutOfSync)" | awk '{print $1}' || true)
+    
+    if [[ -n "$apps_pendientes" ]]; then
+        echo -e "${YELLOW}📋 Aplicaciones pendientes de sincronización:${NC}"
+        echo "$apps_pendientes"
+        echo ""
+        
+        for app in $apps_pendientes; do
+            echo "🔄 Configurando auto-sync para: $app"
+            kubectl patch application "$app" -n argocd --type merge -p '{
+                "spec": {
+                    "syncPolicy": {
+                        "automated": {
+                            "prune": true,
+                            "selfHeal": true
+                        }
+                    }
+                }
+            }' || echo "⚠️ Error al habilitar auto-sync para $app"
+            
+            echo "🔄 Forzando sincronización inicial de: $app"
+            kubectl patch application "$app" -n argocd --type merge -p '{
+                "operation": {
+                    "sync": {}
+                }
+            }' || echo "⚠️ Error al sincronizar $app"
+        done
+        
+        echo "⏳ Esperando 45s para que las aplicaciones se sincronicen..."
+        sleep 45
+        
+        # Mostrar estado final
+        echo "📊 Estado después de sincronización:"
+        kubectl get applications -n argocd -o wide
+        
+    else
+        echo -e "${GREEN}✅ Todas las aplicaciones ya están sincronizadas${NC}"
+    fi
+    
+    echo -e "${GREEN}✅ Sincronización completada${NC}"
+}
+
 mostrar_estado() {
     echo -e "${BLUE}📊 Estado actual del sistema:${NC}"
     echo ""
@@ -1100,6 +1186,7 @@ mostrar_help() {
     echo "  $0 clusters           # Crear solo los clusters"
     echo "  $0 argocd             # Instalar solo ArgoCD"
     echo "  $0 infra              # Aplicar solo infraestructura"
+    echo "  $0 sync               # Sincronizar aplicaciones ArgoCD"
     echo "  $0 port-forwards      # Configurar solo port-forwards"
     echo "  $0 urls               # Mostrar URLs de interfaces"
     echo "  $0 estado             # Mostrar estado actual"
@@ -1112,7 +1199,8 @@ mostrar_help() {
     echo "  1. $0 clusters        # Crear clusters"
     echo "  2. $0 argocd          # Instalar ArgoCD"
     echo "  3. $0 infra           # Aplicar infraestructura"
-    echo "  4. $0 port-forwards   # Configurar acceso"
+    echo "  4. $0 sync            # Sincronizar aplicaciones"
+    echo "  5. $0 port-forwards   # Configurar acceso"
 }
 
 # Manejo de argumentos
@@ -1128,6 +1216,9 @@ case "${1:-}" in
         ;;
     "infra"|"infraestructura")
         solo_infraestructura
+        ;;
+    "sync"|"sincronizar")
+        sincronizar_aplicaciones
         ;;
     "port-forwards"|"pf")
         solo_port_forwards

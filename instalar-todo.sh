@@ -609,7 +609,7 @@ configurar_port_forwards() {
         ["prometheus-stack-kube-prom-prometheus monitoring 8086 9090"]=""
         ["prometheus-stack-kube-prom-alertmanager monitoring 8087 9093"]=""
         ["jaeger-query monitoring 8088 16686"]=""
-        ["loki monitoring 8089 3100"]=""
+        ["loki-gateway monitoring 8089 80"]=""
         ["minio minio 8090 9000"]=""
         ["minio-console minio 8091 9001"]=""
         ["gitea-http gitea 8092 3000"]=""

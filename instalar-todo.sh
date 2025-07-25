@@ -673,6 +673,9 @@ validar_uis() {
 }
 
 mostrar_urls_ui() {
+    # Ejecutar validación primero
+    validar_uis
+    
     echo ""
     echo "🌐 PLATAFORMA GITOPS MULTI-CLUSTER - INTERFACES DE USUARIO"
     echo "=========================================================="

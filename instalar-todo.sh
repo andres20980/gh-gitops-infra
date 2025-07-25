@@ -661,12 +661,12 @@ verificar_y_arreglar_servicios() {
         kubectl rollout status deployment argocd-server -n argocd --timeout=300s
     fi
     
-    # Sincronizar aplicaciones pendientes automáticamente
-    echo "🔄 Sincronizando aplicaciones ArgoCD pendientes..."
+    # Sincronizar aplicaciones pendientes con lógica básica (la lógica completa está en sincronizar_aplicaciones())
+    echo "🔄 Habilitando auto-sync inicial para aplicaciones pendientes..."
     local apps_pendientes=$(kubectl get applications -n argocd --no-headers | grep -E "(Unknown|OutOfSync)" | awk '{print $1}' || true)
     
     if [[ -n "$apps_pendientes" ]]; then
-        echo "📋 Aplicaciones a sincronizar: $apps_pendientes"
+        echo "📋 Aplicaciones a configurar: $apps_pendientes"
         for app in $apps_pendientes; do
             echo "🔄 Habilitando auto-sync para: $app"
             kubectl patch application "$app" -n argocd --type merge -p '{
@@ -680,17 +680,13 @@ verificar_y_arreglar_servicios() {
                 }
             }' 2>/dev/null || true
             
-            echo "🔄 Forzando sincronización de: $app"
-            kubectl patch application "$app" -n argocd --type merge -p '{
-                "operation": {
-                    "sync": {}
-                }
-            }' 2>/dev/null || true
+            # Anotar para refresh desde Git
+            kubectl annotate application "$app" -n argocd argocd.argoproj.io/refresh=now --overwrite 2>/dev/null || true
         done
-        echo "⏳ Esperando 30s para que las aplicaciones se sincronicen..."
+        echo "⏳ Esperando 30s para configuración inicial..."
         sleep 30
     else
-        echo "✅ Todas las aplicaciones están sincronizadas"
+        echo "✅ Todas las aplicaciones están configuradas"
     fi
     
     # Verificar Kargo - si no existe el namespace, intentar crearlo
@@ -1369,58 +1365,264 @@ solo_port_forwards() {
     echo -e "${GREEN}✅ Port-forwards configurados${NC}"
 }
 
+# Función para esperar que una aplicación esté Synced y Healthy
+wait_for_app() {
+    local app_name=$1
+    local max_wait=${2:-300}  # 5 minutos por defecto
+    local wait_time=0
+    
+    echo -e "${BLUE}⏳ Esperando que $app_name esté Synced y Healthy...${NC}"
+    
+    while [ $wait_time -lt $max_wait ]; do
+        local status=$(kubectl get application $app_name -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        local health=$(kubectl get application $app_name -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+        
+        if [[ "$status" == "Synced" && "$health" == "Healthy" ]]; then
+            echo -e "${GREEN}✅ $app_name está Synced y Healthy${NC}"
+            return 0
+        fi
+        
+        echo "   $app_name: sync=$status health=$health (${wait_time}s/${max_wait}s)"
+        sleep 10
+        wait_time=$((wait_time + 10))
+    done
+    
+    echo -e "${RED}❌ TIMEOUT: $app_name no alcanzó estado Synced+Healthy en ${max_wait}s${NC}"
+    return 1
+}
+
+# Función para forzar sincronización de una aplicación
+force_sync() {
+    local app_name=$1
+    echo -e "${YELLOW}🔄 Forzando sincronización de $app_name...${NC}"
+    
+    # Anotar para forzar refresh desde Git
+    kubectl annotate application $app_name -n argocd argocd.argoproj.io/refresh=now --overwrite >/dev/null 2>&1 || true
+    
+    # Habilitar auto-sync si no está habilitado
+    kubectl patch application $app_name -n argocd --type='merge' -p='{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' >/dev/null 2>&1 || true
+    
+    sleep 5
+}
+
 sincronizar_aplicaciones() {
-    echo -e "${BLUE}🔄 Sincronizando aplicaciones ArgoCD...${NC}"
+    echo -e "${BLUE}🚀 DESPLIEGUE SECUENCIAL CON DEPENDENCIAS GITOPS${NC}"
+    echo "================================================"
+    
     kubectl config use-context "$CLUSTER_DEV" || {
         echo -e "${RED}❌ Cluster DEV no disponible${NC}"
         exit 1
     }
     
-    # Mostrar estado actual
-    echo "📊 Estado actual de aplicaciones:"
-    kubectl get applications -n argocd -o wide
-    
-    # Obtener aplicaciones pendientes
-    local apps_pendientes=$(kubectl get applications -n argocd --no-headers | grep -E "(Unknown|OutOfSync)" | awk '{print $1}' || true)
-    
-    if [[ -n "$apps_pendientes" ]]; then
-        echo -e "${YELLOW}📋 Aplicaciones pendientes de sincronización:${NC}"
-        echo "$apps_pendientes"
-        echo ""
-        
-        for app in $apps_pendientes; do
-            echo "🔄 Configurando auto-sync para: $app"
-            kubectl patch application "$app" -n argocd --type merge -p '{
-                "spec": {
-                    "syncPolicy": {
-                        "automated": {
-                            "prune": true,
-                            "selfHeal": true
-                        }
-                    }
-                }
-            }' || echo "⚠️ Error al habilitar auto-sync para $app"
-            
-            echo "🔄 Forzando sincronización inicial de: $app"
-            kubectl patch application "$app" -n argocd --type merge -p '{
-                "operation": {
-                    "sync": {}
-                }
-            }' || echo "⚠️ Error al sincronizar $app"
-        done
-        
-        echo "⏳ Esperando 45s para que las aplicaciones se sincronicen..."
-        sleep 45
-        
-        # Mostrar estado final
-        echo "📊 Estado después de sincronización:"
-        kubectl get applications -n argocd -o wide
-        
+    echo ""
+    echo "📋 VERIFICANDO ESTADO INICIAL..."
+    kubectl get applications -n argocd --no-headers | awk '{print $1 " -> " $2 "/" $3}'
+
+    echo ""
+    echo -e "${BLUE}🏗️ FASE 1: INFRAESTRUCTURA BASE (cert-manager, ingress-nginx)${NC}"
+    echo "============================================================="
+
+    # Cert-manager (crítico para TLS y webhooks)
+    echo "1️⃣ Desplegando cert-manager..."
+    force_sync cert-manager
+    if wait_for_app cert-manager 600; then
+        echo -e "${GREEN}✅ cert-manager desplegado exitosamente${NC}"
     else
-        echo -e "${GREEN}✅ Todas las aplicaciones ya están sincronizadas${NC}"
+        echo -e "${RED}❌ cert-manager falló - CONTINUANDO CON ADVERTENCIA${NC}"
     fi
-    
-    echo -e "${GREEN}✅ Sincronización completada${NC}"
+
+    # Ingress controller
+    echo ""
+    echo "2️⃣ Desplegando ingress-nginx..."
+    force_sync ingress-nginx
+    if wait_for_app ingress-nginx 300; then
+        echo -e "${GREEN}✅ ingress-nginx desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ ingress-nginx con problemas - continuando...${NC}"
+    fi
+
+    echo ""
+    echo -e "${BLUE}🔐 FASE 2: SECRETOS Y MONITOREO (external-secrets, monitoring)${NC}"
+    echo "================================================================="
+
+    # External Secrets (para gestión de secretos)
+    echo "3️⃣ Desplegando external-secrets..."
+    force_sync external-secrets
+    if wait_for_app external-secrets 300; then
+        echo -e "${GREEN}✅ external-secrets desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ external-secrets con problemas - continuando...${NC}"
+    fi
+
+    # Prometheus Stack (ya está desplegado, pero verificamos)
+    echo ""
+    echo "4️⃣ Verificando monitoring (prometheus-stack)..."
+    if wait_for_app monitoring 60; then
+        echo -e "${GREEN}✅ monitoring ya está operativo${NC}"
+    else
+        force_sync monitoring
+        wait_for_app monitoring 300 || echo -e "${YELLOW}⚠️ monitoring con problemas - continuando...${NC}"
+    fi
+
+    echo ""
+    echo -e "${BLUE}� FASE 3: OBSERVABILIDAD (loki, grafana, jaeger)${NC}"
+    echo "=================================================="
+
+    # Loki para logs
+    echo "5️⃣ Desplegando loki..."
+    force_sync loki
+    if wait_for_app loki 300; then
+        echo -e "${GREEN}✅ loki desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ loki con problemas - continuando...${NC}"
+    fi
+
+    # Grafana para dashboards
+    echo ""
+    echo "6️⃣ Desplegando grafana..."
+    force_sync grafana
+    if wait_for_app grafana 300; then
+        echo -e "${GREEN}✅ grafana desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ grafana con problemas - continuando...${NC}"
+    fi
+
+    # Jaeger para tracing
+    echo ""
+    echo "7️⃣ Desplegando jaeger..."
+    force_sync jaeger
+    if wait_for_app jaeger 300; then
+        echo -e "${GREEN}✅ jaeger desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ jaeger con problemas - continuando...${NC}"
+    fi
+
+    echo ""
+    echo -e "${BLUE}🚀 FASE 4: GITOPS AVANZADO (argo-*, kargo)${NC}"
+    echo "==========================================="
+
+    # Argo Rollouts
+    echo "8️⃣ Desplegando argo-rollouts..."
+    force_sync argo-rollouts
+    if wait_for_app argo-rollouts 300; then
+        echo -e "${GREEN}✅ argo-rollouts desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ argo-rollouts con problemas - continuando...${NC}"
+    fi
+
+    # Argo Workflows
+    echo ""
+    echo "9️⃣ Desplegando argo-workflows..."
+    force_sync argo-workflows
+    if wait_for_app argo-workflows 300; then
+        echo -e "${GREEN}✅ argo-workflows desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ argo-workflows con problemas - continuando...${NC}"
+    fi
+
+    # Argo Events
+    echo ""
+    echo "🔟 Desplegando argo-events..."
+    force_sync argo-events
+    if wait_for_app argo-events 300; then
+        echo -e "${GREEN}✅ argo-events desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ argo-events con problemas - continuando...${NC}"
+    fi
+
+    # Kargo (requiere cert-manager + external-secrets)
+    echo ""
+    echo "1️⃣1️⃣ Desplegando kargo..."
+    force_sync kargo
+    if wait_for_app kargo 600; then
+        echo -e "${GREEN}✅ kargo desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ kargo con problemas - continuando...${NC}"
+    fi
+
+    echo ""
+    echo -e "${BLUE}🏪 FASE 5: STORAGE Y SCM (minio, gitea)${NC}"
+    echo "======================================="
+
+    # MinIO
+    echo "1️⃣2️⃣ Desplegando minio..."
+    force_sync minio
+    if wait_for_app minio 300; then
+        echo -e "${GREEN}✅ minio desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ minio con problemas - continuando...${NC}"
+    fi
+
+    # Gitea
+    echo ""
+    echo "1️⃣3️⃣ Desplegando gitea..."
+    force_sync gitea
+    if wait_for_app gitea 300; then
+        echo -e "${GREEN}✅ gitea desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ gitea con problemas - continuando...${NC}"
+    fi
+
+    echo ""
+    echo -e "${BLUE}📱 FASE 6: COMPLEMENTOS (argocd-notifications, argocd-applicationset)${NC}"
+    echo "====================================================================="
+
+    # ArgoCD Notifications
+    echo "1️⃣4️⃣ Desplegando argocd-notifications..."
+    force_sync argocd-notifications
+    if wait_for_app argocd-notifications 180; then
+        echo -e "${GREEN}✅ argocd-notifications desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ argocd-notifications con problemas - continuando...${NC}"
+    fi
+
+    # ArgoCD ApplicationSet
+    echo ""
+    echo "1️⃣5️⃣ Desplegando argocd-applicationset..."
+    force_sync argocd-applicationset
+    if wait_for_app argocd-applicationset 180; then
+        echo -e "${GREEN}✅ argocd-applicationset desplegado exitosamente${NC}"
+    else
+        echo -e "${YELLOW}⚠️ argocd-applicationset con problemas - continuando...${NC}"
+    fi
+
+    echo ""
+    echo -e "${BLUE}🎯 RESUMEN FINAL${NC}"
+    echo "================"
+
+    # Estado final
+    echo ""
+    echo "� ESTADO FINAL DE APLICACIONES:"
+    kubectl get applications -n argocd --no-headers | awk '{
+        if ($2 == "Synced" && $3 == "Healthy") 
+            print "✅ " $1 " -> " $2 "/" $3
+        else if ($2 == "Synced")
+            print "🟡 " $1 " -> " $2 "/" $3  
+        else
+            print "❌ " $1 " -> " $2 "/" $3
+    }'
+
+    # Contar éxitos
+    local TOTAL=$(kubectl get applications -n argocd --no-headers | wc -l)
+    local SYNCED=$(kubectl get applications -n argocd --no-headers | awk '$2=="Synced" && $3=="Healthy"' | wc -l)
+    local PERCENTAGE=$((SYNCED * 100 / TOTAL))
+
+    echo ""
+    echo -e "${GREEN}📊 ESTADÍSTICAS FINALES:${NC}"
+    echo "========================"
+    echo "✅ Aplicaciones Synced+Healthy: $SYNCED/$TOTAL ($PERCENTAGE%)"
+    echo "🎯 Objetivo mínimo para PRE/PRO: 5/7 aplicaciones críticas (≥71%)"
+
+    if [ $PERCENTAGE -ge 70 ]; then
+        echo -e "${GREEN}🎉 ¡ÉXITO! Plataforma lista para crear PRE/PRO${NC}"
+        echo -e "${GREEN}💡 Ejecuta: ./instalar-todo.sh clusters${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Necesita más aplicaciones funcionando para PRE/PRO${NC}"
+        echo -e "${YELLOW}💡 Revisa los logs de aplicaciones fallidas${NC}"
+    fi
+
+    echo ""
+    echo -e "${GREEN}✅ DESPLIEGUE SECUENCIAL COMPLETADO${NC}"
 }
 
 mostrar_estado() {

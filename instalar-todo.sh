@@ -793,15 +793,34 @@ esperar_servicios() {
     
     kubectl config use-context "$CLUSTER_DEV"
     
-    # Esperar namespaces críticos
-    local namespaces=("argocd" "kargo" "monitoring" "loki" "jaeger" "minio" "gitea")
+    # Esperar namespaces críticos con timeouts más largos
+    local namespaces=("argocd" "monitoring" "loki" "jaeger" "minio" "gitea" "argo-rollouts" "argo-workflows" "kubernetes-dashboard")
     
     for ns in "${namespaces[@]}"; do
         echo "📦 Esperando namespace: $ns"
-        kubectl wait --for=condition=Ready pods --all -n "$ns" --timeout=300s 2>/dev/null || echo "⚠️ Algunos pods en $ns pueden no estar listos aún"
+        if kubectl get namespace "$ns" >/dev/null 2>&1; then
+            # Solo esperar pods que existan, con timeout más corto por namespace
+            kubectl wait --for=condition=Ready pods --all -n "$ns" --timeout=180s 2>/dev/null || echo "⚠️ Algunos pods en $ns pueden tardar más en estar listos"
+        else
+            echo "⚠️ Namespace $ns no existe aún"
+        fi
     done
     
-    echo -e "${GREEN}✅ Servicios inicializados${NC}"
+    # Esperar explícitamente a servicios críticos
+    echo "🔍 Verificando servicios críticos..."
+    local servicios_criticos=("argocd-server" "prometheus-stack-grafana" "jaeger-query" "loki" "minio" "gitea-http")
+    local servicios_disponibles=0
+    
+    for servicio in "${servicios_criticos[@]}"; do
+        if kubectl get svc "$servicio" -A >/dev/null 2>&1; then
+            servicios_disponibles=$((servicios_disponibles + 1))
+            echo "✅ Servicio $servicio disponible"
+        else
+            echo "⚠️ Servicio $servicio no encontrado"
+        fi
+    done
+    
+    echo -e "${GREEN}✅ Servicios inicializados: $servicios_disponibles/${#servicios_criticos[@]} críticos disponibles${NC}"
 }
 
 instalar_todo() {

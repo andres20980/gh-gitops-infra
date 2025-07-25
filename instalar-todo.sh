@@ -63,13 +63,12 @@ declare -A UI_URLS=(
     ["AlertManager"]="http://localhost:8087"
     ["Jaeger"]="http://localhost:8088"
     
-    # Logs & Storage
-    ["Loki"]="http://localhost:8089"
+    # Storage & Tools
     ["MinIO_API"]="http://localhost:8090"
     ["MinIO_Console"]="http://localhost:8091"
     
     # Desarrollo & Gestión
-    ["Gitea"]="http://localhost:8092"
+    ["Gitea"]="http://localhost:8092"  
     ["K8s_Dashboard"]="http://localhost:8093"
 )
 
@@ -632,7 +631,7 @@ configurar_port_forwards() {
     sleep 3
     
     # Liberar puertos específicos si están ocupados
-    for puerto in {8080..8093}; do
+    for puerto in 8080 8081 8082 8083 8084 8085 8086 8087 8088 8090 8091 8092 8093; do
         if netstat -tuln | grep -q ":$puerto "; then
             echo "🔌 Liberando puerto $puerto..."
             fuser -k $puerto/tcp 2>/dev/null || true
@@ -661,10 +660,24 @@ configurar_port_forwards() {
             # Usar nohup para evitar que se maten los procesos
             nohup kubectl port-forward -n "$namespace" "service/$servicio" "$puerto_local:$puerto_remoto" >/dev/null 2>&1 &
             local pf_pid=$!
-            sleep 3
+            sleep 5  # Aumentar tiempo de espera para estabilización
             
-            # Verificar que el port-forward esté funcionando
-            if kill -0 $pf_pid 2>/dev/null && netstat -tuln | grep -q ":$puerto_local "; then
+            # Verificar que el port-forward esté funcionando con múltiples métodos
+            local puerto_activo=false
+            if kill -0 $pf_pid 2>/dev/null; then
+                # Verificar que el puerto esté escuchando
+                if netstat -tuln | grep -q ":$puerto_local "; then
+                    puerto_activo=true
+                else
+                    # Esperar un poco más para algunos servicios lentos
+                    sleep 3
+                    if netstat -tuln | grep -q ":$puerto_local "; then
+                        puerto_activo=true
+                    fi
+                fi
+            fi
+            
+            if [ "$puerto_activo" = true ]; then
                 echo -e "${GREEN}✅ Port-forward activo para $servicio en puerto $puerto_local (PID: $pf_pid)${NC}"
                 return 0
             else
@@ -699,7 +712,7 @@ configurar_port_forwards() {
         ["prometheus-stack-kube-prom-prometheus monitoring 8086 9090"]=""
         ["prometheus-stack-kube-prom-alertmanager monitoring 8087 9093"]=""
         ["jaeger-query monitoring 8088 16686"]=""
-        ["loki-gateway monitoring 8089 80"]=""
+        # ["loki-gateway monitoring 8089 80"]=""  # Loki no tiene UI web propia, se consulta via Grafana
         ["minio minio 8090 9000"]=""
         ["minio-console minio 8091 9001"]=""
         ["gitea-http gitea 8092 3000"]=""
@@ -732,7 +745,7 @@ configurar_port_forwards() {
     
     # Verificar port-forwards activos
     echo "🔍 Port-forwards activos:"
-    netstat -tuln | grep -E ':(808[0-9]|809[0-2])' || echo "❌ No se encontraron port-forwards activos"
+    netstat -tuln | grep -E ':(808[0-3]|809[0-3])' || echo "❌ No se encontraron port-forwards activos"
 }
 
 validar_uis() {
@@ -766,7 +779,7 @@ validar_uis() {
     local porcentaje=$((uis_operativas * 100 / uis_total))
     if [ $porcentaje -lt 80 ]; then
         echo -e "${YELLOW}⚠️ Solo $porcentaje% de UIs operativas. Verificando port-forwards...${NC}"
-        netstat -tuln | grep -E ':(808[0-9]|809[0-2])' | while read line; do
+        netstat -tuln | grep -E ':(808[0-3]|809[0-3])' | while read line; do
             puerto=$(echo "$line" | awk '{print $4}' | cut -d: -f2)
             echo "  🔗 Puerto $puerto activo"
         done
@@ -834,10 +847,10 @@ mostrar_urls_ui() {
     echo ""
     echo "📝 LOGS & STORAGE:"
     echo "------------------"
-    echo "📝 Loki UI: http://localhost:8089"
-    echo "   📋 Propósito: Agregación y consulta de logs"
-    echo "   🔓 Acceso: Directo sin autenticación"
-    echo "   ${UI_STATUS["Loki"]:-"⏳ VERIFICANDO..."}"
+    echo "📝 Loki (Logs): Accesible vía Grafana (puerto 8085)"
+    echo "   📋 Propósito: Agregación y consulta de logs con LogQL"
+    echo "   🔓 Acceso: Loki NO tiene UI web - se consulta desde Grafana"
+    echo "   💡 Instrucciones: Ir a Grafana → Explore → Seleccionar Loki como datasource"
     echo ""
     echo "🏪 MinIO API: http://localhost:8090"
     echo "   📋 Propósito: Object storage S3-compatible (API)"
@@ -889,7 +902,8 @@ mostrar_urls_ui() {
     echo "💡 Port-forwards activos PID: $PORTFORWARD_PID"
     echo ""
     echo "🚀 ¡PLATAFORMA GITOPS MULTI-CLUSTER COMPLETAMENTE OPERATIVA!"
-    echo "🔓 ¡TODAS LAS UIS VALIDADAS PARA ACCESO SIN AUTENTICACIÓN!"
+    echo "🔓 ¡TODAS LAS UIS WEB VALIDADAS PARA ACCESO SIN AUTENTICACIÓN!"
+    echo "📝 ¡LOGS DE LOKI DISPONIBLES A TRAVÉS DE GRAFANA!"
 }
 
 esperar_servicios() {
@@ -912,7 +926,7 @@ esperar_servicios() {
     
     # Esperar explícitamente a servicios críticos con verificación mejorada
     echo "🔍 Verificando servicios críticos..."
-    local servicios_criticos=("argocd-server" "prometheus-stack-grafana" "jaeger-query" "loki-gateway" "minio" "gitea-http")
+    local servicios_criticos=("argocd-server" "prometheus-stack-grafana" "jaeger-query" "minio" "gitea-http")
     local servicios_disponibles=0
     
     for servicio in "${servicios_criticos[@]}"; do
@@ -1005,7 +1019,7 @@ instalar_todo() {
     echo "║  ⏱️  Tiempo total: ${minutos}m ${segundos}s                                                    ║"
     echo "║  🏭 3 Clusters creados y configurados                                       ║"
     echo "║  📦 14+ Herramientas GitOps desplegadas                                     ║"
-    echo "║  🌐 12 UIs disponibles                                                      ║"
+    echo "║  🌐 11 UIs web disponibles + Logs via Grafana                              ║"
     echo "╚══════════════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
@@ -1160,7 +1174,7 @@ mostrar_estado() {
     echo ""
     echo "🌐 PORT-FORWARDS ACTIVOS:"
     if pgrep -f "kubectl.*port-forward" >/dev/null; then
-        netstat -tuln | grep -E ':(808[0-9]|809[0-2])' | while read line; do
+        netstat -tuln | grep -E ':(808[0-3]|809[0-3])' | while read line; do
             puerto=$(echo "$line" | awk '{print $4}' | cut -d: -f2)
             echo "  🔗 Puerto $puerto activo"
         done

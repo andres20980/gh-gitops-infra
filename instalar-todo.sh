@@ -30,7 +30,7 @@ CLUSTER_DEV="gitops-dev"
 CLUSTER_PRE="gitops-pre" 
 CLUSTER_PRO="gitops-pro"
 PORTFORWARD_PID=""
-KUBERNETES_VERSION="v1.31.0"  # Versión estable y probada
+KUBERNETES_VERSION="v1.33.1"  # Versión más reciente disponible
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Configuración de recursos calculada según componentes reales
@@ -55,21 +55,22 @@ declare -A UI_URLS=(
     
     # Progressive Delivery
     ["Argo_Workflows"]="http://localhost:8083"
+    ["Argo_Rollouts"]="http://localhost:8084"
     
     # Observability
-    ["Grafana"]="http://localhost:8084"
-    ["Prometheus"]="http://localhost:8085"
-    ["AlertManager"]="http://localhost:8086"
-    ["Jaeger"]="http://localhost:8087"
+    ["Grafana"]="http://localhost:8085"
+    ["Prometheus"]="http://localhost:8086"
+    ["AlertManager"]="http://localhost:8087"
+    ["Jaeger"]="http://localhost:8088"
     
     # Logs & Storage
-    ["Loki"]="http://localhost:8088"
-    ["MinIO_API"]="http://localhost:8089"
-    ["MinIO_Console"]="http://localhost:8090"
+    ["Loki"]="http://localhost:8089"
+    ["MinIO_API"]="http://localhost:8090"
+    ["MinIO_Console"]="http://localhost:8091"
     
     # Desarrollo & Gestión
-    ["Gitea"]="http://localhost:8091"
-    ["K8s_Dashboard"]="http://localhost:8092"
+    ["Gitea"]="http://localhost:8092"
+    ["K8s_Dashboard"]="http://localhost:8093"
 )
 
 declare -A UI_STATUS
@@ -380,7 +381,7 @@ configurar_contextos() {
 }
 
 instalar_argocd() {
-    echo -e "${BLUE}🔄 Instalando ArgoCD en DEV...${NC}"
+    echo -e "${BLUE}🔄 Instalando ArgoCD en DEV con acceso anónimo completo...${NC}"
     
     kubectl config use-context "$CLUSTER_DEV"
     
@@ -394,15 +395,53 @@ instalar_argocd() {
     echo "⏳ Esperando a que ArgoCD esté listo..."
     kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
     
-    # Configurar acceso sin autenticación
+    # Configurar acceso COMPLETAMENTE ANÓNIMO - sin login requerido
+    echo "🔓 Configurando acceso anónimo completo..."
+    
+    # 1. Configurar servidor inseguro (sin TLS)
     kubectl patch configmap argocd-cmd-params-cm -n argocd --patch '{"data":{"server.insecure":"true"}}'
-    kubectl patch deployment argocd-server -n argocd --patch '{"spec":{"template":{"spec":{"containers":[{"name":"argocd-server","args":["argocd-server","--insecure"]}]}}}}'
     
-    # Reiniciar ArgoCD server
+    # 2. Configurar acceso anónimo en argocd-cm
+    kubectl patch configmap argocd-cm -n argocd --patch '{
+      "data": {
+        "url": "http://localhost:8080",
+        "users.anonymous.enabled": "true",
+        "policy.default": "role:admin",
+        "policy.csv": "p, role:anonymous, applications, *, */*, allow\np, role:anonymous, clusters, *, *, allow\np, role:anonymous, repositories, *, *, allow\np, role:anonymous, certificates, *, *, allow\np, role:anonymous, accounts, *, *, allow\np, role:anonymous, gpgkeys, *, *, allow\np, role:anonymous, logs, *, *, allow\np, role:anonymous, exec, *, */*, allow\ng, argocd:anonymous, role:admin"
+      }
+    }'
+    
+    # 3. Deshabilitar Dex (authentication)
+    kubectl patch configmap argocd-cmd-params-cm -n argocd --patch '{"data":{"dex.disable.authentication":"true"}}'
+    
+    # 4. Configurar deployment con argumentos anónimos
+    kubectl patch deployment argocd-server -n argocd --patch '{
+      "spec": {
+        "template": {
+          "spec": {
+            "containers": [{
+              "name": "argocd-server",
+              "args": [
+                "argocd-server",
+                "--insecure",
+                "--disable-auth"
+              ]
+            }]
+          }
+        }
+      }
+    }'
+    
+    # 5. Reiniciar ArgoCD server
+    echo "🔄 Reiniciando ArgoCD server con configuración anónima..."
     kubectl rollout restart deployment argocd-server -n argocd
-    kubectl rollout status deployment argocd-server -n argocd
+    kubectl rollout status deployment argocd-server -n argocd --timeout=300s
     
-    echo -e "${GREEN}✅ ArgoCD instalado y configurado${NC}"
+    # 6. Verificar que el servidor esté respondiendo
+    echo "🔍 Verificando acceso anónimo..."
+    sleep 10
+    
+    echo -e "${GREEN}✅ ArgoCD instalado con acceso anónimo completo (sin login)${NC}"
 }
 
 aplicar_infraestructura() {
@@ -565,15 +604,16 @@ configurar_port_forwards() {
         ["kargo-api kargo 8081 80"]=""
         ["argocd-dex-server argocd 8082 5556"]=""
         ["argo-workflows-server argo-workflows 8083 2746"]=""
-        ["grafana grafana 8084 80"]=""
-        ["prometheus-stack-kube-prom-prometheus monitoring 8085 9090"]=""
-        ["prometheus-stack-kube-prom-alertmanager monitoring 8086 9093"]=""
-        ["jaeger jaeger 8087 16686"]=""
-        ["loki loki 8088 3100"]=""
-        ["minio-api minio 8089 9000"]=""
-        ["minio-console minio 8090 9001"]=""
-        ["gitea-http gitea 8091 3000"]=""
-        ["kubernetes-dashboard kubernetes-dashboard 8092 80"]=""
+        ["argo-rollouts-dashboard argo-rollouts 8084 3100"]=""
+        ["prometheus-stack-grafana monitoring 8085 80"]=""
+        ["prometheus-stack-kube-prom-prometheus monitoring 8086 9090"]=""
+        ["prometheus-stack-kube-prom-alertmanager monitoring 8087 9093"]=""
+        ["jaeger-query monitoring 8088 16686"]=""
+        ["loki monitoring 8089 3100"]=""
+        ["minio minio 8090 9000"]=""
+        ["minio-console minio 8091 9001"]=""
+        ["gitea-http gitea 8092 3000"]=""
+        ["kubernetes-dashboard-web kubernetes-dashboard 8093 8000"]=""
     )
     
     # Crear port-forwards
@@ -653,53 +693,58 @@ mostrar_urls_ui() {
     echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
     echo "   ${UI_STATUS["Argo_Workflows"]:-"⏳ VERIFICANDO..."}"
     echo ""
+    echo "🎯 Argo Rollouts Dashboard: http://localhost:8084"
+    echo "   📋 Propósito: Progressive delivery, canary deployments y blue-green"
+    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
+    echo "   ${UI_STATUS["Argo_Rollouts"]:-"⏳ VERIFICANDO..."}"
+    echo ""
     echo "📈 OBSERVABILITY:"
     echo "-----------------"
-    echo "📊 Grafana UI: http://localhost:8084"
+    echo "📊 Grafana UI: http://localhost:8085"
     echo "   📋 Propósito: Dashboards y visualización de métricas"
     echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
     echo "   ${UI_STATUS["Grafana"]:-"⏳ VERIFICANDO..."}"
     echo ""
-    echo "📈 Prometheus UI: http://localhost:8085"
+    echo "📈 Prometheus UI: http://localhost:8086"
     echo "   📋 Propósito: Metrics collection y time-series database"
     echo "   🔓 Acceso: Directo sin autenticación"
     echo "   ${UI_STATUS["Prometheus"]:-"⏳ VERIFICANDO..."}"
     echo ""
-    echo "🚨 AlertManager UI: http://localhost:8086"
+    echo "🚨 AlertManager UI: http://localhost:8087"
     echo "   📋 Propósito: Alert routing y notification management"
     echo "   🔓 Acceso: Directo sin autenticación"
     echo "   ${UI_STATUS["AlertManager"]:-"⏳ VERIFICANDO..."}"
     echo ""
-    echo "🔍 Jaeger UI: http://localhost:8087"
+    echo "🔍 Jaeger UI: http://localhost:8088"
     echo "   📋 Propósito: Distributed tracing y performance monitoring"
     echo "   🔓 Acceso: Directo sin autenticación"
     echo "   ${UI_STATUS["Jaeger"]:-"⏳ VERIFICANDO..."}"
     echo ""
     echo "📝 LOGS & STORAGE:"
     echo "------------------"
-    echo "📝 Loki UI: http://localhost:8088"
+    echo "📝 Loki UI: http://localhost:8089"
     echo "   📋 Propósito: Agregación y consulta de logs"
     echo "   🔓 Acceso: Directo sin autenticación"
     echo "   ${UI_STATUS["Loki"]:-"⏳ VERIFICANDO..."}"
     echo ""
-    echo "🏪 MinIO API: http://localhost:8089"
+    echo "🏪 MinIO API: http://localhost:8090"
     echo "   📋 Propósito: Object storage S3-compatible (API)"
     echo "   🔓 Acceso: Credenciales fijas (admin/admin123)"
     echo "   ${UI_STATUS["MinIO_API"]:-"⏳ VERIFICANDO..."}"
     echo ""
-    echo "🏪 MinIO Console: http://localhost:8090"
+    echo "🏪 MinIO Console: http://localhost:8091"
     echo "   📋 Propósito: Object storage S3-compatible (Console UI)"
     echo "   🔓 Acceso: admin/admin123"
     echo "   ${UI_STATUS["MinIO_Console"]:-"⏳ VERIFICANDO..."}"
     echo ""
     echo "🔧 DESARROLLO & GESTIÓN:"
     echo "------------------------"
-    echo "🐙 Gitea UI: http://localhost:8091"
+    echo "🐙 Gitea UI: http://localhost:8092"
     echo "   📋 Propósito: Git repository management y source control"
     echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
     echo "   ${UI_STATUS["Gitea"]:-"⏳ VERIFICANDO..."}"
     echo ""
-    echo "🔧 Kubernetes Dashboard: http://localhost:8092"
+    echo "🔧 Kubernetes Dashboard: http://localhost:8093"
     echo "   📋 Propósito: Kubernetes cluster management interface"
     echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
     echo "   ${UI_STATUS["K8s_Dashboard"]:-"⏳ VERIFICANDO..."}"

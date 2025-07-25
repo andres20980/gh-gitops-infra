@@ -10,7 +10,7 @@ spec:
   source:
     chart: kargo
     repoURL: https://charts.akuity.io
-    targetRevision: 1.6.1
+    targetRevision: 1.6.2
     helm:
       values: |
         # Configuración del servidor API de Kargo

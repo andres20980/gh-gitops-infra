@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://charts.akuity.io
+    repoURL: oci://ghcr.io/akuity/kargo-charts
     chart: kargo
-    targetRevision: 1.6.0
+    targetRevision: 1.6.1
     helm:
       values: |
         # Configuración del servidor API de Kargo

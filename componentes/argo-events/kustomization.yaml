@@ -1,19 +1,19 @@
 # Kustomization for Argo Events
-# Using the official remote manifest as base to avoid recursion issues
+# Following official best practices from: https://argoproj.github.io/argo-events/installation/
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Use the official installation as the base
-# This approach avoids Application recursion by referencing remote manifests directly
+# Official recommended approach using remote bases
+bases:
+  - github.com/argoproj/argo-events/manifests/cluster-install
+
+# Additional resources (EventBus)
 resources:
-  - https://raw.githubusercontent.com/argoproj/argo-events/stable/manifests/install.yaml
   - https://raw.githubusercontent.com/argoproj/argo-events/stable/examples/eventbus/native.yaml
 
-# Ensure the namespace exists first 
-patchesStrategicMerge:
-  - patches/namespace-patch.yaml
-
 # Add labels for ArgoCD management
-commonLabels:
-  app.kubernetes.io/managed-by: argocd
-  app.kubernetes.io/part-of: gitops-infra
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/managed-by: argocd
+      app.kubernetes.io/part-of: gitops-infra

@@ -12,6 +12,7 @@ spec:
       revision: HEAD
       directories:
       - path: componentes/*
+        exclude: '{argo-events}'  # Exclude argo-events as it uses Helm chart directly
   template:
     metadata:
       name: '{{path.basename}}'
@@ -24,12 +25,9 @@ spec:
         repoURL: https://github.com/andres20980/gh-gitops-infra.git
         targetRevision: HEAD
         path: '{{path}}'
-        directory:
-          recurse: false
-          include: '*.yaml'
       destination:
         server: https://kubernetes.default.svc
-        namespace: argocd
+        # No definimos namespace fijo - cada componente define el suyo
       syncPolicy:
         automated:
           prune: true

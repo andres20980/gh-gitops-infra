@@ -7,8 +7,9 @@ kind: Kustomization
 bases:
   - github.com/argoproj/argo-events/manifests/cluster-install
 
-# Additional resources (EventBus)
+# Additional resources (EventBus and Namespace)
 resources:
+  - namespace.yaml
   - https://raw.githubusercontent.com/argoproj/argo-events/stable/examples/eventbus/native.yaml
 
 # Add labels for ArgoCD management

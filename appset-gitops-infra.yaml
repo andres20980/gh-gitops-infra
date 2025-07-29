@@ -12,7 +12,7 @@ spec:
       revision: HEAD
       directories:
       - path: componentes/*
-        exclude: '{argo-events}'  # Exclude argo-events as it uses Helm chart directly
+        exclude: '{argo-events,argo-workflows,argo-rollouts,argocd-notifications}'  # These use Helm charts directly
   template:
     metadata:
       name: '{{path.basename}}'

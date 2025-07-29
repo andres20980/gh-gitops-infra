@@ -1,0 +1,79 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.40.2  # Latest version from helm search
+    helm:
+      # Optimized values for GitOps development environment
+      values: |
+        # Controller configuration
+        controller:
+          replicas: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+        
+        # Global settings
+        global:
+          image:
+            tag: v1.8.3
+        
+        # RBAC
+        rbac:
+          enabled: true
+        
+        # Service Account
+        serviceAccount:
+          create: true
+          name: argo-rollouts
+        
+        # Dashboard (optional UI)
+        dashboard:
+          enabled: true
+          replicas: 1
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+          service:
+            type: ClusterIP
+            port: 3100
+        
+        # Metrics
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: false  # Enable if using Prometheus Operator
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

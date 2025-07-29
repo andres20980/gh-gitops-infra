@@ -1,0 +1,7 @@
+# Patch for namespace to add ArgoCD labels
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argo-events
+  labels:
+    name: argo-events

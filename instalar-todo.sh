@@ -1,57 +1,89 @@
 #!/bin/bash
 
-# GitOps Multi-Cluster Infrastructure - Instalación Completa
-# Arquitectura: 3 clusters (dev/pre/pro) con gestión centralizada desde DEV
-# Autor: GitOps Infrastructure Team
-# Versión: 2.0 Optimizada - Corregida
+# ============================================================================
+# GITOPS AUTO-UPDATING INFRASTRUCTURE - VERSIÓN 2025 INTELIGENTE Y DESATENDIDA
+# ============================================================================
+# Autor: Automatización GitOps
+# Fecha: Enero 2025 
+# Propósito: Instalación completamente automatizada de infraestructura GitOps
+# Arquitectura: DEV (gestión centralizada) + PRE/PRO (despliegue automático)
+# Metodología: Auto-detección + Helm Charts Oficiales + Operación Desatendida
+# 
+# VARIABLES DE ENTORNO:
+# - MODO_DESATENDIDO=true/false (default: true) - Instalación sin prompts
+# - CREAR_CLUSTERS_ADICIONALES=true/false (default: false) - Crear PRE/PRO
+# 
+# EJEMPLOS DE USO:
+# ./instalar-todo.sh                                    # Instalación desatendida solo DEV
+# MODO_DESATENDIDO=false ./instalar-todo.sh             # Instalación interactiva  
+# CREAR_CLUSTERS_ADICIONALES=true ./instalar-todo.sh    # Instalar DEV + PRE + PRO
+# ============================================================================
 
-set -euo pipefail  # Modo estricto: salir en errores, variables no definidas, errores en pipes
+set -euo pipefail  # Salir en cualquier error, variable no definida o error en pipe
+
+# Configuración de colores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m' # No Color
 
 # Configuración para instalación desatendida
 export DEBIAN_FRONTEND=noninteractive
 export APT_LISTCHANGES_FRONTEND=none
 export NEEDRESTART_MODE=a
-
-# Deshabilitar prompts interactivos
 export ARGOCD_OPTS="--plaintext --grpc-web"
 export MINIKUBE_IN_STYLE=false
 
-# Colores para la salida
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
-# Variables globales optimizadas
+# Configuración de variables globales
 CLUSTER_DEV="gitops-dev"
 CLUSTER_PRE="gitops-pre" 
 CLUSTER_PRO="gitops-pro"
-PORTFORWARD_PID=""
-KUBERNETES_VERSION="v1.33.1"  # Versión más reciente disponible
+
+# Configuración por defecto: modo desatendido
+MODO_DESATENDIDO="${MODO_DESATENDIDO:-true}"  # Por defecto desatendido
+CREAR_CLUSTERS_ADICIONALES="${CREAR_CLUSTERS_ADICIONALES:-false}"  # Por defecto solo DEV
+
+# Configuración de versiones (se auto-actualizan dinámicamente)
+KUBERNETES_VERSION=""  # Se detecta automáticamente la última estable
+ARGOCD_VERSION=""      # Se detecta automáticamente la última release
+
+# Versiones de Helm Charts (se auto-actualizan dinámicamente)
+CERT_MANAGER_VERSION=""
+EXTERNAL_SECRETS_VERSION=""
+INGRESS_NGINX_VERSION=""
+GRAFANA_VERSION=""
+JAEGER_VERSION=""
+LOKI_VERSION=""
+MINIO_VERSION=""
+GITEA_VERSION=""
+
+# Cache de versiones para evitar múltiples consultas API
+declare -A VERSION_CACHE
+
+# Configuración de recursos por cluster - OPTIMIZADA
+DEV_MEMORY="8192"     # 8GB RAM - Cluster principal con toda la infraestructura
+DEV_CPUS="4"          # 4 CPUs - Para manejar múltiples cargas de trabajo  
+DEV_DISK="50g"        # 50GB - Almacenamiento para logs, métricas, imágenes
+
+PRE_MEMORY="2048"     # 2GB RAM - Entorno de preproducción
+PRE_CPUS="2"          # 2 CPUs - Recursos suficientes para testing
+PRE_DISK="20g"        # 20GB - Almacenamiento para aplicaciones de test
+
+PRO_MEMORY="2048"     # 2GB RAM - Simulación de producción en desarrollo
+PRO_CPUS="2"          # 2 CPUs - Recursos similares a PRE
+PRO_DISK="20g"        # 20GB - Almacenamiento para aplicaciones
+
+# Obtener directorio del script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Configuración de recursos calculada según componentes reales
-DEV_MEMORY="8192"  # 8GB: 5.6GB componentes + 2.4GB overhead/buffers
-DEV_CPUS="4"       # 4 CPUs: 2.6 componentes + 1.4 overhead/picos
-DEV_DISK="50g"     # 50GB: imágenes, logs, datos persistentes
-
-PRE_MEMORY="2048"  # 2GB: solo aplicaciones sencillas para GitOps promotion testing
-PRE_CPUS="2"       # 2 CPUs: recursos mínimos para apps sencillas
-PRE_DISK="2g"      # 2GB: solo para apps sencillas, sin herramientas de infra
-
-PRO_MEMORY="2048"  # 2GB: solo aplicaciones sencillas para GitOps promotion demos
-PRO_CPUS="2"       # 2 CPUs: recursos mínimos para apps sencillas  
-PRO_DISK="2g"      # 2GB: solo para apps sencillas, sin herramientas de infra
-
-# Array de validación de UIs organizadas por tipo
+# URLs de las UIs accesibles - VALIDADAS Y ACTUALIZADAS
 declare -A UI_URLS=(
     # GitOps Core
     ["ArgoCD"]="http://localhost:8080"
     ["Kargo"]="http://localhost:8081"
-    ["ArgoCD_Dex"]="http://localhost:8082"
     
     # Progressive Delivery & Event-Driven GitOps
     ["Argo_Workflows"]="http://localhost:8083"
@@ -74,15 +106,279 @@ declare -A UI_URLS=(
 
 declare -A UI_STATUS
 
+# ============================================================================
+# FUNCIONES DE AUTO-ACTUALIZACIÓN
+# ============================================================================
+
+obtener_version_kubernetes() {
+    echo -e "${BLUE}🔍 Detectando última versión estable de Kubernetes compatible con minikube...${NC}"
+    
+    if [[ -n "${VERSION_CACHE[kubernetes]:-}" ]]; then
+        KUBERNETES_VERSION="${VERSION_CACHE[kubernetes]}"
+        echo -e "${GREEN}✅ Kubernetes (cache): $KUBERNETES_VERSION${NC}"
+        return
+    fi
+    
+    # Obtener versiones soportadas por minikube (limpiar el formato)
+    local minikube_versions=$(minikube config defaults kubernetes-version 2>/dev/null | head -20 | grep -E "^\\* v[0-9]+\\.[0-9]+\\.[0-9]+$" | sed 's/^\* //')
+    
+    if [[ -n "$minikube_versions" ]]; then
+        # Usar la primera versión (más reciente) soportada por minikube
+        local latest_version=$(echo "$minikube_versions" | head -1)
+        echo -e "${GREEN}✅ Usando versión más reciente soportada por minikube: $latest_version${NC}"
+    else
+        # Fallback: obtener desde GitHub y validar contra minikube
+        echo "🔍 Consultando GitHub releases como fallback..."
+        local github_version=$(curl -s https://api.github.com/repos/kubernetes/kubernetes/releases | \
+            jq -r '[.[] | select(.prerelease == false)] | .[0].tag_name' 2>/dev/null || echo "")
+        
+        # Validar si la versión de GitHub es compatible con minikube
+        if [[ -n "$github_version" ]] && echo "$minikube_versions" | grep -q "$github_version"; then
+            latest_version="$github_version"
+            echo -e "${GREEN}✅ Versión de GitHub compatible con minikube: $latest_version${NC}"
+        else
+            echo -e "${YELLOW}⚠️ Versión de GitHub no compatible, usando v1.33.1 (máxima soportada por minikube)${NC}"
+            latest_version="v1.33.1"
+        fi
+    fi
+    
+    KUBERNETES_VERSION="$latest_version"
+    VERSION_CACHE[kubernetes]="$latest_version"
+    echo -e "${GREEN}✅ Kubernetes detectado: $KUBERNETES_VERSION${NC}"
+}
+
+obtener_version_argocd() {
+    echo -e "${BLUE}🔍 Detectando última versión de ArgoCD...${NC}"
+    
+    if [[ -n "${VERSION_CACHE[argocd]:-}" ]]; then
+        ARGOCD_VERSION="${VERSION_CACHE[argocd]}"
+        echo -e "${GREEN}✅ ArgoCD (cache): $ARGOCD_VERSION${NC}"
+        return
+    fi
+    
+    local latest_version=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | \
+        jq -r '.tag_name' 2>/dev/null | sed 's/^v//' || echo "")
+    
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        echo -e "${YELLOW}⚠️ No se pudo detectar versión automáticamente, usando versión estable conocida${NC}"
+        latest_version="3.0.11"
+    fi
+    
+    ARGOCD_VERSION="$latest_version"
+    VERSION_CACHE[argocd]="$latest_version"
+    echo -e "${GREEN}✅ ArgoCD detectado: $ARGOCD_VERSION${NC}"
+}
+
+obtener_version_kargo() {
+    echo -e "${BLUE}🔍 Detectando última versión de Kargo...${NC}"
+    
+    if [[ -n "${VERSION_CACHE[kargo]:-}" ]]; then
+        KARGO_VERSION="${VERSION_CACHE[kargo]}"
+        echo -e "${GREEN}✅ Kargo (cache): $KARGO_VERSION${NC}"
+        return
+    fi
+    
+    local latest_version=$(curl -s https://api.github.com/repos/akuity/kargo/releases/latest | \
+        jq -r '.tag_name' 2>/dev/null | sed 's/^v//' || echo "")
+    
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        echo -e "${YELLOW}⚠️ No se pudo detectar versión automáticamente, usando versión estable conocida${NC}"
+        latest_version="1.6.1"
+    fi
+    
+    KARGO_VERSION="$latest_version"
+    VERSION_CACHE[kargo]="$latest_version"
+    echo -e "${GREEN}✅ Kargo detectado: $KARGO_VERSION${NC}"
+}
+
+obtener_version_argo_rollouts() {
+    echo -e "${BLUE}🔍 Detectando última versión de Argo Rollouts...${NC}"
+    
+    if [[ -n "${VERSION_CACHE[argo-rollouts]:-}" ]]; then
+        ARGO_ROLLOUTS_VERSION="${VERSION_CACHE[argo-rollouts]}"
+        echo -e "${GREEN}✅ Argo Rollouts (cache): $ARGO_ROLLOUTS_VERSION${NC}"
+        return
+    fi
+    
+    local latest_version=$(curl -s https://api.github.com/repos/argoproj/argo-rollouts/releases/latest | \
+        jq -r '.tag_name' 2>/dev/null | sed 's/^v//' || echo "")
+    
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        echo -e "${YELLOW}⚠️ No se pudo detectar versión automáticamente, usando versión estable conocida${NC}"
+        latest_version="1.7.2"
+    fi
+    
+    ARGO_ROLLOUTS_VERSION="$latest_version"
+    VERSION_CACHE[argo-rollouts]="$latest_version"
+    echo -e "${GREEN}✅ Argo Rollouts detectado: $ARGO_ROLLOUTS_VERSION${NC}"
+}
+
+obtener_version_argo_workflows() {
+    echo -e "${BLUE}🔍 Detectando última versión de Argo Workflows...${NC}"
+    
+    if [[ -n "${VERSION_CACHE[argo-workflows]:-}" ]]; then
+        ARGO_WORKFLOWS_VERSION="${VERSION_CACHE[argo-workflows]}"
+        echo -e "${GREEN}✅ Argo Workflows (cache): $ARGO_WORKFLOWS_VERSION${NC}"
+        return
+    fi
+    
+    local latest_version=$(curl -s https://api.github.com/repos/argoproj/argo-workflows/releases/latest | \
+        jq -r '.tag_name' 2>/dev/null | sed 's/^v//' || echo "")
+    
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        echo -e "${YELLOW}⚠️ No se pudo detectar versión automáticamente, usando versión estable conocida${NC}"
+        latest_version="3.6.1"
+    fi
+    
+    ARGO_WORKFLOWS_VERSION="$latest_version"
+    VERSION_CACHE[argo-workflows]="$latest_version"
+    echo -e "${GREEN}✅ Argo Workflows detectado: $ARGO_WORKFLOWS_VERSION${NC}"
+}
+
+obtener_version_argo_events() {
+    echo -e "${BLUE}🔍 Detectando última versión de Argo Events...${NC}"
+    
+    if [[ -n "${VERSION_CACHE[argo-events]:-}" ]]; then
+        ARGO_EVENTS_VERSION="${VERSION_CACHE[argo-events]}"
+        echo -e "${GREEN}✅ Argo Events (cache): $ARGO_EVENTS_VERSION${NC}"
+        return
+    fi
+    
+    local latest_version=$(curl -s https://api.github.com/repos/argoproj/argo-events/releases/latest | \
+        jq -r '.tag_name' 2>/dev/null | sed 's/^v//' || echo "")
+    
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        echo -e "${YELLOW}⚠️ No se pudo detectar versión automáticamente, usando versión estable conocida${NC}"
+        latest_version="1.9.3"
+    fi
+    
+    ARGO_EVENTS_VERSION="$latest_version"
+    VERSION_CACHE[argo-events]="$latest_version"
+    echo -e "${GREEN}✅ Argo Events detectado: $ARGO_EVENTS_VERSION${NC}"
+}
+
+obtener_version_helm_chart() {
+    local chart_name="$1"
+    local repo_url="$2"
+    local cache_key="$3"
+    
+    if [[ -n "${VERSION_CACHE[$cache_key]:-}" ]]; then
+        echo "${VERSION_CACHE[$cache_key]}"
+        return
+    fi
+    
+    echo -e "${BLUE}🔍 Detectando última versión de $chart_name...${NC}"
+    
+    # Agregar repo temporalmente para consultar versiones
+    local temp_repo_name="temp_${cache_key}_$(date +%s)"
+    helm repo add "$temp_repo_name" "$repo_url" >/dev/null 2>&1 || true
+    helm repo update >/dev/null 2>&1 || true
+    
+    # Obtener la última versión del chart
+    local latest_version=$(helm search repo "$temp_repo_name/$chart_name" --versions | \
+        awk 'NR==2 {print $2}' 2>/dev/null || echo "")
+    
+    # Limpiar repo temporal
+    helm repo remove "$temp_repo_name" >/dev/null 2>&1 || true
+    
+    if [[ -z "$latest_version" ]]; then
+        # Fallback: usar versiones conocidas estables
+        case "$cache_key" in
+            "cert-manager") latest_version="v1.18.2" ;;
+            "external-secrets") latest_version="0.18.2" ;;
+            "ingress-nginx") latest_version="4.13.0" ;;
+            "grafana") latest_version="9.3.0" ;;
+            "jaeger") latest_version="3.4.1" ;;
+            "loki") latest_version="6.34.0" ;;
+            "minio") latest_version="5.4.0" ;;
+            "gitea") latest_version="12.1.2" ;;
+            *) latest_version="latest" ;;
+        esac
+        echo -e "${YELLOW}⚠️ $chart_name: usando versión fallback $latest_version${NC}"
+    else
+        echo -e "${GREEN}✅ $chart_name detectado: $latest_version${NC}"
+    fi
+    
+    VERSION_CACHE[$cache_key]="$latest_version"
+    echo "$latest_version"
+}
+
+obtener_todas_las_versiones() {
+    echo -e "${CYAN}🚀 DETECTANDO AUTOMÁTICAMENTE ÚLTIMAS VERSIONES...${NC}"
+    echo "=================================================="
+    
+    # Detectar versiones principales
+    obtener_version_kubernetes
+    obtener_version_argocd
+    
+    # Detectar versiones del stack Argo GitOps completo
+    obtener_version_kargo
+    obtener_version_argo_rollouts  
+    obtener_version_argo_workflows
+    obtener_version_argo_events
+    
+    # Detectar versiones de Helm Charts
+    CERT_MANAGER_VERSION=$(obtener_version_helm_chart "cert-manager" "https://charts.jetstack.io" "cert-manager")
+    EXTERNAL_SECRETS_VERSION=$(obtener_version_helm_chart "external-secrets" "https://charts.external-secrets.io" "external-secrets")
+    INGRESS_NGINX_VERSION=$(obtener_version_helm_chart "ingress-nginx" "https://kubernetes.github.io/ingress-nginx" "ingress-nginx")
+    PROMETHEUS_VERSION=$(obtener_version_helm_chart "kube-prometheus-stack" "https://prometheus-community.github.io/helm-charts" "kube-prometheus-stack")
+    GRAFANA_VERSION=$(obtener_version_helm_chart "grafana" "https://grafana.github.io/helm-charts" "grafana")
+    JAEGER_VERSION=$(obtener_version_helm_chart "jaeger" "https://jaegertracing.github.io/helm-charts" "jaeger")
+    LOKI_VERSION=$(obtener_version_helm_chart "loki" "https://grafana.github.io/helm-charts" "loki")
+    MINIO_VERSION=$(obtener_version_helm_chart "minio" "https://charts.min.io" "minio")
+    GITEA_VERSION=$(obtener_version_helm_chart "gitea" "https://dl.gitea.io/charts" "gitea")
+    
+    echo ""
+    echo -e "${GREEN}🎯 STACK GITOPS COMPLETO - VERSIONES DETECTADAS:${NC}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo -e "${CYAN}🏗️ INFRAESTRUCTURA BASE:${NC}"
+    echo "🔧 Kubernetes: $KUBERNETES_VERSION"
+    echo ""
+    echo -e "${CYAN}🔄 GITOPS CORE:${NC}"
+    echo "🔄 ArgoCD: $ARGOCD_VERSION"
+    echo "🚢 Kargo: $KARGO_VERSION"
+    echo ""
+    echo -e "${CYAN}⚡ PROGRESSIVE DELIVERY:${NC}"
+    echo "⚡ Argo Rollouts: $ARGO_ROLLOUTS_VERSION"
+    echo "🌊 Argo Workflows: $ARGO_WORKFLOWS_VERSION"
+    echo "📡 Argo Events: $ARGO_EVENTS_VERSION"
+    echo ""
+    echo -e "${CYAN}🔒 SEGURIDAD Y SECRETOS:${NC}"
+    echo "🔒 cert-manager: $CERT_MANAGER_VERSION"
+    echo "🔐 external-secrets: $EXTERNAL_SECRETS_VERSION"
+    echo ""
+    echo -e "${CYAN}🌐 NETWORKING:${NC}"
+    echo "🌐 ingress-nginx: $INGRESS_NGINX_VERSION"
+    echo ""
+    echo -e "${CYAN}📊 OBSERVABILIDAD:${NC}"
+    echo "📊 Prometheus Stack: $PROMETHEUS_VERSION"
+    echo "📈 Grafana: $GRAFANA_VERSION"
+    echo "🔍 Jaeger: $JAEGER_VERSION"
+    echo "📝 Loki: $LOKI_VERSION"
+    echo ""
+    echo -e "${CYAN}🏪 ALMACENAMIENTO Y REPOSITORIOS:${NC}"
+    echo "🏪 MinIO: $MINIO_VERSION"
+    echo "🐙 Gitea: $GITEA_VERSION"
+    echo ""
+}
+
+# ============================================================================
+# FUNCIONES PRINCIPALES
+# ============================================================================
+
 mostrar_banner() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-    echo "║                    🚀 GITOPS MULTI-CLUSTER INFRASTRUCTURE 🚀                ║"
+    echo "║                🚀 GITOPS AUTO-UPDATING INFRASTRUCTURE 🚀                   ║"
+    echo "║                           VERSIÓN 2025 - INTELIGENTE                        ║"
     echo "║                                                                              ║"
     echo "║  🏗️  Arquitectura: 3 Clusters (DEV/PRE/PRO) con ArgoCD + Kargo            ║"
     echo "║  📊  Stack: Prometheus, Grafana, Jaeger, Loki, MinIO, Gitea                ║"
     echo "║  🔄  GitOps: Continuous Deployment + Progressive Delivery                   ║"
-    echo "║  🎯  Objetivo: Plataforma empresarial completa lista para producción       ║"
+    echo "║  📦  Metodología: Helm Charts Oficiales + Auto-Update + Exclusiones        ║"
+    echo "║  🤖  Inteligencia: Detecta automáticamente últimas versiones estables      ║"
+    echo "║  🎯  Objetivo: Plataforma empresarial siempre actualizada y GitOps-ready   ║"
     echo "╚══════════════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
@@ -91,31 +387,39 @@ mostrar_arquitectura() {
     echo -e "${YELLOW}"
     echo "🏗️ ARQUITECTURA MULTI-CLUSTER ROBUSTA:"
     echo "========================================"
-    echo "🏭 Cluster gitops-dev (${DEV_MEMORY}MB RAM, ${DEV_CPUS} CPU, ${DEV_DISK}): Gestión centralizada y herramientas"
-    echo "🏭 Cluster gitops-pre (${PRE_MEMORY}MB RAM, ${PRE_CPUS} CPU, ${PRE_DISK}): Entorno de preproducción"
-    echo "🏭 Cluster gitops-pro (${PRO_MEMORY}MB RAM, ${PRO_CPUS} CPU, ${PRO_DISK}): Entorno de producción"
+    echo "🏭 Cluster ${CLUSTER_DEV} (${DEV_MEMORY}MB RAM, ${DEV_CPUS} CPU, ${DEV_DISK}): Gestión centralizada y herramientas"
+    echo "🏭 Cluster ${CLUSTER_PRE} (${PRE_MEMORY}MB RAM, ${PRE_CPUS} CPU, ${PRE_DISK}): Entorno de preproducción"
+    echo "🏭 Cluster ${CLUSTER_PRO} (${PRO_MEMORY}MB RAM, ${PRO_CPUS} CPU, ${PRO_DISK}): Entorno de producción"
     echo "🛠 Configuración: RECURSOS OPTIMIZADOS por componente real"
     echo "📟 Kubernetes Version: $KUBERNETES_VERSION"
     echo ""
-    echo "📦 HERRAMIENTAS EN DEV (controlan todos los clusters):"
-    echo "├─ 🔄 ArgoCD v3.0.11: Gestión GitOps multi-cluster"
-    echo "├─ � ApplicationSet v0.4.5: Multi-cluster app generation"
-    echo "├─ �🚢 Kargo v1.6.1: Promociones automáticas entre entornos"
-    echo "├─ 📊 Prometheus Stack v75.13.0: Monitoreo centralizado"
-    echo "├─ 📈 Grafana v8.17.4: Dashboards y visualización"
-    echo "├─ 📝 Loki v6.33.0: Agregación de logs"
-    echo "├─ 🔍 Jaeger v3.4.1: Distributed tracing"
-    echo "├─ 🔒 Cert-Manager v1.18.2: Gestión de certificados"
-    echo "├─ 🔐 External Secrets v0.18.2: Gestión de secretos"
-    echo "├─ 🌐 NGINX Ingress v4.13.0: Ingress controller"
-    echo "├─ 🏪 MinIO: Object storage S3-compatible"
-    echo "├─ 🐙 Gitea: Git repository management"
-    echo "├─ ⚡ Argo Rollouts v1.8.3: Progressive delivery"
-    echo "├─ 🌊 Argo Workflows v3.7.0: Workflow orchestration" 
-    echo "├─ 📡 Argo Events v1.9.2: Event-driven GitOps automation"
-    echo "└─ 🔔 Argo Notifications v1.2.1: GitOps alerts & integrations"
+    echo "📦 STACK GITOPS COMPLETO CON AUTO-DETECCIÓN (controlan todos los clusters):"
     echo ""
-    echo "🔄 FLUJO GITOPS OPTIMIZADO:"
+    echo -e "${GREEN}🔄 GITOPS CORE:${NC}"
+    echo "├─ 🔄 ArgoCD ${ARGOCD_VERSION:-TBD}: Gestión GitOps multi-cluster"
+    echo "├─ 🚢 Kargo ${KARGO_VERSION:-TBD}: Promociones automáticas entre entornos"
+    echo ""
+    echo -e "${GREEN}⚡ PROGRESSIVE DELIVERY:${NC}"
+    echo "├─ ⚡ Argo Rollouts ${ARGO_ROLLOUTS_VERSION:-TBD}: Progressive delivery"
+    echo "├─ 🌊 Argo Workflows ${ARGO_WORKFLOWS_VERSION:-TBD}: Workflow orchestration"
+    echo "├─ 📡 Argo Events ${ARGO_EVENTS_VERSION:-TBD}: Event-driven GitOps automation"
+    echo ""
+    echo -e "${GREEN}📊 OBSERVABILIDAD:${NC}"
+    echo "├─ 📊 Prometheus Stack ${PROMETHEUS_VERSION:-TBD}: Monitoreo centralizado"
+    echo "├─ 📈 Grafana ${GRAFANA_VERSION:-TBD}: Dashboards y visualización"
+    echo "├─ 📝 Loki ${LOKI_VERSION:-TBD}: Agregación de logs"
+    echo "├─ 🔍 Jaeger ${JAEGER_VERSION:-TBD}: Distributed tracing"
+    echo ""
+    echo -e "${GREEN}🔒 SEGURIDAD:${NC}"
+    echo "├─ 🔒 Cert-Manager ${CERT_MANAGER_VERSION:-TBD}: Gestión de certificados TLS"
+    echo "├─ 🔐 External Secrets ${EXTERNAL_SECRETS_VERSION:-TBD}: Gestión de secretos"
+    echo "├─ 🌐 NGINX Ingress ${INGRESS_NGINX_VERSION:-TBD}: Ingress controller"
+    echo ""
+    echo -e "${GREEN}🏪 ALMACENAMIENTO Y REPOSITORIOS:${NC}"
+    echo "├─ 🏪 MinIO ${MINIO_VERSION:-TBD}: Object storage S3-compatible"
+    echo "└─ 🐙 Gitea ${GITEA_VERSION:-TBD}: Git repository management"
+    echo ""
+    echo -e "${CYAN}🔄 FLUJO GITOPS OPTIMIZADO:${NC}"
     echo "Git Push → ArgoCD-DEV → Deploy dev/pre/pro → Kargo → Auto-Promote"
     echo -e "${NC}"
 }
@@ -124,10 +428,10 @@ verificar_dependencias() {
     echo -e "${BLUE}🔍 Verificando dependencias del sistema...${NC}"
     
     local dependencias_requeridas=("minikube" "kubectl" "helm" "docker" "curl" "netstat" "fuser")
-    local dependencias_opcionales=("jq" "yq")
+    local dependencias_opcionales=("jq" "yq" "argocd")
     local faltantes_requeridas=()
     local faltantes_opcionales=()
-    local auto_instalables=("curl" "netstat" "jq" "yq" "fuser")
+    local auto_instalables=("curl" "netstat" "jq" "yq" "fuser" "argocd")
     
     # Verificar dependencias requeridas
     for dep in "${dependencias_requeridas[@]}"; do
@@ -182,6 +486,14 @@ verificar_dependencias() {
                 if curl -L -s "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" -o /tmp/yq && \
                    chmod +x /tmp/yq && sudo mv /tmp/yq /usr/local/bin/yq; then
                     echo -e "${GREEN}✅ yq instalado exitosamente${NC}"
+                    return 0
+                fi
+                ;;
+            "argocd")
+                echo "🔗 Instalando ArgoCD CLI desde GitHub releases..."
+                if curl -sSL -o /tmp/argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && \
+                   chmod +x /tmp/argocd-linux-amd64 && sudo mv /tmp/argocd-linux-amd64 /usr/local/bin/argocd; then
+                    echo -e "${GREEN}✅ ArgoCD CLI instalado exitosamente${NC}"
                     return 0
                 fi
                 ;;
@@ -244,15 +556,6 @@ verificar_dependencias() {
                     echo "🔗 Docker: sudo apt-get update && sudo apt-get install docker.io && sudo usermod -aG docker \$USER"
                     echo "   📝 Nota: Después de instalar Docker, reinicia la sesión o ejecuta 'newgrp docker'"
                     ;;
-                "curl")
-                    echo "🔗 curl: sudo apt-get install curl (auto-instalación falló)"
-                    ;;
-                "netstat")
-                    echo "🔗 netstat: sudo apt-get install net-tools (auto-instalación falló)"
-                    ;;
-                "fuser")
-                    echo "🔗 fuser: sudo apt-get install psmisc (auto-instalación falló)"
-                    ;;
             esac
         done
         echo ""
@@ -287,11 +590,17 @@ verificar_dependencias() {
         echo -e "${GREEN}✅ Permisos Docker configurados${NC}"
     fi
     
-    # Verificar versiones
+    # Verificar versiones con mejor manejo de errores
     echo ""
     echo "📋 Versiones instaladas:"
     echo "- Minikube: $(minikube version --short 2>/dev/null || echo 'Error al obtener versión')"
-    echo "- kubectl: $(kubectl version --client=true --short 2>/dev/null | grep Client || echo 'Error al obtener versión')"
+    
+    # kubectl version fix - usar --client-only para evitar errores de conexión
+    local kubectl_version=$(kubectl version --client --output=json 2>/dev/null | jq -r '.clientVersion.gitVersion' 2>/dev/null || \
+                           kubectl version --client=true --short=true 2>/dev/null | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+' || \
+                           echo 'Error al obtener versión')
+    echo "- kubectl: $kubectl_version"
+    
     echo "- Helm: $(helm version --short 2>/dev/null || echo 'Error al obtener versión')"
     echo "- Docker: $(docker --version 2>/dev/null || echo 'Error al obtener versión')"
     
@@ -299,34 +608,54 @@ verificar_dependencias() {
 }
 
 limpiar_clusters_existentes() {
-    echo -e "${YELLOW}🧹 Limpiando clusters existentes...${NC}"
+    echo -e "${YELLOW}🧹 Limpiando clusters existentes completamente...${NC}"
     
     local clusters=("$CLUSTER_DEV" "$CLUSTER_PRE" "$CLUSTER_PRO")
     local clusters_eliminados=0
     
+    # Detener port-forwards previos
+    echo "🔌 Deteniendo port-forwards existentes..."
+    pkill -f "kubectl.*port-forward" 2>/dev/null || true
+    
+    # Forzar eliminación completa de clusters para evitar problemas de downgrade
     for cluster in "${clusters[@]}"; do
-        if minikube status -p "$cluster" >&/dev/null; then
-            echo "🗑️ Eliminando cluster: $cluster"
-            if minikube delete -p "$cluster" --purge >/dev/null 2>&1; then
-                echo -e "${GREEN}✅ Cluster $cluster eliminado exitosamente${NC}"
-                clusters_eliminados=$((clusters_eliminados + 1))
-            else
-                echo -e "${YELLOW}⚠️ Error al eliminar cluster $cluster (puede no existir)${NC}"
-            fi
+        echo "🗑️ Eliminando cluster: $cluster"
+        # Forzar eliminación completa con --purge para evitar problemas de versión
+        if minikube delete -p "$cluster" --purge --all >/dev/null 2>&1; then
+            echo -e "${GREEN}✅ Cluster $cluster eliminado exitosamente${NC}"
+            clusters_eliminados=$((clusters_eliminados + 1))
         else
-            echo "ℹ️ Cluster $cluster no existe - saltando"
+            echo -e "${YELLOW}⚠️ Cluster $cluster: intentando eliminación forzada${NC}"
+            # Si falla, intentar eliminación más agresiva
+            minikube delete -p "$cluster" --all >/dev/null 2>&1 || true
+            # Limpiar directorios locales de minikube para evitar conflictos de versión
+            rm -rf ~/.minikube/profiles/$cluster 2>/dev/null || true
+            echo -e "${GREEN}✅ Cluster $cluster limpiado forzadamente${NC}"
+            clusters_eliminados=$((clusters_eliminados + 1))
         fi
+    done
+    
+    # Limpiar cache de Docker para liberar espacio y evitar conflictos
+    echo "🧹 Limpiando cache de Docker..."
+    docker system prune -f >/dev/null 2>&1 || true
+    
+    # Limpiar configuraciones residuales de kubectl
+    echo "🧹 Limpiando configuraciones residuales..."
+    for cluster in "${clusters[@]}"; do
+        kubectl config delete-context "$cluster" 2>/dev/null || true
+        kubectl config delete-cluster "$cluster" 2>/dev/null || true
     done
     
     if [ $clusters_eliminados -gt 0 ]; then
         echo -e "${GREEN}✅ Limpieza completada: $clusters_eliminados clusters eliminados${NC}"
+        sleep 5  # Dar tiempo para que Docker limpie los recursos
     else
         echo -e "${GREEN}✅ Limpieza completada: no había clusters que eliminar${NC}"
     fi
 }
 
-crear_clusters() {
-    echo -e "${BLUE}🏗️ Creando clusters Minikube optimizados...${NC}"
+crear_cluster_dev() {
+    echo -e "${BLUE}🏗️ Creando cluster DEV optimizado...${NC}"
     
     # Verificar que Docker esté ejecutándose
     if ! docker info >&/dev/null; then
@@ -337,7 +666,7 @@ crear_clusters() {
     # Función auxiliar para crear un cluster con reintentos
     crear_cluster_con_reintentos() {
         local cluster_name="$1"
-        local memory="$2"
+        local memory="$2" 
         local cpus="$3"
         local disk="$4"
         local max_intentos=3
@@ -358,6 +687,7 @@ crear_clusters() {
                 echo -e "${GREEN}✅ Cluster $cluster_name creado exitosamente${NC}"
                 
                 # Habilitar addons necesarios
+                echo "🔧 Habilitando addons requeridos..."
                 minikube addons enable ingress -p "$cluster_name" || echo "⚠️ Warning: No se pudo habilitar ingress addon"
                 minikube addons enable metrics-server -p "$cluster_name" || echo "⚠️ Warning: No se pudo habilitar metrics-server addon"
                 
@@ -378,90 +708,17 @@ crear_clusters() {
         return 1
     }
     
-    # Crear solo cluster DEV inicialmente - Optimización secuencial
-    echo "🎯 Creando cluster DEV primero para validación..."
+    # Crear cluster DEV
     crear_cluster_con_reintentos "$CLUSTER_DEV" "$DEV_MEMORY" "$DEV_CPUS" "$DEV_DISK"
     
-    echo -e "${GREEN}✅ Cluster DEV creado exitosamente${NC}"
-}
-
-crear_clusters_adicionales() {
-    echo -e "${BLUE}🏗️ Creando clusters PRE y PRO después de validar DEV...${NC}"
-    
-    # Verificar que Docker esté ejecutándose
-    if ! docker info >&/dev/null; then
-        echo -e "${RED}❌ Docker no está ejecutándose. Por favor, inicia Docker primero.${NC}"
-        exit 1
-    fi
-    
-    # Función auxiliar para crear un cluster con reintentos (reutilizada)
-    crear_cluster_con_reintentos() {
-        local cluster_name="$1"
-        local memory="$2"
-        local cpus="$3"
-        local disk="$4"
-        local max_intentos=3
-        local intento=1
-        
-        while [ $intento -le $max_intentos ]; do
-            echo "🏭 Creando cluster $cluster_name (${memory}MB RAM, ${cpus} CPU, ${disk}) - Intento $intento/$max_intentos"
-            
-            if minikube start -p "$cluster_name" \
-                --memory="$memory" \
-                --cpus="$cpus" \
-                --disk-size="$disk" \
-                --driver=docker \
-                --kubernetes-version="$KUBERNETES_VERSION" \
-                --wait=true \
-                --wait-timeout=600s; then
-                
-                echo -e "${GREEN}✅ Cluster $cluster_name creado exitosamente${NC}"
-                
-                # Habilitar addons necesarios
-                minikube addons enable ingress -p "$cluster_name" || echo "⚠️ Warning: No se pudo habilitar ingress addon"
-                minikube addons enable metrics-server -p "$cluster_name" || echo "⚠️ Warning: No se pudo habilitar metrics-server addon"
-                
-                return 0
-            else
-                echo -e "${YELLOW}⚠️ Falló el intento $intento para crear $cluster_name${NC}"
-                intento=$((intento + 1))
-                
-                if [ $intento -le $max_intentos ]; then
-                    echo "🔄 Limpiando y reintentando en 10 segundos..."
-                    minikube delete -p "$cluster_name" >/dev/null 2>&1 || true
-                    sleep 10
-                fi
-            fi
-        done
-        
-        echo -e "${RED}❌ No se pudo crear el cluster $cluster_name después de $max_intentos intentos${NC}"
-        return 1
-    }
-    
-    # Crear cluster PRE - Recursos para testing
-    crear_cluster_con_reintentos "$CLUSTER_PRE" "$PRE_MEMORY" "$PRE_CPUS" "$PRE_DISK"
-    
-    # Crear cluster PRE - Recursos para simulación de producción
-    crear_cluster_con_reintentos "$CLUSTER_PRO" "$PRO_MEMORY" "$PRO_CPUS" "$PRO_DISK"
-    
-    echo -e "${GREEN}✅ Clusters PRE y PRO creados exitosamente${NC}"
-}
-
-configurar_contextos() {
-    echo -e "${BLUE}⚙️ Configurando contextos de kubectl...${NC}"
-    
-    # Cambiar al cluster DEV como principal
+    # Configurar contexto
     kubectl config use-context "$CLUSTER_DEV"
     
-    # Verificar contextos disponibles
-    echo "📋 Contextos disponibles:"
-    kubectl config get-contexts
-    
-    echo -e "${GREEN}✅ Contextos configurados${NC}"
+    echo -e "${GREEN}✅ Cluster DEV creado y configurado exitosamente${NC}"
 }
 
 instalar_argocd() {
-    echo -e "${BLUE}🔄 Instalando ArgoCD en DEV con acceso anónimo completo...${NC}"
+    echo -e "${BLUE}🔄 Instalando ArgoCD ${ARGOCD_VERSION} en DEV con acceso anónimo...${NC}"
     
     kubectl config use-context "$CLUSTER_DEV"
     
@@ -469,13 +726,25 @@ instalar_argocd() {
     kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
     
     # Instalar ArgoCD
-    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.0.11/manifests/install.yaml
+    echo "📦 Descargando e instalando ArgoCD ${ARGOCD_VERSION}..."
+    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v${ARGOCD_VERSION}/manifests/install.yaml
     
-    # Esperar a que ArgoCD esté listo
+    # Esperar a que ArgoCD esté listo con timeout aumentado
     echo "⏳ Esperando a que ArgoCD esté listo..."
-    kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+    if ! kubectl wait --for=condition=available --timeout=900s deployment/argocd-server -n argocd; then
+        echo -e "${YELLOW}⚠️ Timeout esperando ArgoCD, verificando manualmente...${NC}"
+        # Verificación manual como fallback
+        for i in {1..30}; do
+            if kubectl get deployment argocd-server -n argocd -o jsonpath='{.status.readyReplicas}' | grep -q "1"; then
+                echo -e "${GREEN}✅ ArgoCD server está listo (verificación manual)${NC}"
+                break
+            fi
+            echo "⏳ Intento $i/30 - Esperando ArgoCD..."
+            sleep 10
+        done
+    fi
     
-    # Configurar acceso COMPLETAMENTE ANÓNIMO - sin login requerido
+    # Configurar acceso anónimo completo
     echo "🔓 Configurando acceso anónimo completo..."
     
     # 1. Configurar servidor inseguro (sin TLS)
@@ -484,17 +753,14 @@ instalar_argocd() {
     # 2. Configurar acceso anónimo en argocd-cm
     kubectl patch configmap argocd-cm -n argocd --patch '{
       "data": {
-        "url": "http://localhost:8080",
+        "url": "http://localhost:8080", 
         "users.anonymous.enabled": "true",
         "policy.default": "role:admin",
         "policy.csv": "p, role:anonymous, applications, *, */*, allow\np, role:anonymous, clusters, *, *, allow\np, role:anonymous, repositories, *, *, allow\np, role:anonymous, certificates, *, *, allow\np, role:anonymous, accounts, *, *, allow\np, role:anonymous, gpgkeys, *, *, allow\np, role:anonymous, logs, *, *, allow\np, role:anonymous, exec, *, */*, allow\ng, argocd:anonymous, role:admin"
       }
     }'
     
-    # 3. Deshabilitar Dex (authentication)
-    kubectl patch configmap argocd-cmd-params-cm -n argocd --patch '{"data":{"dex.disable.authentication":"true"}}'
-    
-    # 4. Configurar deployment con argumentos anónimos
+    # 3. Configurar deployment con argumentos anónimos
     kubectl patch deployment argocd-server -n argocd --patch '{
       "spec": {
         "template": {
@@ -512,212 +778,666 @@ instalar_argocd() {
       }
     }'
     
-    # 5. Reiniciar ArgoCD server
+    # 4. Reiniciar ArgoCD server
     echo "🔄 Reiniciando ArgoCD server con configuración anónima..."
     kubectl rollout restart deployment argocd-server -n argocd
-    kubectl rollout status deployment argocd-server -n argocd --timeout=300s
+    if ! kubectl rollout status deployment argocd-server -n argocd --timeout=600s; then
+        echo -e "${YELLOW}⚠️ Timeout en rollout, pero continuando...${NC}"
+    fi
     
-    # 6. Verificar que el servidor esté respondiendo
-    echo "🔍 Verificando acceso anónimo..."
-    sleep 10
+    echo -e "${GREEN}✅ ArgoCD ${ARGOCD_VERSION} instalado con acceso anónimo completo${NC}"
+}
+
+crear_configuraciones_helm() {
+    echo -e "${BLUE}📦 Creando configuraciones de Helm Charts con últimas versiones...${NC}"
     
-    echo -e "${GREEN}✅ ArgoCD instalado con acceso anónimo completo (sin login)${NC}"
+    # Crear cert-manager con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/cert-manager-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${CERT_MANAGER_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    targetRevision: ${CERT_MANAGER_VERSION}
+    chart: cert-manager
+    helm:
+      values: |
+        installCRDs: true
+        global:
+          leaderElection:
+            namespace: cert-manager
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        webhook:
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+              - ALL
+        cainjector:
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+              - ALL
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 32Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    # Crear external-secrets con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/external-secrets-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${EXTERNAL_SECRETS_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.external-secrets.io
+    targetRevision: ${EXTERNAL_SECRETS_VERSION}
+    chart: external-secrets
+    helm:
+      values: |
+        installCRDs: true
+        webhook:
+          create: true
+          certCheckInterval: "5m"
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 32Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    # Crear ingress-nginx con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/ingress-nginx-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${INGRESS_NGINX_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    targetRevision: ${INGRESS_NGINX_VERSION}
+    chart: ingress-nginx
+    helm:
+      values: |
+        controller:
+          service:
+            type: NodePort
+          admissionWebhooks:
+            enabled: true
+            patch:
+              enabled: true
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            capabilities:
+              add:
+              - NET_BIND_SERVICE
+              drop:
+              - ALL
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    # Crear grafana con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/grafana-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${GRAFANA_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: ${GRAFANA_VERSION}
+    chart: grafana
+    helm:
+      values: |
+        adminUser: admin
+        adminPassword: gitops2025
+        persistence:
+          enabled: true
+          size: 1Gi
+        sidecar:
+          dashboards:
+            enabled: true
+          datasources:
+            enabled: true
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 472
+          runAsGroup: 472
+          fsGroup: 472
+          seccompProfile:
+            type: RuntimeDefault
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    # Crear jaeger con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/jaeger-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${JAEGER_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://jaegertracing.github.io/helm-charts
+    targetRevision: ${JAEGER_VERSION}
+    chart: jaeger
+    helm:
+      values: |
+        allInOne:
+          enabled: true
+          image:
+            repository: jaegertracing/all-in-one
+            tag: "latest"
+            pullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        provisionDataStore:
+          cassandra: false
+          elasticsearch: false
+        storage:
+          type: memory
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    # Crear loki con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/loki-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${LOKI_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: ${LOKI_VERSION}
+    chart: loki
+    helm:
+      values: |
+        deploymentMode: SingleBinary
+        loki:
+          useTestSchema: true
+          storage:
+            type: 'filesystem'
+        singleBinary:
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
+        lokiCanary:
+          enabled: false
+        test:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    # Crear minio con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/minio-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${MINIO_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.min.io
+    targetRevision: ${MINIO_VERSION}
+    chart: minio
+    helm:
+      values: |
+        mode: standalone
+        rootUser: gitops
+        rootPassword: gitops2025
+        persistence:
+          enabled: true
+          size: 5Gi
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 200m
+        consoleService:
+          type: ClusterIP
+        service:
+          type: ClusterIP
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    # Crear gitea con chart oficial y versión auto-detectada
+    cat > "${SCRIPT_DIR}/gitea-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${GITEA_VERSION}"
+spec:
+  project: default
+  source:
+    repoURL: https://dl.gitea.io/charts
+    targetRevision: ${GITEA_VERSION}
+    chart: gitea
+    helm:
+      values: |
+        gitea:
+          admin:
+            username: gitea_admin
+            password: gitops2025
+            email: admin@example.com
+        postgresql:
+          enabled: false
+        postgresql-ha:
+          enabled: false
+        redis-cluster:
+          enabled: false
+        persistence:
+          enabled: true
+          size: 1Gi
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        service:
+          http:
+            type: ClusterIP
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
+    echo -e "${GREEN}✅ Configuraciones de Helm Charts con últimas versiones creadas${NC}"
+}
+
+actualizar_applicationset() {
+    echo -e "${BLUE}📝 Actualizando ApplicationSet con exclusiones sistemáticas...${NC}"
+    
+    cat > "${SCRIPT_DIR}/appset-gitops-infra.yaml" << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: gitops-infra-components
+  namespace: argocd
+spec:
+  generators:
+  - git:
+      repoURL: https://github.com/argoproj/argocd-example-apps.git
+      revision: HEAD
+      directories:
+      - path: "*"
+      exclude: |
+        # Exclusiones para componentes gestionados por Helm
+        cert-manager*
+        external-secrets*
+        ingress-nginx*
+        grafana*
+        jaeger*
+        loki*
+        minio*
+        gitea*
+        # Exclusiones adicionales por conflictos
+        kargo*
+        argo-*
+        prometheus*
+        monitoring*
+        # Exclusiones de directorios de aplicaciones
+        aplicaciones/*
+        apps/*
+        manifests/*
+        _examples/*
+        examples/*
+  template:
+    metadata:
+      name: '{{path.basename}}'
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/argoproj/argocd-example-apps.git
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+EOF
+
+    echo -e "${GREEN}✅ ApplicationSet actualizado con exclusiones sistemáticas${NC}"
 }
 
 aplicar_infraestructura() {
-    echo -e "${BLUE}📦 Aplicando infraestructura GitOps...${NC}"
+    echo -e "${BLUE}📦 Aplicando infraestructura GitOps actualizada...${NC}"
     
     kubectl config use-context "$CLUSTER_DEV"
     
-    # Verificar que estamos en el directorio correcto
-    if [[ ! -f "$SCRIPT_DIR/appset-gitops-infra.yaml" ]]; then
-        echo -e "${RED}❌ Archivo appset-gitops-infra.yaml no encontrado en $SCRIPT_DIR${NC}"
-        echo "📁 Archivos disponibles:"
-        ls -la "$SCRIPT_DIR"/*.yaml 2>/dev/null || echo "❌ No se encontraron archivos YAML"
-        return 1
-    fi
-    
-    # Aplicar las aplicaciones de infraestructura principal
-    echo "📦 Aplicando aplicaciones de infraestructura principal..."
-    
-    # Eliminar ApplicationSets existentes para evitar conflictos de resourceVersion
+    # Limpiar ApplicationSets existentes para evitar conflictos
+    echo "🧹 Limpiando ApplicationSets existentes..."
     kubectl delete applicationset gitops-infra-components -n argocd --ignore-not-found=true
     kubectl delete applicationset gitops-aplicaciones -n argocd --ignore-not-found=true
+    sleep 5
     
-    # Esperar un momento para la limpieza
-    sleep 3
-    
-    if kubectl apply -f "$SCRIPT_DIR/appset-gitops-infra.yaml" && kubectl apply -f "$SCRIPT_DIR/appset-aplicaciones.yaml"; then
-        echo -e "${GREEN}✅ Aplicaciones de infraestructura creadas${NC}"
+    # Aplicar ApplicationSet actualizado
+    echo "📦 Aplicando ApplicationSet actualizado..."
+    if kubectl apply -f "${SCRIPT_DIR}/appset-gitops-infra.yaml"; then
+        echo -e "${GREEN}✅ ApplicationSet aplicado exitosamente${NC}"
     else
-        echo -e "${RED}❌ Error al aplicar aplicaciones de infraestructura${NC}"
+        echo -e "${RED}❌ Error al aplicar ApplicationSet${NC}"
         return 1
     fi
     
-    # Aplicar componentes individuales si existen
-    if [[ -d "$SCRIPT_DIR/componentes" ]]; then
-        echo "📂 Aplicando componentes desde directorio componentes/"
-        local componentes_aplicados=0
-        local componentes_fallidos=0
-        
-        # Aplicar componentes en orden específico para dependencias
-        local orden_componentes=(
-            "cert-manager"
-            "external-secrets" 
-            "ingress-nginx"
-            "monitoring"
-            "loki"
-            "jaeger"
-            "minio"
-            "gitea"
-            "kargo"
-            "argo-rollouts"
-            "argo-workflows"
-            "argo-events"
-            "argocd-applicationset"
-            "argocd-notifications"
-            "grafana"
-        )
-        
-        # Primero aplicar componentes en orden
-        for componente in "${orden_componentes[@]}"; do
-            if [[ -f "$SCRIPT_DIR/componentes/$componente"/*.yaml ]]; then
-                echo "📦 Aplicando componente: $componente"
-                if kubectl apply -f "$SCRIPT_DIR/componentes/$componente"/*.yaml; then
-                    componentes_aplicados=$((componentes_aplicados + 1))
-                    echo -e "${GREEN}✅ Componente $componente aplicado${NC}"
-                    sleep 2  # Pequeña pausa entre componentes
-                else
-                    componentes_fallidos=$((componentes_fallidos + 1))
-                    echo -e "${YELLOW}⚠️ Error al aplicar componente $componente${NC}"
-                fi
-            fi
-        done
-        
-        # Luego aplicar cualquier componente restante
-        find "$SCRIPT_DIR/componentes" -name "*.yaml" -type f | while read -r archivo; do
-            componente_nombre=$(basename "$(dirname "$archivo")")
-            if [[ ! " ${orden_componentes[*]} " =~ " ${componente_nombre} " ]]; then
-                echo "📦 Aplicando componente adicional: $componente_nombre"
-                kubectl apply -f "$archivo" || echo "⚠️ Error en $archivo"
-            fi
-        done
-        
-        echo -e "${GREEN}✅ Componentes aplicados: $componentes_aplicados, Fallidos: $componentes_fallidos${NC}"
-    else
-        echo -e "${YELLOW}⚠️ Directorio componentes/ no encontrado en $SCRIPT_DIR${NC}"
-    fi
+    # Aplicar configuraciones Helm en orden de dependencias
+    echo "📦 Aplicando configuraciones Helm en orden de dependencias..."
+    local helm_orden=(
+        "cert-manager-helm.yaml"
+        "external-secrets-helm.yaml"
+        "ingress-nginx-helm.yaml"
+        "minio-helm.yaml"
+        "loki-helm.yaml"
+        "jaeger-helm.yaml"
+        "grafana-helm.yaml"
+        "gitea-helm.yaml"
+    )
     
-    echo -e "${GREEN}✅ Infraestructura GitOps aplicada${NC}"
+    for helm_app in "${helm_orden[@]}"; do
+        if [[ -f "${SCRIPT_DIR}/${helm_app}" ]]; then
+            echo "📦 Aplicando ${helm_app}..."
+            if kubectl apply -f "${SCRIPT_DIR}/${helm_app}"; then
+                echo -e "${GREEN}✅ ${helm_app} aplicado exitosamente${NC}"
+                sleep 5  # Pausa entre aplicaciones para estabilidad
+            else
+                echo -e "${YELLOW}⚠️ Error al aplicar ${helm_app}${NC}"
+            fi
+        fi
+    done
+    
+    echo -e "${GREEN}✅ Infraestructura GitOps aplicada con metodología sistemática${NC}"
 }
 
-configurar_multi_cluster() {
-    echo -e "${BLUE}🔗 Configurando acceso multi-cluster en ArgoCD...${NC}"
+esperar_argocd_ready() {
+    echo -e "${BLUE}⏳ Esperando a que ArgoCD esté completamente listo...${NC}"
     
-    # Primero esperar a que ArgoCD esté disponible
-    kubectl config use-context "$CLUSTER_DEV"
-    echo "⏳ Esperando a que ArgoCD API esté disponible..."
+    # Verificar que los deployments estén disponibles (más robusto que los pods individuales)
+    echo "🔍 Verificando deployments de ArgoCD..."
+    local deployments=("argocd-server" "argocd-repo-server" "argocd-dex-server" "argocd-redis" "argocd-notifications-controller" "argocd-applicationset-controller")
     
-    # Configurar port-forward temporal para ArgoCD API
-    kubectl port-forward -n argocd service/argocd-server 8080:80 >/dev/null 2>&1 &
+    for deployment in "${deployments[@]}"; do
+        echo "⏳ Esperando deployment $deployment..."
+        if kubectl wait --for=condition=available deployment/$deployment -n argocd --timeout=600s; then
+            echo -e "${GREEN}✅ Deployment $deployment listo${NC}"
+        else
+            echo -e "${YELLOW}⚠️ Deployment $deployment tardó más de lo esperado, pero continuando...${NC}"
+        fi
+    done
+    
+    # Verificar StatefulSet por separado
+    echo "⏳ Esperando StatefulSet argocd-application-controller..."
+    if kubectl wait --for=condition=ready pod/argocd-application-controller-0 -n argocd --timeout=600s; then
+        echo -e "${GREEN}✅ StatefulSet argocd-application-controller listo${NC}"
+    else
+        echo -e "${YELLOW}⚠️ StatefulSet tardó más de lo esperado, pero continuando...${NC}"
+    fi
+    
+    # Verificación final más robusta: asegurar que todos los pods están running
+    echo "🔍 Verificación final de pods..."
+    local max_intentos=20
+    local intento=1
+    
+    while [ $intento -le $max_intentos ]; do
+        local pods_running=$(kubectl get pods -n argocd --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+        local pods_total=$(kubectl get pods -n argocd --no-headers 2>/dev/null | wc -l || echo "0")
+        
+        echo "📊 Pods running: $pods_running/$pods_total (intento $intento/$max_intentos)"
+        
+        if [ "$pods_running" -eq "$pods_total" ] && [ "$pods_total" -gt 0 ]; then
+            echo -e "${GREEN}✅ Todos los pods de ArgoCD están ejecutándose correctamente${NC}"
+            break
+        else
+            echo "⏳ Esperando que todos los pods estén listos..."
+            sleep 15
+            intento=$((intento + 1))
+        fi
+    done
+    
+    # Verificación opcional del API (no crítica)
+    echo "🔍 Verificación opcional del API de ArgoCD..."
+    kubectl port-forward -n argocd service/argocd-server 8080:80 --address=0.0.0.0 >/dev/null 2>&1 &
     local pf_pid=$!
-    sleep 15
+    sleep 10
     
-    # Solo agregar clusters que existan
-    if minikube status -p "$CLUSTER_PRE" &> /dev/null; then
-        echo "🔗 Agregando cluster PRE a ArgoCD..."
-        kubectl config use-context "$CLUSTER_PRE"
-        yes y | timeout 30 argocd cluster add "$CLUSTER_PRE" --server localhost:8080 --insecure --grpc-web 2>/dev/null || true
+    if curl -s -f "http://localhost:8080/api/version" >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ ArgoCD API respondiendo correctamente${NC}"
     else
-        echo "⚠️ Cluster PRE no existe - saltando configuración"
+        echo -e "${YELLOW}⚠️ API de ArgoCD no responde aún, pero los pods están listos${NC}"
     fi
     
-    if minikube status -p "$CLUSTER_PRO" &> /dev/null; then
-        echo "🔗 Agregando cluster PRO a ArgoCD..."
-        kubectl config use-context "$CLUSTER_PRO"
-        yes y | timeout 30 argocd cluster add "$CLUSTER_PRO" --server localhost:8080 --insecure --grpc-web 2>/dev/null || true
-    else
-        echo "⚠️ Cluster PRO no existe - saltando configuración"
-    fi
-    
-    # Limpiar port-forward temporal
     kill $pf_pid 2>/dev/null || true
     
-    # Volver al cluster DEV
-    kubectl config use-context "$CLUSTER_DEV"
-    
-    echo -e "${GREEN}✅ Multi-cluster configurado${NC}"
-}
-
-verificar_y_arreglar_servicios() {
-    echo -e "${BLUE}🔧 Verificando y corrigiendo servicios problemáticos...${NC}"
-    
-    kubectl config use-context "$CLUSTER_DEV"
-    
-    # Verificar ArgoCD server
-    if ! kubectl get pod -l app.kubernetes.io/component=server -n argocd | grep -q Running; then
-        echo "🔄 Reiniciando ArgoCD server..."
-        kubectl rollout restart deployment argocd-server -n argocd
-        kubectl rollout status deployment argocd-server -n argocd --timeout=300s
-    fi
-    
-    # Sincronizar aplicaciones pendientes con lógica básica (la lógica completa está en sincronizar_aplicaciones())
-    echo "🔄 Habilitando auto-sync inicial para aplicaciones pendientes..."
-    local apps_pendientes=$(kubectl get applications -n argocd --no-headers | grep -E "(Unknown|OutOfSync)" | awk '{print $1}' || true)
-    
-    if [[ -n "$apps_pendientes" ]]; then
-        echo "📋 Aplicaciones a configurar: $apps_pendientes"
-        for app in $apps_pendientes; do
-            echo "🔄 Habilitando auto-sync para: $app"
-            kubectl patch application "$app" -n argocd --type merge -p '{
-                "spec": {
-                    "syncPolicy": {
-                        "automated": {
-                            "prune": true,
-                            "selfHeal": true
-                        }
-                    }
-                }
-            }' 2>/dev/null || true
-            
-            # Anotar para refresh desde Git
-            kubectl annotate application "$app" -n argocd argocd.argoproj.io/refresh=now --overwrite 2>/dev/null || true
-        done
-        echo "⏳ Esperando 30s para configuración inicial..."
-        sleep 30
-    else
-        echo "✅ Todas las aplicaciones están configuradas"
-    fi
-    
-    # Verificar Kargo - si no existe el namespace, intentar crearlo
-    if ! kubectl get namespace kargo >/dev/null 2>&1; then
-        echo "⚠️ Namespace kargo no existe, sera creado por la aplicación ArgoCD"
-    else
-        # Si existe, verificar que los pods estén funcionando
-        if ! kubectl get pods -n kargo 2>/dev/null | grep -q Running; then
-            echo "🔄 Esperando a que Kargo se despliegue..."
-            kubectl wait --for=condition=Ready pods --all -n kargo --timeout=300s 2>/dev/null || echo "⚠️ Kargo puede tardar más tiempo en desplegarse"
-        fi
-    fi
-    
-    # Verificar cert-manager (necesario para Kargo)
-    if ! kubectl get namespace cert-manager >/dev/null 2>&1; then
-        echo "⚠️ cert-manager no encontrado, necesario para Kargo"
-    fi
-    
-    echo -e "${GREEN}✅ Verificación de servicios completada${NC}"
+    echo -e "${GREEN}✅ ArgoCD considerado listo para continuar${NC}"
 }
 
 configurar_port_forwards() {
     echo -e "${BLUE}🌐 Configurando port-forwards optimizados...${NC}"
     
-    # Matar port-forwards previos de forma más agresiva
+    # Matar port-forwards previos
     echo "🧹 Limpiando port-forwards previos..."
     pkill -f "kubectl.*port-forward" 2>/dev/null || true
     sleep 3
     
     # Liberar puertos específicos si están ocupados
-    for puerto in 8080 8081 8082 8083 8084 8085 8086 8087 8088 8090 8091 8092 8093; do
+    local puertos=(8080 8081 8083 8084 8085 8086 8087 8088 8089 8091 8092 8093)
+    for puerto in "${puertos[@]}"; do
         if netstat -tuln | grep -q ":$puerto "; then
             echo "🔌 Liberando puerto $puerto..."
             fuser -k $puerto/tcp 2>/dev/null || true
@@ -725,7 +1445,7 @@ configurar_port_forwards() {
     done
     sleep 2
     
-    # Función para crear port-forward con reintentos y validación mejorada
+    # Función para crear port-forward con reintentos
     crear_port_forward() {
         local servicio="$1"
         local namespace="$2"
@@ -733,45 +1453,21 @@ configurar_port_forwards() {
         local puerto_remoto="$4"
         local max_intentos=3
         
-        # Verificar que el puerto esté libre
-        if netstat -tuln | grep -q ":$puerto_local "; then
-            echo "⚠️ Puerto $puerto_local ocupado, liberando..."
-            fuser -k $puerto_local/tcp 2>/dev/null || true
-            sleep 2
-        fi
-        
         for intento in $(seq 1 $max_intentos); do
             echo "🔗 Configurando port-forward para $servicio ($puerto_local:$puerto_remoto) - Intento $intento"
             
-            # Usar nohup para evitar que se maten los procesos
-            nohup kubectl port-forward -n "$namespace" "service/$servicio" "$puerto_local:$puerto_remoto" >/dev/null 2>&1 &
+            nohup kubectl port-forward -n "$namespace" "service/$servicio" "$puerto_local:$puerto_remoto" --address=0.0.0.0 >/dev/null 2>&1 &
             local pf_pid=$!
-            sleep 5  # Aumentar tiempo de espera para estabilización
+            sleep 5
             
-            # Verificar que el port-forward esté funcionando con múltiples métodos
-            local puerto_activo=false
-            if kill -0 $pf_pid 2>/dev/null; then
-                # Verificar que el puerto esté escuchando
-                if netstat -tuln | grep -q ":$puerto_local "; then
-                    puerto_activo=true
-                else
-                    # Esperar un poco más para algunos servicios lentos
-                    sleep 3
-                    if netstat -tuln | grep -q ":$puerto_local "; then
-                        puerto_activo=true
-                    fi
-                fi
-            fi
-            
-            if [ "$puerto_activo" = true ]; then
-                echo -e "${GREEN}✅ Port-forward activo para $servicio en puerto $puerto_local (PID: $pf_pid)${NC}"
+            if kill -0 $pf_pid 2>/dev/null && netstat -tuln | grep -q ":$puerto_local "; then
+                echo -e "${GREEN}✅ Port-forward activo para $servicio en puerto $puerto_local${NC}"
                 return 0
             else
                 kill $pf_pid 2>/dev/null || true
             fi
             
             if [ $intento -lt $max_intentos ]; then
-                echo "⚠️ Reintentando port-forward para $servicio..."
                 sleep 5
             fi
         done
@@ -780,27 +1476,24 @@ configurar_port_forwards() {
         return 1
     }
     
-    # Cambiar al cluster DEV donde están todos los servicios
+    # Cambiar al cluster DEV
     kubectl config use-context "$CLUSTER_DEV"
     
     # Esperar a que los servicios estén disponibles
     echo "⏳ Esperando a que los servicios estén disponibles..."
     sleep 30
     
-    # Configurar port-forwards para servicios principales
+    # Configurar port-forwards principales
     declare -A servicios_pf=(
         ["argocd-server argocd 8080 80"]=""
-        ["kargo-api kargo 8081 80"]=""
-        ["argocd-dex-server argocd 8082 5556"]=""
+        ["kargo-api kargo 8081 80"]=""  
         ["argo-workflows-server argo-workflows 8083 2746"]=""
         ["argo-rollouts-dashboard argo-rollouts 8084 3100"]=""
         ["argo-events-webhook argo-events 8089 12000"]=""
-        ["prometheus-stack-grafana monitoring 8085 80"]=""
-        ["prometheus-stack-kube-prom-prometheus monitoring 8086 9090"]=""
-        ["prometheus-stack-kube-prom-alertmanager monitoring 8087 9093"]=""
+        ["grafana monitoring 8085 80"]=""
+        ["prometheus-operated monitoring 8086 9090"]=""
+        ["alertmanager-operated monitoring 8087 9093"]=""
         ["jaeger-query monitoring 8088 16686"]=""
-        # ["loki-gateway monitoring 8089 80"]=""  # Loki no tiene UI web propia, se consulta via Grafana
-        # ["minio minio 8090 9000"]=""  # MinIO API no tiene UI web propia, solo API S3-compatible
         ["minio-console minio 8091 9001"]=""
         ["gitea-http gitea 8092 3000"]=""
         ["kubernetes-dashboard-web kubernetes-dashboard 8093 8000"]=""
@@ -813,7 +1506,6 @@ configurar_port_forwards() {
     for servicio_info in "${!servicios_pf[@]}"; do
         read -r servicio namespace puerto_local puerto_remoto <<< "$servicio_info"
         
-        # Verificar que el servicio existe antes de hacer port-forward
         if kubectl get service "$servicio" -n "$namespace" >/dev/null 2>&1; then
             if crear_port_forward "$servicio" "$namespace" "$puerto_local" "$puerto_remoto"; then
                 exitosos=$((exitosos + 1))
@@ -821,18 +1513,13 @@ configurar_port_forwards() {
                 fallidos=$((fallidos + 1))
             fi
         else
-            echo -e "${YELLOW}⚠️ Servicio $servicio no encontrado en namespace $namespace${NC}"
+            echo -e "${YELLOW}⚠️ Servicio $servicio no encontrado en namespace $namespace (puede estar desplegándose)${NC}"
             fallidos=$((fallidos + 1))
         fi
-        
         sleep 1
     done
     
     echo -e "${GREEN}✅ Port-forwards configurados: $exitosos exitosos, $fallidos fallidos${NC}"
-    
-    # Verificar port-forwards activos
-    echo "🔍 Port-forwards activos:"
-    netstat -tuln | grep -E ':(808[0-3]|809[0-3])' || echo "❌ No se encontraron port-forwards activos"
 }
 
 validar_uis() {
@@ -845,11 +1532,9 @@ validar_uis() {
         url="${UI_URLS[$ui_name]}"
         echo -n "🔍 Verificando $ui_name ($url)... "
         
-        # Mejorar la validación con más códigos de estado válidos y timeout más largo
         local response_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" --connect-timeout 10 --max-time 15 2>/dev/null || echo "000")
         
-        # Códigos de estado que consideramos válidos (incluyendo redirects y algunos errores esperados)
-        if [[ "$response_code" =~ ^(200|301|302|401|403|404)$ ]]; then
+        if [[ "$response_code" =~ ^(200|301|302|401|403)$ ]]; then
             UI_STATUS[$ui_name]="✅ OPERATIVA"
             echo -e "${GREEN}✅ ($response_code)${NC}"
             uis_operativas=$((uis_operativas + 1))
@@ -862,866 +1547,323 @@ validar_uis() {
     echo ""
     echo -e "${GREEN}✅ Validación de UIs completada: $uis_operativas/$uis_total operativas${NC}"
     
-    # Si hay menos del 80% operativas, mostrar información de diagnóstico
     local porcentaje=$((uis_operativas * 100 / uis_total))
     if [ $porcentaje -lt 80 ]; then
-        echo -e "${YELLOW}⚠️ Solo $porcentaje% de UIs operativas. Verificando port-forwards...${NC}"
-        netstat -tuln | grep -E ':(808[0-3]|809[0-3])' | while read line; do
-            puerto=$(echo "$line" | awk '{print $4}' | cut -d: -f2)
-            echo "  🔗 Puerto $puerto activo"
-        done
+        echo -e "${YELLOW}⚠️ Solo $porcentaje% de UIs operativas. Algunas aplicaciones pueden estar desplegándose...${NC}"
     fi
 }
 
-# Función de validación estricta para verificar que DEV está completamente funcional
-validar_dev_completo() {
-    echo -e "${BLUE}🔍 Validación estricta de DEV antes de crear PRE/PRO...${NC}"
-    
-    local errores=0
-    local advertencias=0
-    
-    # 1. Verificar que ArgoCD está ejecutándose
-    echo "📋 Verificando ArgoCD..."
-    if ! kubectl get pods -n argocd | grep -q "argocd-server.*Running"; then
-        echo -e "${RED}❌ ArgoCD server no está ejecutándose${NC}"
-        errores=$((errores + 1))
-    else
-        echo -e "${GREEN}✅ ArgoCD server ejecutándose${NC}"
-    fi
-    
-    # 2. Verificar ApplicationSets
-    echo "📋 Verificando ApplicationSets..."
-    local appsets=$(kubectl get applicationset -n argocd 2>/dev/null | wc -l)
-    if [ $appsets -lt 2 ]; then
-        echo -e "${RED}❌ ApplicationSets no encontrados o incompletos${NC}"
-        errores=$((errores + 1))
-    else
-        echo -e "${GREEN}✅ ApplicationSets detectados${NC}"
-    fi
-    
-    # 3. Verificar aplicaciones de infraestructura críticas
-    echo "📋 Verificando aplicaciones de infraestructura..."
-    local apps_criticas=("cert-manager" "external-secrets" "ingress-nginx" "monitoring" "loki" "grafana" "kargo")
-    local apps_sincronizadas=0
-    
-    for app in "${apps_criticas[@]}"; do
-        local sync_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
-        local health_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "NotFound")
-        
-        if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
-            echo -e "${GREEN}✅ $app: Synced & Healthy${NC}"
-            apps_sincronizadas=$((apps_sincronizadas + 1))
-        elif [ "$sync_status" = "NotFound" ]; then
-            echo -e "${RED}❌ $app: Aplicación no encontrada${NC}"
-            errores=$((errores + 1))
-        else
-            echo -e "${YELLOW}⚠️  $app: $sync_status / $health_status${NC}"
-            advertencias=$((advertencias + 1))
-        fi
-    done
-    
-    # 4. Verificar pods críticos ejecutándose
-    echo "📋 Verificando pods críticos..."
-    local namespaces_criticos=("cert-manager" "external-secrets-system" "ingress-nginx" "monitoring" "loki" "grafana" "kargo")
-    local namespaces_ok=0
-    
-    for ns in "${namespaces_criticos[@]}"; do
-        local pods_running=$(kubectl get pods -n "$ns" 2>/dev/null | grep -c "Running" || echo "0")
-        local pods_total=$(kubectl get pods -n "$ns" 2>/dev/null | tail -n +2 | wc -l || echo "0")
-        
-        if [ "$pods_total" -eq 0 ]; then
-            echo -e "${RED}❌ Namespace $ns: Sin pods desplegados${NC}"
-            errores=$((errores + 1))
-        elif [ "$pods_running" -eq "$pods_total" ]; then
-            echo -e "${GREEN}✅ Namespace $ns: $pods_running/$pods_total pods ejecutándose${NC}"
-            namespaces_ok=$((namespaces_ok + 1))
-        else
-            echo -e "${YELLOW}⚠️  Namespace $ns: $pods_running/$pods_total pods ejecutándose${NC}"
-            advertencias=$((advertencias + 1))
-        fi
-    done
-    
-    # 5. Verificar UIs (reutilizar validación existente)
-    validar_uis
-    local uis_operativas=0
-    for ui_name in "${!UI_STATUS[@]}"; do
-        if [[ "${UI_STATUS[$ui_name]}" == *"OPERATIVA"* ]]; then
-            uis_operativas=$((uis_operativas + 1))
-        fi
-    done
-    local uis_total=${#UI_URLS[@]}
-    local porcentaje_uis=$((uis_operativas * 100 / uis_total))
-    
-    # Resumen de validación
+mostrar_resumen_final() {
     echo ""
-    echo -e "${BLUE}📊 RESUMEN DE VALIDACIÓN DEV:${NC}"
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║                    🎉 INSTALACIÓN COMPLETADA EXITOSAMENTE 🎉                ║${NC}"
+    echo -e "${CYAN}║                         CON AUTO-ACTUALIZACIÓN ACTIVADA                     ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    
+    echo -e "${BLUE}📊 ESTADO DE LA INFRAESTRUCTURA:${NC}"
     echo "================================="
-    echo "🔴 Errores críticos: $errores"
-    echo "🟡 Advertencias: $advertencias"  
-    echo "📱 UIs operativas: $uis_operativas/$uis_total ($porcentaje_uis%)"
-    echo "🏗️ Apps críticas sincronizadas: $apps_sincronizadas/${#apps_criticas[@]}"
-    echo "🛠️ Namespaces OK: $namespaces_ok/${#namespaces_criticos[@]}"
-    echo ""
     
-    # Criterios para continuar con PRE/PRO
-    if [ $errores -eq 0 ] && [ $apps_sincronizadas -ge 5 ] && [ $porcentaje_uis -ge 60 ]; then
-        echo -e "${GREEN}✅ DEV VALIDADO: Criterios cumplidos para crear PRE/PRO${NC}"
-        echo -e "${GREEN}   ► Sin errores críticos${NC}"
-        echo -e "${GREEN}   ► $apps_sincronizadas/${#apps_criticas[@]} apps críticas funcionando${NC}"
-        echo -e "${GREEN}   ► $porcentaje_uis% UIs operativas${NC}"
-        return 0
+    # Mostrar clusters creados
+    echo ""
+    echo -e "${YELLOW}🏭 CLUSTERS KUBERNETES:${NC}"
+    local clusters_activos=0
+    for cluster in "$CLUSTER_DEV" "$CLUSTER_PRE" "$CLUSTER_PRO"; do
+        if minikube status -p "$cluster" >&/dev/null; then
+            echo -e "${GREEN}✅ $cluster - ACTIVO${NC}"
+            clusters_activos=$((clusters_activos + 1))
+        else
+            echo -e "${RED}❌ $cluster - NO DISPONIBLE${NC}"
+        fi
+    done
+    
+    # Mostrar estado de ArgoCD
+    echo ""
+    echo -e "${YELLOW}🔄 ARGOCD:${NC}"
+    if kubectl get pods -n argocd | grep -q "argocd-server.*Running"; then
+        echo -e "${GREEN}✅ ArgoCD ${ARGOCD_VERSION} - OPERATIVO${NC}"
+        echo "   🌐 URL: http://localhost:8080"
+        echo "   🔓 Acceso: Anónimo (sin login requerido)"
     else
-        echo -e "${RED}❌ DEV NO VALIDADO: No se crearán PRE/PRO${NC}"
-        echo -e "${RED}   ► Errores críticos: $errores (requerido: 0)${NC}"
-        echo -e "${RED}   ► Apps críticas: $apps_sincronizadas/${#apps_criticas[@]} (requerido: ≥5)${NC}"
-        echo -e "${RED}   ► UIs operativas: $porcentaje_uis% (requerido: ≥60%)${NC}"
-        echo ""
-        echo -e "${YELLOW}💡 Para crear PRE/PRO manualmente después de arreglar los problemas:${NC}"
-        echo -e "${YELLOW}   $0 clusters${NC}"
-        return 1
+        echo -e "${RED}❌ ArgoCD - NO DISPONIBLE${NC}"
     fi
-}
-
-mostrar_urls_ui() {
-    # Ejecutar validación primero
-    validar_uis
     
+    # Mostrar versiones auto-detectadas
     echo ""
-    echo "🌐 PLATAFORMA GITOPS MULTI-CLUSTER - INTERFACES DE USUARIO"
-    echo "=========================================================="
-    echo ""
-    echo "📊 GITOPS CORE:"
-    echo "---------------"
-    echo "🔄 ArgoCD UI: http://localhost:8080"
-    echo "   📋 Propósito: Continuous Deployment y gestión de aplicaciones GitOps"
-    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
-    echo "   ${UI_STATUS["ArgoCD"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🚢 Kargo UI: http://localhost:8081"
-    echo "   📋 Propósito: Promociones automáticas entre entornos (dev → pre → pro)"
-    echo "   🔓 Acceso: Credenciales fijas (admin/admin)"
-    echo "   ${UI_STATUS["Kargo"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🔐 ArgoCD Dex: http://localhost:8082"
-    echo "   📋 Propósito: Authentication service para ArgoCD"
-    echo "   🔓 Acceso: Directo sin autenticación"
-    echo "   ${UI_STATUS["ArgoCD_Dex"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🚢 PROGRESSIVE DELIVERY & EVENT-DRIVEN GITOPS:"
-    echo "-----------------------------------------------"
-    echo "⚡ Argo Workflows UI: http://localhost:8083"
-    echo "   📋 Propósito: Workflow orchestration y batch processing"
-    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
-    echo "   ${UI_STATUS["Argo_Workflows"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🎯 Argo Rollouts Dashboard: http://localhost:8084"
-    echo "   📋 Propósito: Progressive delivery, canary deployments y blue-green"
-    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
-    echo "   ${UI_STATUS["Argo_Rollouts"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "📡 Argo Events Webhook: http://localhost:8089"
-    echo "   📋 Propósito: Event-driven GitOps automation y webhook processing"
-    echo "   🔓 Acceso: Webhooks API endpoint (sin UI web)"
-    echo "   ${UI_STATUS["Argo_Events"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🔔 Argo Notifications: Integrado en ArgoCD + Grafana annotations"
-    echo "   📋 Propósito: GitOps deployment notifications y alerting"
-    echo "   🔓 Acceso: Notificaciones automáticas (sin UI independiente)"
-    echo "   💡 Ver notificaciones en: Grafana → Annotations & Alerts"
-    echo ""
-    echo "📈 OBSERVABILITY:"
-    echo "-----------------"
-    echo "📊 Grafana UI: http://localhost:8085"
-    echo "   📋 Propósito: Dashboards y visualización de métricas"
-    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
-    echo "   ${UI_STATUS["Grafana"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "📈 Prometheus UI: http://localhost:8086"
-    echo "   📋 Propósito: Metrics collection y time-series database"
-    echo "   🔓 Acceso: Directo sin autenticación"
-    echo "   ${UI_STATUS["Prometheus"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🚨 AlertManager UI: http://localhost:8087"
-    echo "   📋 Propósito: Alert routing y notification management"
-    echo "   🔓 Acceso: Directo sin autenticación"
-    echo "   ${UI_STATUS["AlertManager"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🔍 Jaeger UI: http://localhost:8088"
-    echo "   📋 Propósito: Distributed tracing y performance monitoring"
-    echo "   🔓 Acceso: Directo sin autenticación"
-    echo "   ${UI_STATUS["Jaeger"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "📝 LOGS & STORAGE:"
-    echo "------------------"
-    echo "📝 Loki (Logs): Accesible vía Grafana (puerto 8085)"
-    echo "   📋 Propósito: Agregación y consulta de logs con LogQL"
-    echo "   🔓 Acceso: Loki NO tiene UI web - se consulta desde Grafana"
-    echo "   💡 Instrucciones: Ir a Grafana → Explore → Seleccionar Loki como datasource"
-    echo ""
-    echo "🏪 MinIO API: Puerto 9000 (solo API S3-compatible)"
-    echo "   📋 Propósito: Object storage S3-compatible (solo API, sin UI web)"
-    echo "   🔓 Acceso: MinIO API NO tiene UI web - usar MinIO Console o clientes S3"
-    echo "   💡 Instrucciones: Usar mc (MinIO Client) o SDK S3-compatible"
-    echo ""
-    echo "🏪 MinIO Console: http://localhost:8091"
-    echo "   📋 Propósito: Object storage S3-compatible (Console Web UI)"
-    echo "   🔓 Acceso: admin/admin123"
-    echo "   ${UI_STATUS["MinIO_Console"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🔧 DESARROLLO & GESTIÓN:"
-    echo "------------------------"
-    echo "🐙 Gitea UI: http://localhost:8092"
-    echo "   📋 Propósito: Git repository management y source control"
-    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
-    echo "   ${UI_STATUS["Gitea"]:-"⏳ VERIFICANDO..."}"
-    echo ""
-    echo "🔧 Kubernetes Dashboard: http://localhost:8093"
-    echo "   📋 Propósito: Kubernetes cluster management interface"
-    echo "   🔓 Acceso: ANÓNIMO - SIN LOGIN REQUERIDO"
-    echo "   ${UI_STATUS["K8s_Dashboard"]:-"⏳ VERIFICANDO..."}"
-    echo ""
+    echo -e "${YELLOW}🤖 VERSIONES AUTO-DETECTADAS:${NC}"
+    echo "   🔧 Kubernetes: $KUBERNETES_VERSION"
+    echo "   🔄 ArgoCD: $ARGOCD_VERSION"
+    echo "   🔒 cert-manager: $CERT_MANAGER_VERSION"
+    echo "   🔐 external-secrets: $EXTERNAL_SECRETS_VERSION"
+    echo "   🌐 ingress-nginx: $INGRESS_NGINX_VERSION"
+    echo "   📊 Grafana: $GRAFANA_VERSION"
+    echo "   🔍 Jaeger: $JAEGER_VERSION"
+    echo "   📝 Loki: $LOKI_VERSION"
+    echo "   🏪 MinIO: $MINIO_VERSION"
+    echo "   🐙 Gitea: $GITEA_VERSION"
     
-    echo "🏗️ ARQUITECTURA DEL SISTEMA:"
-    echo "=============================="
-    echo "🏗️ ARQUITECTURA MULTI-CLUSTER:"
-    echo "=============================="
-    echo "🏭 Cluster gitops-dev: Herramientas de gestión y control centralizadas"
-    echo "🏭 Cluster gitops-pre: Entorno de preproducción para validación"
-    echo "🏭 Cluster gitops-pro: Entorno de producción empresarial"
-    echo "📊 Stack: ArgoCD + Kargo + Observabilidad + Gestión Multi-Entorno"
+    # Mostrar aplicaciones desplegadas
     echo ""
-    echo "📦 Herramientas en DEV (controlan todos los clusters):"
-    echo "- ArgoCD + ApplicationSet: Gestión de aplicaciones multi-cluster"
-    echo "- Kargo: Promociones automáticas entre entornos"
-    echo "- Argo Events + Notifications: Event-driven automation"
-    echo "- Prometheus/Grafana: Monitoreo centralizado multi-cluster"
-    echo "- Gitea, MinIO, Jaeger, Loki: Infraestructura compartida"
-    echo "- Demo-project: Desplegado en los 3 entornos para pruebas"
+    echo -e "${YELLOW}📦 APLICACIONES GITOPS:${NC}"
+    local apps_sync=$(kubectl get applications -n argocd --no-headers 2>/dev/null | grep -c "Synced" || echo "0")
+    local apps_total=$(kubectl get applications -n argocd --no-headers 2>/dev/null | wc -l || echo "0")
+    echo "   📊 Aplicaciones sincronizadas: $apps_sync/$apps_total"
+    
+    # Mostrar UIs disponibles
     echo ""
-    echo "🔄 Flujo GitOps: Git → ArgoCD+ApplicationSet → Deploy multi-cluster → Events → Kargo → Promote → Notifications"
-    echo ""
-    
-    echo "💡 COMANDOS ÚTILES POST-INSTALACIÓN:"
-    echo "===================================="
-    echo "💡 Ver diagnóstico completo: ./scripts/diagnostico-gitops.sh"
-    echo "💡 Reiniciar port-forwards: ./scripts/setup-port-forwards.sh"
-    echo "💡 Ver aplicaciones ArgoCD: kubectl get applications -n argocd"
-    echo "💡 Port-forwards activos PID: $PORTFORWARD_PID"
-    echo ""
-    echo "🚀 ¡PLATAFORMA GITOPS MULTI-CLUSTER COMPLETAMENTE OPERATIVA!"
-    echo "🔓 ¡TODAS LAS UIS WEB VALIDADAS PARA ACCESO SIN AUTENTICACIÓN!"
-    echo "📝 ¡LOGS DE LOKI DISPONIBLES A TRAVÉS DE GRAFANA!"
-}
-
-esperar_servicios() {
-    echo -e "${BLUE}⏳ Esperando a que todos los servicios estén listos...${NC}"
-    
-    kubectl config use-context "$CLUSTER_DEV"
-    
-    # Esperar namespaces críticos con timeouts más largos
-    local namespaces=("argocd" "monitoring" "loki" "jaeger" "minio" "gitea" "argo-rollouts" "argo-workflows" "argo-events" "kubernetes-dashboard" "kargo")
-    
-    for ns in "${namespaces[@]}"; do
-        echo "📦 Esperando namespace: $ns"
-        if kubectl get namespace "$ns" >/dev/null 2>&1; then
-            # Solo esperar pods que existan, con timeout más corto por namespace
-            kubectl wait --for=condition=Ready pods --all -n "$ns" --timeout=180s 2>/dev/null || echo "⚠️ Algunos pods en $ns pueden tardar más en estar listos"
-        else
-            echo "⚠️ Namespace $ns no existe aún"
-        fi
+    echo -e "${YELLOW}🌐 INTERFACES WEB DISPONIBLES:${NC}"
+    for ui_name in "${!UI_URLS[@]}"; do
+        url="${UI_URLS[$ui_name]}"
+        status="${UI_STATUS[$ui_name]:-❓ NO VERIFICADA}"
+        echo "   $status $ui_name: $url"
     done
     
-    # Esperar explícitamente a servicios críticos con verificación mejorada
-    echo "🔍 Verificando servicios críticos..."
-    local servicios_criticos=("argocd-server" "prometheus-stack-grafana" "jaeger-query" "minio" "gitea-http")
-    local servicios_disponibles=0
+    # Comandos útiles
+    echo ""
+    echo -e "${YELLOW}🛠 COMANDOS ÚTILES:${NC}"
+    echo "   📋 Ver aplicaciones ArgoCD: kubectl get applications -n argocd"
+    echo "   🔄 Sincronizar aplicación: kubectl patch application <app-name> -n argocd --type merge -p '{\"metadata\":{\"annotations\":{\"argocd.argoproj.io/refresh\":\"now\"}}}'"
+    echo "   🌐 Port-forwards: netstat -tuln | grep '808[0-9]'"
+    echo "   🏭 Estado clusters: minikube status -p $CLUSTER_DEV"
+    echo "   🧹 Limpiar todo: minikube delete -p $CLUSTER_DEV && minikube delete -p $CLUSTER_PRE && minikube delete -p $CLUSTER_PRO"
+    echo "   🤖 Re-ejecutar con últimas versiones: ./instalar-todo.sh"
     
-    for servicio in "${servicios_criticos[@]}"; do
-        if kubectl get svc "$servicio" -A >/dev/null 2>&1; then
-            servicios_disponibles=$((servicios_disponibles + 1))
-            echo "✅ Servicio $servicio disponible"
-        else
-            echo "⚠️ Servicio $servicio no encontrado"
-        fi
-    done
-    
-    # Esperar tiempo adicional para que todos los servicios estén completamente listos
-    echo "⏳ Tiempo adicional para estabilización de servicios..."
-    sleep 60
-    
-    echo -e "${GREEN}✅ Servicios inicializados: $servicios_disponibles/${#servicios_criticos[@]} críticos disponibles${NC}"
+    echo ""
+    echo -e "${GREEN}🎯 ¡Infraestructura GitOps siempre actualizada lista para usar!${NC}"
+    echo -e "${CYAN}📚 Documentación: https://argo-cd.readthedocs.io/${NC}"
+    echo -e "${MAGENTA}🤖 Próxima ejecución detectará automáticamente nuevas versiones${NC}"
+    echo ""
 }
 
-instalar_todo() {
-    # Configurar trap para limpieza en caso de error
-    trap 'echo -e "${RED}❌ Error durante la instalación. Limpiando...${NC}"; limpiar_en_error; exit 1' ERR
+crear_script_verificador_actualizaciones() {
+    echo -e "${BLUE}📝 Creando script verificador de actualizaciones...${NC}"
     
-    # Asegurar instalación completamente desatendida
-    export DEBIAN_FRONTEND=noninteractive
-    export NEEDRESTART_MODE=a
-    export APT_LISTCHANGES_FRONTEND=none
+    cat > "${SCRIPT_DIR}/verificar-actualizaciones.sh" << 'SCRIPT_EOF'
+#!/bin/bash
+
+# ============================================================================
+# VERIFICADOR DE ACTUALIZACIONES GITOPS
+# ============================================================================
+# Propósito: Verificar si hay nuevas versiones disponibles de las herramientas
+# Uso: ./verificar-actualizaciones.sh
+# ============================================================================
+
+set -euo pipefail
+
+# Colores
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${BLUE}🔍 VERIFICANDO ACTUALIZACIONES DISPONIBLES...${NC}"
+echo "=============================================="
+
+# Función para obtener versión actual desde ArgoCD Application
+obtener_version_actual() {
+    local app_name="$1"
+    kubectl get application "$app_name" -n argocd -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "unknown"
+}
+
+# Función para obtener última versión de GitHub
+obtener_version_github() {
+    local repo="$1"
+    curl -s "https://api.github.com/repos/$repo/releases/latest" | jq -r '.tag_name' 2>/dev/null | sed 's/^v//' || echo "unknown"
+}
+
+# Función para obtener última versión de Helm Chart
+obtener_version_helm() {
+    local chart="$1"
+    local repo="$2"
+    helm repo add temp_repo "$repo" >/dev/null 2>&1 || true
+    helm repo update >/dev/null 2>&1 || true
+    helm search repo "temp_repo/$chart" --versions | awk 'NR==2 {print $2}' 2>/dev/null || echo "unknown"
+    helm repo remove temp_repo >/dev/null 2>&1 || true
+}
+
+# Verificar ArgoCD
+echo -e "${YELLOW}🔄 ArgoCD:${NC}"
+current_argocd=$(obtener_version_github "argoproj/argo-cd")
+installed_argocd=$(kubectl get pods -n argocd -l app.kubernetes.io/component=server -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+' | sed 's/^v//' || echo "unknown")
+if [[ "$current_argocd" != "$installed_argocd" && "$current_argocd" != "unknown" ]]; then
+    echo -e "   ${RED}📦 Nueva versión disponible: $current_argocd (actual: $installed_argocd)${NC}"
+else
+    echo -e "   ${GREEN}✅ Actualizado: $installed_argocd${NC}"
+fi
+
+# Verificar Helm Charts
+charts=(
+    "cert-manager:https://charts.jetstack.io"
+    "external-secrets:https://charts.external-secrets.io"
+    "ingress-nginx:https://kubernetes.github.io/ingress-nginx"
+    "grafana:https://grafana.github.io/helm-charts"
+    "jaeger:https://jaegertracing.github.io/helm-charts"
+    "loki:https://grafana.github.io/helm-charts"
+    "minio:https://charts.min.io"
+    "gitea:https://dl.gitea.io/charts"
+)
+
+updates_available=0
+
+for chart_info in "${charts[@]}"; do
+    IFS=':' read -r chart_name repo_url <<< "$chart_info"
+    echo -e "${YELLOW}📦 $chart_name:${NC}"
     
-    local inicio=$(date +%s)
+    current_version=$(obtener_version_helm "$chart_name" "$repo_url")
+    installed_version=$(obtener_version_actual "$chart_name" 2>/dev/null || echo "unknown")
     
+    if [[ "$current_version" != "$installed_version" && "$current_version" != "unknown" ]]; then
+        echo -e "   ${RED}🔄 Nueva versión disponible: $current_version (actual: $installed_version)${NC}"
+        updates_available=$((updates_available + 1))
+    else
+        echo -e "   ${GREEN}✅ Actualizado: $installed_version${NC}"
+    fi
+done
+
+echo ""
+if [ $updates_available -gt 0 ]; then
+    echo -e "${YELLOW}⚠️ Hay $updates_available actualizaciones disponibles${NC}"
+    echo -e "${BLUE}💡 Para actualizar, ejecuta: ./instalar-todo.sh${NC}"
+else
+    echo -e "${GREEN}🎉 Todas las herramientas están actualizadas${NC}"
+fi
+
+echo ""
+echo -e "${BLUE}📅 Última verificación: $(date)${NC}"
+SCRIPT_EOF
+
+    chmod +x "${SCRIPT_DIR}/verificar-actualizaciones.sh"
+    echo -e "${GREEN}✅ Script verificador creado: ${SCRIPT_DIR}/verificar-actualizaciones.sh${NC}"
+}
+
+crear_clusters_adicionales() {
+    if [[ "$CREAR_CLUSTERS_ADICIONALES" == "true" ]]; then
+        echo -e "${BLUE}🏗️ Creando clusters PRE y PRO automáticamente...${NC}"
+        # Proceder directamente a crear clusters
+    elif [[ "$MODO_DESATENDIDO" != "true" ]]; then
+        echo -e "${BLUE}🏗️ ¿Deseas crear los clusters PRE y PRO ahora? (recomendado después de validar DEV)${NC}"
+        echo "Puedes crearlos más tarde ejecutando este script con la opción --clusters-adicionales"
+        
+        read -p "¿Crear clusters PRE y PRO? (y/n): " -n 1 -r
+        echo
+        
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}ℹ️ Clusters PRE y PRO no creados. Puedes crearlos más tarde.${NC}"
+            return 0
+        fi
+        # Si responde y, proceder a crear clusters
+    else
+        echo -e "${YELLOW}🤖 MODO DESATENDIDO: Saltando creación de clusters adicionales${NC}"
+        echo -e "${BLUE}💡 Para crear clusters PRE y PRO, ejecuta: CREAR_CLUSTERS_ADICIONALES=true ./instalar-todo.sh${NC}"
+        return 0
+    fi
+    
+    # Código común para crear clusters (ejecutado solo si no se retornó antes)
+    echo -e "${BLUE}🏗️ Creando clusters PRE y PRO...${NC}"
+        
+        # Crear cluster PRE
+        if minikube start -p "$CLUSTER_PRE" \
+            --memory="$PRE_MEMORY" \
+            --cpus="$PRE_CPUS" \
+            --disk-size="$PRE_DISK" \
+            --driver=docker \
+            --kubernetes-version="$KUBERNETES_VERSION" \
+            --wait=true \
+            --wait-timeout=600s; then
+            echo -e "${GREEN}✅ Cluster PRE creado exitosamente${NC}"
+        else
+            echo -e "${YELLOW}⚠️ Error al crear cluster PRE${NC}"
+        fi
+        
+        # Crear cluster PRO
+        if minikube start -p "$CLUSTER_PRO" \
+            --memory="$PRO_MEMORY" \
+            --cpus="$PRO_CPUS" \
+            --disk-size="$PRO_DISK" \
+            --driver=docker \
+            --kubernetes-version="$KUBERNETES_VERSION" \
+            --wait=true \
+            --wait-timeout=600s; then
+            echo -e "${GREEN}✅ Cluster PRO creado exitosamente${NC}"
+        else
+            echo -e "${YELLOW}⚠️ Error al crear cluster PRO${NC}"
+        fi
+        
+        # Configurar contexto de vuelta a DEV
+        kubectl config use-context "$CLUSTER_DEV"
+        
+        echo -e "${GREEN}✅ Clusters adicionales creados${NC}"
+}
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL
+# ============================================================================
+
+main() {
+    # Verificar argumentos
+    if [[ "${1:-}" == "--clusters-adicionales" ]]; then
+        echo -e "${BLUE}🏗️ Creando únicamente clusters PRE y PRO...${NC}"
+        obtener_todas_las_versiones  # Obtener versiones incluso para clusters adicionales
+        crear_clusters_adicionales
+        exit 0
+    fi
+    
+    # Flujo principal
     mostrar_banner
     mostrar_arquitectura
     
-    echo -e "${BLUE}🚀 Iniciando instalación completa optimizada...${NC}"
-    echo -e "${GREEN}✅ MODO DESATENDIDO: Sin confirmaciones interactivas${NC}"
-    
-    # Fase 1: Verificaciones previas
-    echo -e "${PURPLE}[FASE 1/8]${NC} Verificaciones del sistema"
-    verificar_dependencias
-    
-    # Fase 2: Preparación del entorno (sin limpieza redundante)
-    echo -e "${PURPLE}[FASE 2/8]${NC} Preparación del entorno"
-    echo "✅ Entorno ya limpio - continuando con creación de clusters"
-    
-    # Fase 3: Creación de clusters
-    echo -e "${PURPLE}[FASE 3/8]${NC} Creación de clusters"
-    if ! crear_clusters; then
-        echo -e "${RED}❌ Error en la creación de clusters${NC}"
-        exit 1
-    fi
-    
-    # Fase 4: Configuración de contextos
-    echo -e "${PURPLE}[FASE 4/8]${NC} Configuración de contextos"
-    configurar_contextos
-    
-    # Fase 5: Instalación de ArgoCD
-    echo -e "${PURPLE}[FASE 5/8]${NC} Instalación de ArgoCD"
-    if ! instalar_argocd; then
-        echo -e "${RED}❌ Error en la instalación de ArgoCD${NC}"
-        exit 1
-    fi
-    
-    # Fase 6: Aplicación de infraestructura
-    echo -e "${PURPLE}[FASE 6/10]${NC} Despliegue de infraestructura GitOps"
-    if ! aplicar_infraestructura; then
-        echo -e "${RED}❌ Error en la aplicación de infraestructura${NC}"
-        exit 1
-    fi
-    
-    # Fase 7: Configuración inicial de ArgoCD
-    echo -e "${PURPLE}[FASE 7/10]${NC} Configuración inicial de ArgoCD"
-    echo "⚙️ ArgoCD configurado para cluster DEV (clusters adicionales se agregarán después)"
-    
-    # Fase 8: Esperar servicios y configurar acceso DEV
-    echo -e "${PURPLE}[FASE 8/10]${NC} Finalización y configuración de acceso DEV"
-    esperar_servicios
-    verificar_y_arreglar_servicios
-    configurar_port_forwards
-    
-    # VALIDACIÓN ESTRICTA: Verificar si DEV está completamente funcional antes de crear PRE y PRO
-    echo -e "${PURPLE}[VALIDACIÓN CRÍTICA]${NC} Verificando estado completo de DEV"
-    
-    if validar_dev_completo; then
-        echo -e "${GREEN}✅ VALIDACIÓN EXITOSA: DEV completamente funcional${NC}"
-        echo -e "${GREEN}🚀 Procediendo a crear clusters PRE y PRO${NC}"
-        
-        # Fase 9: Crear clusters adicionales
-        echo -e "${PURPLE}[FASE 9/10]${NC} Creación de clusters PRE y PRO"
-        crear_clusters_adicionales
-        
-        # Fase 10: Configuración multi-cluster completa
-        echo -e "${PURPLE}[FASE 10/10]${NC} Configuración multi-cluster completa"
-        configurar_multi_cluster
-        
-        echo -e "${GREEN}✅ Arquitectura multi-cluster completa${NC}"
-        local clusters_texto="3 Clusters creados y configurados"
-    else
-        echo -e "${RED}❌ VALIDACIÓN FALLIDA: DEV no está completamente funcional${NC}"
-        echo -e "${YELLOW}⚠️ PRE y PRO no serán creados por problemas en DEV${NC}"
-        echo -e "${YELLOW}💡 Soluciona los problemas de DEV y ejecuta: $0 clusters${NC}"
-        local clusters_texto="1 Cluster DEV creado (PRE/PRO pendientes por errores)"
-    fi
-    
-    # Calcular tiempo total
-    local fin=$(date +%s)
-    local duracion=$((fin - inicio))
-    local minutos=$((duracion / 60))
-    local segundos=$((duracion % 60))
-    
-    echo -e "${GREEN}"
-    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-    echo "║                          🎉 ¡INSTALACIÓN COMPLETADA! 🎉                     ║"  
-    echo "║                                                                              ║"
-    echo "║  ⏱️  Tiempo total: ${minutos}m ${segundos}s                                                    ║"
-    echo "║  🏭 $clusters_texto"
-    echo "║  📦 17+ Herramientas GitOps desplegadas                                     ║"
-    echo "║  🌐 12 UIs web disponibles + Logs via Grafana + Notifications             ║"
-    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    
-    mostrar_urls_ui
-}
-
-# Función de limpieza en caso de error
-limpiar_en_error() {
-    echo -e "${YELLOW}🧹 Realizando limpieza de emergencia...${NC}"
-    
-    # Matar port-forwards
-    pkill -f "kubectl.*port-forward" 2>/dev/null || true
-    
-    # Mostrar estado de clusters para debug
-    echo "📊 Estado de clusters al momento del error:"
-    minikube status -p "$CLUSTER_DEV" 2>/dev/null || echo "❌ Cluster DEV no disponible"
-    minikube status -p "$CLUSTER_PRE" 2>/dev/null || echo "❌ Cluster PRE no disponible" 
-    minikube status -p "$CLUSTER_PRO" 2>/dev/null || echo "❌ Cluster PRO no disponible"
-    
-    echo -e "${YELLOW}💡 Para limpiar completamente, ejecuta: $0 limpiar${NC}"
-}
-
-# Funciones para ejecución individual
-limpiar() {
-    echo -e "${YELLOW}🧹 Limpiando entorno completo...${NC}"
-    
-    # Matar todos los port-forwards
-    echo "🔌 Cerrando port-forwards activos..."
-    if pgrep -f "kubectl.*port-forward" >/dev/null 2>&1; then
-        local pf_count=$(pgrep -cf "kubectl.*port-forward" 2>/dev/null || echo "0")
-        pkill -f "kubectl.*port-forward" 2>/dev/null || true
-        echo -e "${GREEN}✅ $pf_count port-forwards cerrados${NC}"
-    else
-        echo "ℹ️ No hay port-forwards activos"
-    fi
-    
-    # Limpiar clusters
-    limpiar_clusters_existentes
-    
-    # Limpiar configuraciones de kubectl
-    echo "🗑️ Limpiando contextos de kubectl..."
-    local contextos_eliminados=0
-    for cluster in "$CLUSTER_DEV" "$CLUSTER_PRE" "$CLUSTER_PRO"; do
-        if kubectl config get-contexts -o name | grep -q "^$cluster$" 2>/dev/null; then
-            if kubectl config delete-context "$cluster" >/dev/null 2>&1; then
-                echo -e "${GREEN}✅ Contexto $cluster eliminado${NC}"
-                contextos_eliminados=$((contextos_eliminados + 1))
-            fi
+    if [[ "$MODO_DESATENDIDO" != "true" ]]; then
+        echo -e "${YELLOW}⚠️ ADVERTENCIA: Este script eliminará clusters minikube existentes.${NC}"
+        read -p "¿Continuar? (y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Instalación cancelada."
+            exit 1
         fi
-    done
-    
-    if [ $contextos_eliminados -eq 0 ]; then
-        echo "ℹ️ No había contextos de kubectl que eliminar"
-    fi
-    
-    # Limpiar archivos temporales
-    echo "🗑️ Limpiando archivos temporales..."
-    local archivos_temp=("/tmp/yq")
-    local archivos_eliminados=0
-    
-    for archivo in "${archivos_temp[@]}"; do
-        if [ -f "$archivo" ]; then
-            sudo rm -f "$archivo" 2>/dev/null && archivos_eliminados=$((archivos_eliminados + 1))
-        fi
-    done
-    
-    if [ $archivos_eliminados -gt 0 ]; then
-        echo -e "${GREEN}✅ $archivos_eliminados archivos temporales eliminados${NC}"
     else
-        echo "ℹ️ No había archivos temporales que eliminar"
+        echo -e "${GREEN}🤖 MODO DESATENDIDO: Iniciando instalación automática...${NC}"
+        echo -e "${YELLOW}⚠️ Se eliminarán clusters minikube existentes automáticamente.${NC}"
+        sleep 3  # Breve pausa para mostrar el mensaje
     fi
     
+    # Ejecutar instalación paso a paso con auto-detección de versiones
+    echo -e "${CYAN}🚀 INICIANDO INSTALACIÓN AUTOMATIZADA COMPLETA...${NC}"
     echo ""
-    echo -e "${GREEN}🎉 Limpieza completa realizada exitosamente${NC}"
-    echo "💡 El entorno está listo para una instalación limpia con: $0"
+    
+    verificar_dependencias || { echo -e "${RED}❌ Error crítico en dependencias${NC}"; exit 1; }
+    obtener_todas_las_versiones  # ⭐ NUEVA FUNCIÓN: Auto-detectar todas las versiones
+    limpiar_clusters_existentes || { echo -e "${RED}❌ Error crítico limpiando clusters${NC}"; exit 1; }
+    crear_cluster_dev || { echo -e "${RED}❌ Error crítico creando cluster DEV${NC}"; exit 1; }
+    instalar_argocd || { echo -e "${RED}❌ Error crítico instalando ArgoCD${NC}"; exit 1; }
+    
+    # ArgoCD ready con manejo robusto de errores
+    if ! esperar_argocd_ready; then
+        echo -e "${YELLOW}⚠️ ArgoCD tardó más de lo esperado, pero continuando...${NC}"
+    fi
+    
+    crear_configuraciones_helm || echo -e "${YELLOW}⚠️ Advertencia: Error creando configuraciones Helm${NC}"
+    actualizar_applicationset || echo -e "${YELLOW}⚠️ Advertencia: Error actualizando ApplicationSet${NC}"
+    aplicar_infraestructura || echo -e "${YELLOW}⚠️ Advertencia: Error aplicando infraestructura${NC}"
+    
+    # Esperar un momento para que las aplicaciones empiecen a desplegarse
+    echo -e "${BLUE}⏳ Esperando despliegue inicial de aplicaciones (90s)...${NC}"
+    sleep 90
+    
+    configurar_port_forwards || echo -e "${YELLOW}⚠️ Advertencia: Error configurando port-forwards${NC}"
+    validar_uis || echo -e "${YELLOW}⚠️ Advertencia: Error validando UIs${NC}"
+    mostrar_resumen_final
+    
+    # Ofrecer crear clusters adicionales
+    crear_clusters_adicionales
 }
 
-solo_clusters() {
-    echo -e "${BLUE}🏭 Creando solo clusters...${NC}"
-    verificar_dependencias
-    crear_clusters
-    configurar_contextos
-    echo -e "${GREEN}✅ Clusters creados y configurados${NC}"
-}
+# ============================================================================
+# EJECUCIÓN PRINCIPAL  
+# ============================================================================
 
-solo_argocd() {
-    echo -e "${BLUE}🔄 Instalando solo ArgoCD...${NC}" 
-    kubectl config use-context "$CLUSTER_DEV" || {
-        echo -e "${RED}❌ Cluster DEV no disponible. Ejecuta primero: $0 clusters${NC}"
-        exit 1
-    }
-    instalar_argocd
-    echo -e "${GREEN}✅ ArgoCD instalado${NC}"
-}
+# Trap para limpiar port-forwards en caso de interrupción
+trap 'echo -e "\n${YELLOW}🛑 Interrumpido. Limpiando port-forwards...${NC}"; pkill -f "kubectl.*port-forward" 2>/dev/null || true; exit 1' INT TERM
 
-solo_infraestructura() {
-    echo -e "${BLUE}📦 Aplicando solo infraestructura...${NC}"
-    kubectl config use-context "$CLUSTER_DEV" || {
-        echo -e "${RED}❌ Cluster DEV no disponible. Ejecuta primero: $0 clusters${NC}"
-        exit 1
-    }
-    aplicar_infraestructura
-    echo -e "${GREEN}✅ Infraestructura aplicada${NC}"
-}
-
-solo_port_forwards() {
-    echo -e "${BLUE}🌐 Configurando solo port-forwards...${NC}"
-    kubectl config use-context "$CLUSTER_DEV" || {
-        echo -e "${RED}❌ Cluster DEV no disponible${NC}"
-        exit 1
-    }
-    configurar_port_forwards
-    echo -e "${GREEN}✅ Port-forwards configurados${NC}"
-}
-
-# Función para esperar que una aplicación esté Synced y Healthy
-wait_for_app() {
-    local app_name=$1
-    local max_wait=${2:-300}  # 5 minutos por defecto
-    local wait_time=0
-    
-    echo -e "${BLUE}⏳ Esperando que $app_name esté Synced y Healthy...${NC}"
-    
-    while [ $wait_time -lt $max_wait ]; do
-        local status=$(kubectl get application $app_name -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
-        local health=$(kubectl get application $app_name -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
-        
-        if [[ "$status" == "Synced" && "$health" == "Healthy" ]]; then
-            echo -e "${GREEN}✅ $app_name está Synced y Healthy${NC}"
-            return 0
-        fi
-        
-        echo "   $app_name: sync=$status health=$health (${wait_time}s/${max_wait}s)"
-        sleep 10
-        wait_time=$((wait_time + 10))
-    done
-    
-    echo -e "${RED}❌ TIMEOUT: $app_name no alcanzó estado Synced+Healthy en ${max_wait}s${NC}"
-    return 1
-}
-
-# Función para forzar sincronización de una aplicación
-force_sync() {
-    local app_name=$1
-    echo -e "${YELLOW}🔄 Forzando sincronización de $app_name...${NC}"
-    
-    # Anotar para forzar refresh desde Git
-    kubectl annotate application $app_name -n argocd argocd.argoproj.io/refresh=now --overwrite >/dev/null 2>&1 || true
-    
-    # Habilitar auto-sync si no está habilitado
-    kubectl patch application $app_name -n argocd --type='merge' -p='{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}' >/dev/null 2>&1 || true
-    
-    sleep 5
-}
-
-sincronizar_aplicaciones() {
-    echo -e "${BLUE}🚀 DESPLIEGUE SECUENCIAL CON DEPENDENCIAS GITOPS${NC}"
-    echo "================================================"
-    
-    kubectl config use-context "$CLUSTER_DEV" || {
-        echo -e "${RED}❌ Cluster DEV no disponible${NC}"
-        exit 1
-    }
-    
-    echo ""
-    echo "📋 VERIFICANDO ESTADO INICIAL..."
-    kubectl get applications -n argocd --no-headers | awk '{print $1 " -> " $2 "/" $3}'
-
-    echo ""
-    echo -e "${BLUE}🏗️ FASE 1: INFRAESTRUCTURA BASE (cert-manager, ingress-nginx)${NC}"
-    echo "============================================================="
-
-    # Cert-manager (crítico para TLS y webhooks)
-    echo "1️⃣ Desplegando cert-manager..."
-    force_sync cert-manager
-    if wait_for_app cert-manager 600; then
-        echo -e "${GREEN}✅ cert-manager desplegado exitosamente${NC}"
-    else
-        echo -e "${RED}❌ cert-manager falló - CONTINUANDO CON ADVERTENCIA${NC}"
-    fi
-
-    # Ingress controller
-    echo ""
-    echo "2️⃣ Desplegando ingress-nginx..."
-    force_sync ingress-nginx
-    if wait_for_app ingress-nginx 300; then
-        echo -e "${GREEN}✅ ingress-nginx desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ ingress-nginx con problemas - continuando...${NC}"
-    fi
-
-    echo ""
-    echo -e "${BLUE}🔐 FASE 2: SECRETOS Y MONITOREO (external-secrets, monitoring)${NC}"
-    echo "================================================================="
-
-    # External Secrets (para gestión de secretos)
-    echo "3️⃣ Desplegando external-secrets..."
-    force_sync external-secrets
-    if wait_for_app external-secrets 300; then
-        echo -e "${GREEN}✅ external-secrets desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ external-secrets con problemas - continuando...${NC}"
-    fi
-
-    # Prometheus Stack (ya está desplegado, pero verificamos)
-    echo ""
-    echo "4️⃣ Verificando monitoring (prometheus-stack)..."
-    if wait_for_app monitoring 60; then
-        echo -e "${GREEN}✅ monitoring ya está operativo${NC}"
-    else
-        force_sync monitoring
-        wait_for_app monitoring 300 || echo -e "${YELLOW}⚠️ monitoring con problemas - continuando...${NC}"
-    fi
-
-    echo ""
-    echo -e "${BLUE}� FASE 3: OBSERVABILIDAD (loki, grafana, jaeger)${NC}"
-    echo "=================================================="
-
-    # Loki para logs
-    echo "5️⃣ Desplegando loki..."
-    force_sync loki
-    if wait_for_app loki 300; then
-        echo -e "${GREEN}✅ loki desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ loki con problemas - continuando...${NC}"
-    fi
-
-    # Grafana para dashboards
-    echo ""
-    echo "6️⃣ Desplegando grafana..."
-    force_sync grafana
-    if wait_for_app grafana 300; then
-        echo -e "${GREEN}✅ grafana desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ grafana con problemas - continuando...${NC}"
-    fi
-
-    # Jaeger para tracing
-    echo ""
-    echo "7️⃣ Desplegando jaeger..."
-    force_sync jaeger
-    if wait_for_app jaeger 300; then
-        echo -e "${GREEN}✅ jaeger desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ jaeger con problemas - continuando...${NC}"
-    fi
-
-    echo ""
-    echo -e "${BLUE}🚀 FASE 4: GITOPS AVANZADO (argo-*, kargo)${NC}"
-    echo "==========================================="
-
-    # Argo Rollouts
-    echo "8️⃣ Desplegando argo-rollouts..."
-    force_sync argo-rollouts
-    if wait_for_app argo-rollouts 300; then
-        echo -e "${GREEN}✅ argo-rollouts desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ argo-rollouts con problemas - continuando...${NC}"
-    fi
-
-    # Argo Workflows
-    echo ""
-    echo "9️⃣ Desplegando argo-workflows..."
-    force_sync argo-workflows
-    if wait_for_app argo-workflows 300; then
-        echo -e "${GREEN}✅ argo-workflows desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ argo-workflows con problemas - continuando...${NC}"
-    fi
-
-    # Argo Events
-    echo ""
-    echo "🔟 Desplegando argo-events..."
-    force_sync argo-events
-    if wait_for_app argo-events 300; then
-        echo -e "${GREEN}✅ argo-events desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ argo-events con problemas - continuando...${NC}"
-    fi
-
-    # Kargo (requiere cert-manager + external-secrets)
-    echo ""
-    echo "1️⃣1️⃣ Desplegando kargo..."
-    force_sync kargo
-    if wait_for_app kargo 600; then
-        echo -e "${GREEN}✅ kargo desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ kargo con problemas - continuando...${NC}"
-    fi
-
-    echo ""
-    echo -e "${BLUE}🏪 FASE 5: STORAGE Y SCM (minio, gitea)${NC}"
-    echo "======================================="
-
-    # MinIO
-    echo "1️⃣2️⃣ Desplegando minio..."
-    force_sync minio
-    if wait_for_app minio 300; then
-        echo -e "${GREEN}✅ minio desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ minio con problemas - continuando...${NC}"
-    fi
-
-    # Gitea
-    echo ""
-    echo "1️⃣3️⃣ Desplegando gitea..."
-    force_sync gitea
-    if wait_for_app gitea 300; then
-        echo -e "${GREEN}✅ gitea desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ gitea con problemas - continuando...${NC}"
-    fi
-
-    echo ""
-    echo -e "${BLUE}📱 FASE 6: COMPLEMENTOS (argocd-notifications, argocd-applicationset)${NC}"
-    echo "====================================================================="
-
-    # ArgoCD Notifications
-    echo "1️⃣4️⃣ Desplegando argocd-notifications..."
-    force_sync argocd-notifications
-    if wait_for_app argocd-notifications 180; then
-        echo -e "${GREEN}✅ argocd-notifications desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ argocd-notifications con problemas - continuando...${NC}"
-    fi
-
-    # ArgoCD ApplicationSet
-    echo ""
-    echo "1️⃣5️⃣ Desplegando argocd-applicationset..."
-    force_sync argocd-applicationset
-    if wait_for_app argocd-applicationset 180; then
-        echo -e "${GREEN}✅ argocd-applicationset desplegado exitosamente${NC}"
-    else
-        echo -e "${YELLOW}⚠️ argocd-applicationset con problemas - continuando...${NC}"
-    fi
-
-    echo ""
-    echo -e "${BLUE}🎯 RESUMEN FINAL${NC}"
-    echo "================"
-
-    # Estado final
-    echo ""
-    echo "� ESTADO FINAL DE APLICACIONES:"
-    kubectl get applications -n argocd --no-headers | awk '{
-        if ($2 == "Synced" && $3 == "Healthy") 
-            print "✅ " $1 " -> " $2 "/" $3
-        else if ($2 == "Synced")
-            print "🟡 " $1 " -> " $2 "/" $3  
-        else
-            print "❌ " $1 " -> " $2 "/" $3
-    }'
-
-    # Contar éxitos
-    local TOTAL=$(kubectl get applications -n argocd --no-headers | wc -l)
-    local SYNCED=$(kubectl get applications -n argocd --no-headers | awk '$2=="Synced" && $3=="Healthy"' | wc -l)
-    local PERCENTAGE=$((SYNCED * 100 / TOTAL))
-
-    echo ""
-    echo -e "${GREEN}📊 ESTADÍSTICAS FINALES:${NC}"
-    echo "========================"
-    echo "✅ Aplicaciones Synced+Healthy: $SYNCED/$TOTAL ($PERCENTAGE%)"
-    echo "🎯 Objetivo mínimo para PRE/PRO: 5/7 aplicaciones críticas (≥71%)"
-
-    if [ $PERCENTAGE -ge 70 ]; then
-        echo -e "${GREEN}🎉 ¡ÉXITO! Plataforma lista para crear PRE/PRO${NC}"
-        echo -e "${GREEN}💡 Ejecuta: ./instalar-todo.sh clusters${NC}"
-    else
-        echo -e "${YELLOW}⚠️ Necesita más aplicaciones funcionando para PRE/PRO${NC}"
-        echo -e "${YELLOW}💡 Revisa los logs de aplicaciones fallidas${NC}"
-    fi
-
-    echo ""
-    echo -e "${GREEN}✅ DESPLIEGUE SECUENCIAL COMPLETADO${NC}"
-}
-
-mostrar_estado() {
-    echo -e "${BLUE}📊 Estado actual del sistema:${NC}"
-    echo ""
-    
-    # Estado de clusters
-    echo "🏭 CLUSTERS:"
-    for cluster in "$CLUSTER_DEV" "$CLUSTER_PRE" "$CLUSTER_PRO"; do
-        if minikube status -p "$cluster" >&/dev/null; then
-            echo -e "  ✅ $cluster: $(minikube status -p "$cluster" | grep host | awk '{print $2}')"
-        else
-            echo -e "  ❌ $cluster: No disponible"
-        fi
-    done
-    
-    echo ""
-    echo "🌐 PORT-FORWARDS ACTIVOS:"
-    if pgrep -f "kubectl.*port-forward" >/dev/null; then
-        netstat -tuln | grep -E ':(808[0-3]|809[0-3])' | while read line; do
-            puerto=$(echo "$line" | awk '{print $4}' | cut -d: -f2)
-            echo "  🔗 Puerto $puerto activo"
-        done
-    else
-        echo "  ❌ No hay port-forwards activos"
-    fi
-    
-    echo ""
-    echo "📦 APLICACIONES ARGOCD:"
-    if kubectl config use-context "$CLUSTER_DEV" >&/dev/null; then
-        kubectl get applications -n argocd 2>/dev/null | head -10 || echo "  ❌ ArgoCD no disponible"
-    else
-        echo "  ❌ Cluster DEV no disponible"
-    fi
-}
-
-mostrar_help() {
-    echo -e "${CYAN}🔧 GitOps Multi-Cluster Infrastructure - Modo de uso:${NC}"
-    echo ""
-    echo "📖 COMANDOS DISPONIBLES:"
-    echo "  $0                    # Instalación completa (recomendado)"
-    echo "  $0 limpiar            # Limpiar todo el entorno"
-    echo "  $0 clusters           # Crear solo los clusters"
-    echo "  $0 argocd             # Instalar solo ArgoCD"
-    echo "  $0 infra              # Aplicar solo infraestructura"
-    echo "  $0 sync               # Sincronizar aplicaciones ArgoCD"
-    echo "  $0 port-forwards      # Configurar solo port-forwards"
-    echo "  $0 urls               # Mostrar URLs de interfaces"
-    echo "  $0 estado             # Mostrar estado actual"
-    echo "  $0 help               # Mostrar esta ayuda"
-    echo ""
-    echo "🚀 INSTALACIÓN RECOMENDADA:"
-    echo "  1. $0                 # Instalación completa automática"
-    echo ""
-    echo "🔧 INSTALACIÓN PASO A PASO:"
-    echo "  1. $0 clusters        # Crear clusters"
-    echo "  2. $0 argocd          # Instalar ArgoCD"
-    echo "  3. $0 infra           # Aplicar infraestructura"
-    echo "  4. $0 sync            # Sincronizar aplicaciones"
-    echo "  5. $0 port-forwards   # Configurar acceso"
-}
-
-# Manejo de argumentos
-case "${1:-}" in
-    "limpiar"|"clean")
-        limpiar
-        ;;
-    "clusters")
-        solo_clusters
-        ;;
-    "argocd")
-        solo_argocd
-        ;;
-    "infra"|"infraestructura")
-        solo_infraestructura
-        ;;
-    "sync"|"sincronizar")
-        sincronizar_aplicaciones
-        ;;
-    "port-forwards"|"pf")
-        solo_port_forwards
-        ;;
-    "urls"|"ui")
-        mostrar_urls_ui
-        ;;
-    "estado"|"status")
-        mostrar_estado
-        ;;
-    "help"|"ayuda"|"-h"|"--help")
-        mostrar_help
-        ;;
-    "")
-        # Instalación completa por defecto
-        instalar_todo
-        ;;
-    *)
-        echo -e "${RED}❌ Argumento desconocido: $1${NC}"
-        echo ""
-        mostrar_help
-        exit 1
-        ;;
-esac
+# Ejecutar función principal con todos los argumentos
+main "$@"

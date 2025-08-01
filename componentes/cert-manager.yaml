@@ -12,18 +12,10 @@ spec:
     helm:
       values: |
         # Install CRDs automatically
-        crds:
-          enabled: true
-        
-        # Enable Prometheus monitoring
-        prometheus:
-          enabled: true
-          servicemonitor:
-            enabled: true
-        
+        installCRDs: true
+
         # Enable webhook for validation
         webhook:
-          enabled: true
           resources:
             limits:
               cpu: 100m
@@ -31,10 +23,9 @@ spec:
             requests:
               cpu: 25m
               memory: 64Mi
-        
+
         # Enable cainjector for CA injection
         cainjector:
-          enabled: true
           resources:
             limits:
               cpu: 200m
@@ -42,7 +33,7 @@ spec:
             requests:
               cpu: 50m
               memory: 128Mi
-        
+
         # Resources for development
         resources:
           limits:

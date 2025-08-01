@@ -10,7 +10,7 @@ spec:
   source:
     chart: kargo
     repoURL: oci://ghcr.io/akuity/kargo-charts/kargo
-    targetRevision: 1.6.1
+    targetRevision: 1.6.2
     helm:
       releaseName: kargo
       parameters:

@@ -8,124 +8,88 @@ metadata:
 spec:
   project: default
   source:
-    # Repositorio OCI oficial según documentación Kargo
-    chart: kargo
-    repoURL: oci://ghcr.io/akuity/kargo-charts
-    targetRevision: v1.0.8
+    # Repositorio Git directo desde GitHub
+    repoURL: https://github.com/akuity/kargo.git
+    targetRevision: v1.6.2
+    path: charts/kargo
     helm:
-      values: |
-        # Configuración simplificada para desarrollo siguiendo documentación oficial
-        api:
-          enabled: true
-          replicas: 1
-          logLevel: INFO
-          adminAccount:
-            enabled: true
-            # Password: admin123 (hash oficial de los ejemplos de quickstart)
-            passwordHash: "$2a$10$Zrhhie4vLz5ygtVSaif6o.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"
-            # Token signing key del quickstart oficial
-            tokenSigningKey: "iwishtowashmyirishwristwatch"
-            tokenTTL: 24h
-          service:
-            type: ClusterIP
-            port: 8080
-          # Recursos mínimos para desarrollo
-          resources:
-            limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          # TLS simplificado para desarrollo
-          tls:
-            enabled: true
-            selfSignedCert: true
-            
-        # Controller principal con integración ArgoCD
-        controller:
-          enabled: true
-          logLevel: INFO
-          resources:
-            limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          # Integración ArgoCD oficial
-          argocd:
-            integrationEnabled: true
-            namespace: argocd
-            watchArgocdNamespaceOnly: false
-          # Integración Argo Rollouts oficial
-          rollouts:
-            integrationEnabled: true
-            
-        # Management Controller
-        managementController:
-          enabled: true
-          logLevel: INFO
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            
-        # Webhooks Server simplificado
-        webhooksServer:
-          enabled: true
-          replicas: 1
-          logLevel: INFO
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
-        
-        # External Webhooks Server simplificado
-        externalWebhooksServer:
-          enabled: true
-          replicas: 1
-          logLevel: INFO
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
-        
-        # Garbage Collector simplificado
-        garbageCollector:
-          enabled: true
-          logLevel: INFO
-          resources:
-            limits:
-              cpu: 50m
-              memory: 64Mi
-            requests:
-              cpu: 25m
-              memory: 32Mi
-
+      parameters:
+        - name: api.enabled
+          value: "true"
+        - name: api.replicas
+          value: "1"
+        - name: api.resources.requests.memory
+          value: "128Mi"
+        - name: api.resources.requests.cpu
+          value: "100m"
+        - name: api.resources.limits.memory
+          value: "256Mi"
+        - name: api.resources.limits.cpu
+          value: "200m"
+        - name: controller.enabled
+          value: "true"
+        - name: controller.replicas
+          value: "1"
+        - name: controller.resources.requests.memory
+          value: "128Mi"
+        - name: controller.resources.requests.cpu
+          value: "100m"
+        - name: controller.resources.limits.memory
+          value: "256Mi"
+        - name: controller.resources.limits.cpu
+          value: "200m"
+        - name: managementController.enabled
+          value: "true"
+        - name: managementController.replicas
+          value: "1"
+        - name: managementController.resources.requests.memory
+          value: "128Mi"
+        - name: managementController.resources.requests.cpu
+          value: "100m"
+        - name: managementController.resources.limits.memory
+          value: "256Mi"
+        - name: managementController.resources.limits.cpu
+          value: "200m"
+        - name: webhooksServer.enabled
+          value: "true"
+        - name: webhooksServer.replicas
+          value: "1"
+        - name: webhooksServer.resources.requests.memory
+          value: "64Mi"
+        - name: webhooksServer.resources.requests.cpu
+          value: "50m"
+        - name: webhooksServer.resources.limits.memory
+          value: "128Mi"
+        - name: webhooksServer.resources.limits.cpu
+          value: "100m"
+        - name: garbageCollector.enabled
+          value: "true"
+        - name: garbageCollector.replicas
+          value: "1"
+        - name: garbageCollector.resources.requests.memory
+          value: "64Mi"
+        - name: garbageCollector.resources.requests.cpu
+          value: "50m"
+        - name: garbageCollector.resources.limits.memory
+          value: "128Mi"
+        - name: garbageCollector.resources.limits.cpu
+          value: "100m"
+        - name: image.tag
+          value: "v1.6.2"
+        - name: controller.argocd.namespace
+          value: "argocd"
+        - name: admin.enabled
+          value: "true"
+        - name: admin.password
+          value: "$2a$10$5LZHS0xL0lUEE2Rp6gJ1LO6zBN80JSXbTQ8P7VzpAdIe7w.e8vJeK"
+        - name: admin.tokenSigningKey
+          value: "iwishtowashmyirishwristwatch"
   destination:
     server: https://kubernetes.default.svc
-    namespace: kargo
-  
+    namespace: kargo-system
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m

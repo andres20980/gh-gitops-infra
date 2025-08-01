@@ -8,18 +8,21 @@ metadata:
 spec:
   project: default
   source:
-    # Repositorio OCI oficial de Kargo - según documentación oficial
-    repoURL: ghcr.io/akuity/kargo-charts
+    # Repositorio OCI oficial según documentación Kargo
     chart: kargo
-    targetRevision: 1.0.8
+    repoURL: oci://ghcr.io/akuity/kargo-charts
+    targetRevision: v1.0.8
     helm:
       values: |
-        # Configuración simplificada para desarrollo siguiendo docs oficiales
+        # Configuración simplificada para desarrollo siguiendo documentación oficial
         api:
+          enabled: true
+          replicas: 1
+          logLevel: INFO
           adminAccount:
             enabled: true
-            # Password: admin123 (usando bcrypt hash oficial de los ejemplos)
-            passwordHash: "$$2a$$10$$Zrhhie4vLz5ygtVSaif6o.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"
+            # Password: admin123 (hash oficial de los ejemplos de quickstart)
+            passwordHash: "$2a$10$Zrhhie4vLz5ygtVSaif6o.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"
             # Token signing key del quickstart oficial
             tokenSigningKey: "iwishtowashmyirishwristwatch"
             tokenTTL: 24h
@@ -34,10 +37,14 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
-          
-        # Controller simplificado según docs
+          # TLS simplificado para desarrollo
+          tls:
+            enabled: true
+            selfSignedCert: true
+            
+        # Controller principal con integración ArgoCD
         controller:
-          replicas: 1
+          enabled: true
           logLevel: INFO
           resources:
             limits:
@@ -46,18 +53,19 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
-          # Integración ArgoCD habilitada - namespace correcto
+          # Integración ArgoCD oficial
           argocd:
             integrationEnabled: true
             namespace: argocd
             watchArgocdNamespaceOnly: false
-          # Integración Argo Rollouts habilitada
+          # Integración Argo Rollouts oficial
           rollouts:
             integrationEnabled: true
             
-        # Webhooks server simplificado
-        webhooksServer:
-          replicas: 1
+        # Management Controller
+        managementController:
+          enabled: true
+          logLevel: INFO
           resources:
             limits:
               cpu: 100m
@@ -65,6 +73,44 @@ spec:
             requests:
               cpu: 50m
               memory: 64Mi
+            
+        # Webhooks Server simplificado
+        webhooksServer:
+          enabled: true
+          replicas: 1
+          logLevel: INFO
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+        
+        # External Webhooks Server simplificado
+        externalWebhooksServer:
+          enabled: true
+          replicas: 1
+          logLevel: INFO
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+        
+        # Garbage Collector simplificado
+        garbageCollector:
+          enabled: true
+          logLevel: INFO
+          resources:
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
 
   destination:
     server: https://kubernetes.default.svc

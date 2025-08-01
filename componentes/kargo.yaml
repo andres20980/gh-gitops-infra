@@ -8,26 +8,25 @@ metadata:
 spec:
   project: default
   source:
+    # Repositorio OCI oficial de Kargo - según documentación oficial
+    repoURL: ghcr.io/akuity/kargo-charts
     chart: kargo
-    # Usar repositorio Helm tradicional en lugar de OCI
-    repoURL: https://charts.akuity.io
-    targetRevision: 1.6.2
+    targetRevision: 1.0.8
     helm:
-      releaseName: kargo
       values: |
-        # Configuración simplificada para desarrollo
+        # Configuración simplificada para desarrollo siguiendo docs oficiales
         api:
           adminAccount:
             enabled: true
-            passwordHash: "$$2a$$10$$Zrhhie4vLz5ygtVSaif6e.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"  # admin123
-            tokenSigningKey: "1uyxpL0en7D1cqakaYhE1NhN23CkY16F"
+            # Password: admin123 (usando bcrypt hash oficial de los ejemplos)
+            passwordHash: "$$2a$$10$$Zrhhie4vLz5ygtVSaif6o.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"
+            # Token signing key del quickstart oficial
+            tokenSigningKey: "iwishtowashmyirishwristwatch"
+            tokenTTL: 24h
           service:
             type: ClusterIP
             port: 8080
-          
-        # Controller simplificado
-        controller:
-          replicas: 1
+          # Recursos mínimos para desarrollo
           resources:
             limits:
               cpu: 200m
@@ -35,13 +34,26 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
-          serviceAccount:
-            create: true
-            clusterWideSecretReadingEnabled: true
+          
+        # Controller simplificado según docs
+        controller:
+          replicas: 1
+          logLevel: INFO
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          # Integración ArgoCD habilitada - namespace correcto
           argocd:
-            enabled: true
-            watchArgocdNamespaceOnly: false
+            integrationEnabled: true
             namespace: argocd
+            watchArgocdNamespaceOnly: false
+          # Integración Argo Rollouts habilitada
+          rollouts:
+            integrationEnabled: true
             
         # Webhooks server simplificado
         webhooksServer:

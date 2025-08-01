@@ -78,11 +78,11 @@ spec:
           value: "v1.6.2"
         - name: controller.argocd.namespace
           value: "argocd"
-        - name: admin.enabled
+        - name: api.adminAccount.enabled
           value: "true"
-        - name: admin.password
+        - name: api.adminAccount.passwordHash
           value: "$2a$10$5LZHS0xL0lUEE2Rp6gJ1LO6zBN80JSXbTQ8P7VzpAdIe7w.e8vJeK"
-        - name: admin.tokenSigningKey
+        - name: api.adminAccount.tokenSigningKey
           value: "iwishtowashmyirishwristwatch"
   destination:
     server: https://kubernetes.default.svc

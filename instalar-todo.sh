@@ -183,7 +183,7 @@ obtener_version_kargo() {
     
     if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
         echo -e "${YELLOW}⚠️ No se pudo detectar versión automáticamente, usando versión estable conocida${NC}"
-        latest_version="1.6.1"
+        latest_version="1.6.2"
     fi
     
     KARGO_VERSION="$latest_version"

@@ -13,75 +13,56 @@ spec:
     targetRevision: 12.1.2
     helm:
       values: |
-        # Configuración de Gitea (SIN autenticación requerida)
+        # CONFIGURACIÓN MÍNIMA PARA DEV - SINGLE POD con SQLite
         gitea:
           admin:
             username: admin
             password: admin123
             email: admin@gitea.local
           config:
-            server:
-              DOMAIN: localhost
-              ROOT_URL: http://localhost:8087
-              PROTOCOL: http
-              HTTP_PORT: 3000
-              DISABLE_REGISTRATION: false
-              REQUIRE_SIGNIN_VIEW: false
             database:
               DB_TYPE: sqlite3
               PATH: /data/gitea/gitea.db
-            repository:
-              ROOT: /data/git/repositories
-            security:
-              INSTALL_LOCK: true
-            service:
-              DISABLE_REGISTRATION: false
-              REQUIRE_SIGNIN_VIEW: false
-              ENABLE_NOTIFY_MAIL: false
-            ui:
-              EXPLORE_PAGING_NUM: 20
-              ISSUE_PAGING_NUM: 10
-              FEED_MAX_COMMIT_NUM: 5
-            log:
-              LEVEL: Info
         
-        # Service configuration
+        # Service básico
         service:
           http:
             type: ClusterIP
             port: 3000
         
-        # Ingress disabled for simplicity
+        # Sin ingress
         ingress:
           enabled: false
         
-        # Configuración de persistencia (manejada por Helm)
+        # Persistencia mínima
         persistence:
           enabled: true
-          create: true
-          size: 10Gi
-          # Helm creará automáticamente el PVC
+          size: 5Gi
         
-        # Configuración adicional de Gitea
-        gitea:
-          additionalConfigFromEnvs: []
-          
-        # PostgreSQL disabled (using SQLite for simplicity)  
+        # PostgreSQL DESHABILITADO (SQLite)
         postgresql:
           enabled: false
           
-        # Redis disabled for PoC
-        redis-cluster:
+        # PostgreSQL-HA DESHABILITADO (causa de los problemas pgpool)
+        postgresql-ha:
+          enabled: false
+          
+        # Valkey-cluster DESHABILITADO (habilitado por defecto en el chart)
+        valkey-cluster:
+          enabled: false
+          
+        # Valkey DESHABILITADO  
+        valkey:
           enabled: false
         
-        # Resources
+        # Resources mínimos
         resources:
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 200m
+            memory: 256Mi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 50m
+            memory: 64Mi
 
   destination:
     server: https://kubernetes.default.svc

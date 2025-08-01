@@ -161,7 +161,7 @@ obtener_version_argocd() {
     
     if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
         echo -e "${YELLOW}⚠️ No se pudo detectar versión automáticamente, usando versión estable conocida${NC}"
-        latest_version="3.0.11"
+        latest_version="3.0.12"
     fi
     
     ARGOCD_VERSION="$latest_version"
@@ -1253,116 +1253,129 @@ spec:
       - ServerSideApply=true
 EOF
 
+    # Crear kargo con chart oficial OCI y versión auto-detectada
+    cat > "${SCRIPT_DIR}/kargo-helm.yaml" << EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/auto-generated-by: "gitops-installer"
+    argocd.argoproj.io/version: "${KARGO_VERSION}"
+spec:
+  project: default
+  source:
+    chart: kargo
+    repoURL: oci://ghcr.io/akuity/kargo-charts
+    targetRevision: ${KARGO_VERSION}
+    helm:
+      releaseName: kargo
+      parameters:
+        - name: "api.adminAccount.passwordHash"
+          value: "\$\$2a\$\$10\$\$Zrhhie4vLz5ygtVSaif6e.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"  # admin123 (escaped)
+        - name: "api.adminAccount.tokenSigningKey"
+          value: "1uyxpL0en7D1cqakaYhE1NhN23CkY16F"
+        - name: "controller.serviceAccount.create"
+          value: "true"
+        - name: "controller.serviceAccount.clusterWideSecretReadingEnabled"
+          value: "true"
+        - name: "controller.argocd.enabled"
+          value: "true"
+        - name: "controller.argocd.watchArgocdNamespaceOnly"
+          value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kargo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+EOF
+
     echo -e "${GREEN}✅ Configuraciones de Helm Charts con últimas versiones creadas${NC}"
 }
 
-actualizar_applicationset() {
-    echo -e "${BLUE}📝 Actualizando ApplicationSet con exclusiones sistemáticas...${NC}"
+crear_app_of_apps() {
+    echo -e "${BLUE}📝 Creando App of Apps GitOps con patrón actualizado...${NC}"
     
-    cat > "${SCRIPT_DIR}/appset-gitops-infra.yaml" << 'EOF'
+    # Crear el App of Apps principal que gestiona todos los componentes
+    cat > "${SCRIPT_DIR}/app-of-apps-gitops.yaml" << EOF
 apiVersion: argoproj.io/v1alpha1
-kind: ApplicationSet
+kind: Application
 metadata:
-  name: gitops-infra-components
+  name: gitops-infra-app-of-apps
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
-  generators:
-  - git:
-      repoURL: https://github.com/argoproj/argocd-example-apps.git
-      revision: HEAD
-      directories:
-      - path: "*"
-      exclude: |
-        # Exclusiones para componentes gestionados por Helm
-        cert-manager*
-        external-secrets*
-        ingress-nginx*
-        grafana*
-        jaeger*
-        loki*
-        minio*
-        gitea*
-        # Exclusiones adicionales por conflictos
-        kargo*
-        argo-*
-        prometheus*
-        monitoring*
-        # Exclusiones de directorios de aplicaciones
-        aplicaciones/*
-        apps/*
-        manifests/*
-        _examples/*
-        examples/*
-  template:
-    metadata:
-      name: '{{path.basename}}'
-      namespace: argocd
-    spec:
-      project: default
-      source:
-        repoURL: https://github.com/argoproj/argocd-example-apps.git
-        targetRevision: HEAD
-        path: '{{path}}'
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: '{{path.basename}}'
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
+  project: default
+  source:
+    repoURL: https://github.com/andres20980/gh-gitops-infra.git
+    targetRevision: main
+    path: componentes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
 EOF
 
-    echo -e "${GREEN}✅ ApplicationSet actualizado con exclusiones sistemáticas${NC}"
+    echo -e "${GREEN}✅ App of Apps creado con patrón GitOps moderno${NC}"
 }
 
 aplicar_infraestructura() {
-    echo -e "${BLUE}📦 Aplicando infraestructura GitOps actualizada...${NC}"
+    echo -e "${BLUE}📦 Aplicando infraestructura GitOps con App of Apps...${NC}"
     
     kubectl config use-context "$CLUSTER_DEV"
     
-    # Limpiar ApplicationSets existentes para evitar conflictos
-    echo "🧹 Limpiando ApplicationSets existentes..."
+    # Limpiar ApplicationSets y aplicaciones existentes para evitar conflictos
+    echo "🧹 Limpiando recursos existentes..."
     kubectl delete applicationset gitops-infra-components -n argocd --ignore-not-found=true
     kubectl delete applicationset gitops-aplicaciones -n argocd --ignore-not-found=true
+    kubectl delete application gitops-infra-app-of-apps -n argocd --ignore-not-found=true
     sleep 5
     
-    # Aplicar ApplicationSet actualizado
-    echo "📦 Aplicando ApplicationSet actualizado..."
-    if kubectl apply -f "${SCRIPT_DIR}/appset-gitops-infra.yaml"; then
-        echo -e "${GREEN}✅ ApplicationSet aplicado exitosamente${NC}"
+    # Aplicar App of Apps principal
+    echo "📦 Aplicando App of Apps principal..."
+    if kubectl apply -f "${SCRIPT_DIR}/app-of-apps-gitops.yaml"; then
+        echo -e "${GREEN}✅ App of Apps aplicado exitosamente${NC}"
     else
-        echo -e "${RED}❌ Error al aplicar ApplicationSet${NC}"
+        echo -e "${RED}❌ Error al aplicar App of Apps${NC}"
         return 1
     fi
     
-    # Aplicar configuraciones Helm en orden de dependencias
-    echo "📦 Aplicando configuraciones Helm en orden de dependencias..."
-    local helm_orden=(
-        "cert-manager-helm.yaml"
-        "external-secrets-helm.yaml"
-        "ingress-nginx-helm.yaml"
-        "minio-helm.yaml"
-        "loki-helm.yaml"
-        "jaeger-helm.yaml"
-        "grafana-helm.yaml"
-        "gitea-helm.yaml"
-    )
+    # Esperar un momento para que el App of Apps procese los componentes
+    echo "⏳ Esperando que App of Apps detecte componentes (30s)..."
+    sleep 30
     
-    for helm_app in "${helm_orden[@]}"; do
-        if [[ -f "${SCRIPT_DIR}/${helm_app}" ]]; then
-            echo "📦 Aplicando ${helm_app}..."
-            if kubectl apply -f "${SCRIPT_DIR}/${helm_app}"; then
-                echo -e "${GREEN}✅ ${helm_app} aplicado exitosamente${NC}"
-                sleep 5  # Pausa entre aplicaciones para estabilidad
-            else
-                echo -e "${YELLOW}⚠️ Error al aplicar ${helm_app}${NC}"
-            fi
-        fi
-    done
+    # Verificar que las aplicaciones fueron creadas
+    echo "🔍 Verificando aplicaciones creadas por App of Apps..."
+    kubectl get applications -n argocd | grep -E "(cert-manager|external-secrets|ingress-nginx|grafana|jaeger|loki|minio|gitea|kargo|argo-)" || true
     
-    echo -e "${GREEN}✅ Infraestructura GitOps aplicada con metodología sistemática${NC}"
+    echo -e "${GREEN}✅ Infraestructura GitOps aplicada con patrón App of Apps${NC}"
 }
 
 esperar_argocd_ready() {
@@ -1593,7 +1606,8 @@ mostrar_resumen_final() {
     echo -e "${YELLOW}🤖 VERSIONES AUTO-DETECTADAS:${NC}"
     echo "   🔧 Kubernetes: $KUBERNETES_VERSION"
     echo "   🔄 ArgoCD: $ARGOCD_VERSION"
-    echo "   🔒 cert-manager: $CERT_MANAGER_VERSION"
+    echo "   � Kargo: $KARGO_VERSION"
+    echo "   �🔒 cert-manager: $CERT_MANAGER_VERSION"
     echo "   🔐 external-secrets: $EXTERNAL_SECRETS_VERSION"
     echo "   🌐 ingress-nginx: $INGRESS_NGINX_VERSION"
     echo "   📊 Grafana: $GRAFANA_VERSION"
@@ -1604,10 +1618,12 @@ mostrar_resumen_final() {
     
     # Mostrar aplicaciones desplegadas
     echo ""
-    echo -e "${YELLOW}📦 APLICACIONES GITOPS:${NC}"
+    echo -e "${YELLOW}📦 APLICACIONES GITOPS (App of Apps):${NC}"
     local apps_sync=$(kubectl get applications -n argocd --no-headers 2>/dev/null | grep -c "Synced" || echo "0")
     local apps_total=$(kubectl get applications -n argocd --no-headers 2>/dev/null | wc -l || echo "0")
     echo "   📊 Aplicaciones sincronizadas: $apps_sync/$apps_total"
+    echo "   🎯 Patrón: App of Apps (gitops-infra-app-of-apps)"
+    echo "   📁 Componentes gestionados desde: /componentes/"
     
     # Mostrar UIs disponibles
     echo ""
@@ -1622,9 +1638,11 @@ mostrar_resumen_final() {
     echo ""
     echo -e "${YELLOW}🛠 COMANDOS ÚTILES:${NC}"
     echo "   📋 Ver aplicaciones ArgoCD: kubectl get applications -n argocd"
+    echo "   🎯 Ver App of Apps: kubectl get application gitops-infra-app-of-apps -n argocd"
     echo "   🔄 Sincronizar aplicación: kubectl patch application <app-name> -n argocd --type merge -p '{\"metadata\":{\"annotations\":{\"argocd.argoproj.io/refresh\":\"now\"}}}'"
     echo "   🌐 Port-forwards: netstat -tuln | grep '808[0-9]'"
     echo "   🏭 Estado clusters: minikube status -p $CLUSTER_DEV"
+    echo "   📊 Verificar actualizaciones: ./scripts/verificar-actualizaciones.sh"
     echo "   🧹 Limpiar todo: minikube delete -p $CLUSTER_DEV && minikube delete -p $CLUSTER_PRE && minikube delete -p $CLUSTER_PRO"
     echo "   🤖 Re-ejecutar con últimas versiones: ./instalar-todo.sh"
     
@@ -1690,6 +1708,17 @@ if [[ "$current_argocd" != "$installed_argocd" && "$current_argocd" != "unknown"
     echo -e "   ${RED}📦 Nueva versión disponible: $current_argocd (actual: $installed_argocd)${NC}"
 else
     echo -e "   ${GREEN}✅ Actualizado: $installed_argocd${NC}"
+fi
+
+# Verificar Kargo
+echo -e "${YELLOW}🚢 Kargo:${NC}"
+current_kargo=$(obtener_version_github "akuity/kargo")
+installed_kargo=$(obtener_version_actual "kargo" 2>/dev/null || echo "unknown")
+if [[ "$current_kargo" != "$installed_kargo" && "$current_kargo" != "unknown" ]]; then
+    echo -e "   ${RED}📦 Nueva versión disponible: $current_kargo (actual: $installed_kargo)${NC}"
+    updates_available=$((updates_available + 1))
+else
+    echo -e "   ${GREEN}✅ Actualizado: $installed_kargo${NC}"
 fi
 
 # Verificar Helm Charts
@@ -1843,7 +1872,7 @@ main() {
     fi
     
     crear_configuraciones_helm || echo -e "${YELLOW}⚠️ Advertencia: Error creando configuraciones Helm${NC}"
-    actualizar_applicationset || echo -e "${YELLOW}⚠️ Advertencia: Error actualizando ApplicationSet${NC}"
+    crear_app_of_apps || echo -e "${YELLOW}⚠️ Advertencia: Error creando App of Apps${NC}"
     aplicar_infraestructura || echo -e "${YELLOW}⚠️ Advertencia: Error aplicando infraestructura${NC}"
     
     # Esperar un momento para que las aplicaciones empiecen a desplegarse

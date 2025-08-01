@@ -417,7 +417,7 @@ mostrar_arquitectura() {
     echo ""
     echo -e "${GREEN}🏪 ALMACENAMIENTO Y REPOSITORIOS:${NC}"
     echo "├─ 🏪 MinIO ${MINIO_VERSION:-TBD}: Object storage S3-compatible"
-    echo "└─ 🐙 Gitea ${GITEA_VERSION:-TBD}: Git repository management"
+    echo "└─ 🐙 Gitea ${GITEA_VERSION:-TBD}: Git repository management (SQLite single-pod para DEV)"
     echo ""
     echo -e "${CYAN}🔄 FLUJO GITOPS OPTIMIZADO:${NC}"
     echo "Git Push → ArgoCD-DEV → Deploy dev/pre/pro → Kargo → Auto-Promote"
@@ -1209,6 +1209,7 @@ metadata:
   annotations:
     argocd.argoproj.io/auto-generated-by: "gitops-installer"
     argocd.argoproj.io/version: "${GITEA_VERSION}"
+    argocd.argoproj.io/sync-options: "PrunePropagationPolicy=foreground"
 spec:
   project: default
   source:
@@ -1217,30 +1218,56 @@ spec:
     chart: gitea
     helm:
       values: |
+        # CONFIGURACIÓN MÍNIMA PARA DEV - SINGLE POD con SQLite
         gitea:
           admin:
-            username: gitea_admin
-            password: gitops2025
-            email: admin@example.com
-        postgresql:
+            username: admin
+            password: admin123
+            email: admin@gitea.local
+          config:
+            database:
+              DB_TYPE: sqlite3
+              PATH: /data/gitea/gitea.db
+        
+        # Service básico
+        service:
+          http:
+            type: ClusterIP
+            port: 3000
+        
+        # Sin ingress
+        ingress:
           enabled: false
-        postgresql-ha:
-          enabled: false
-        redis-cluster:
-          enabled: false
+        
+        # Persistencia mínima
         persistence:
           enabled: true
-          size: 1Gi
+          size: 5Gi
+        
+        # PostgreSQL DESHABILITADO (SQLite)
+        postgresql:
+          enabled: false
+          
+        # PostgreSQL-HA DESHABILITADO (causa de los problemas pgpool)
+        postgresql-ha:
+          enabled: false
+          
+        # Valkey-cluster DESHABILITADO (habilitado por defecto en el chart)
+        valkey-cluster:
+          enabled: false
+          
+        # Valkey DESHABILITADO  
+        valkey:
+          enabled: false
+        
+        # Resources mínimos
         resources:
           limits:
             cpu: 200m
             memory: 256Mi
           requests:
-            cpu: 100m
-            memory: 128Mi
-        service:
-          http:
-            type: ClusterIP
+            cpu: 50m
+            memory: 64Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: gitea
@@ -1250,7 +1277,14 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
+      - Replace=true
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
 EOF
 
     # Crear kargo con chart oficial OCI y versión auto-detectada

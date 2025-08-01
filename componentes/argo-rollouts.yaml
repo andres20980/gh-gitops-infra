@@ -11,21 +11,39 @@ spec:
     targetRevision: 2.40.2  # Chart version correcta (app version v1.8.3)
     helm:
       values: |
-        # Configuración del controlador
+        # CONFIGURACIÓN MÍNIMA PARA DEV
         controller:
           replicas: 1
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
           
-        # Habilitar dashboard sin autenticación
+        # Dashboard simplificado para dev
         dashboard:
           enabled: true
           readonly: false
           service:
             type: ClusterIP
             port: 3100
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
           # Sin autenticación para desarrollo
           config:
             auth:
               enabled: false
+              
+        # Deshabilitar métricas para dev
+        serviceMonitor:
+          enabled: false
             
   destination:
     server: https://kubernetes.default.svc
@@ -42,3 +60,5 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
+    - Replace=true
+    - SkipDryRunOnMissingResource=true

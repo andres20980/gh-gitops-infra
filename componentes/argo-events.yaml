@@ -11,21 +11,10 @@ spec:
     chart: argo-events
     helm:
       values: |
-        # Enable controller
+        # CONFIGURACIÓN MÍNIMA PARA DEV - Single replica
         controller:
           enabled: true
           replicas: 1
-          resources:
-            limits:
-              cpu: 500m
-              memory: 512Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-        
-        # Enable webhook
-        webhook:
-          enabled: true
           resources:
             limits:
               cpu: 200m
@@ -34,15 +23,24 @@ spec:
               cpu: 50m
               memory: 64Mi
         
-        # Security context
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 1000
-          fsGroup: 2000
-        
-        # Service monitor for Prometheus
-        serviceMonitor:
+        # Webhook simplificado
+        webhook:
           enabled: true
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+        
+        # Deshabilitar métricas para dev
+        serviceMonitor:
+          enabled: false
+          
+        # Deshabilitar RBAC cluster-wide para dev
+        createAggregateRoles: false
+        
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-events
@@ -52,4 +50,5 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
+      - Replace=true
+      - SkipDryRunOnMissingResource=true

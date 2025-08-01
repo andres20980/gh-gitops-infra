@@ -11,49 +11,52 @@ spec:
     targetRevision: 0.45.21  # Chart version correcta (app version v3.7.0)
     helm:
       values: |
+        # CONFIGURACIÓN MÍNIMA PARA DEV
         server:
           enabled: true
           serviceType: ClusterIP
           servicePort: 2746
-          # Configuración para acceso sin autenticación
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          # Sin autenticación para desarrollo
           extraArgs:
           - --auth-mode=server
           - --secure=false
-          - --auth-mode=client
-          sso:
-            enabled: false
         
         controller:
           enabled: true
+          replicas: 1
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          # Solo namespace propio para dev
           workflowNamespaces:
           - argo-workflows
-          - default
         
-        # Disable workflow controller in other namespaces for simplicity
-        singleNamespace: false
+        # Configuración simple sin persistencia de artefactos
+        useDefaultArtifactRepo: false
+        useStaticCredentials: false
         
-        # Basic RBAC for development
-        useDefaultArtifactRepo: true
-        useStaticCredentials: true
+        # Deshabilitar artefactos S3 para dev
+        artifactRepository: {}
         
-        artifactRepository:
-          archiveLogs: false
-          s3:
-            # Use minio for artifact storage in development
-            endpoint: minio.minio.svc.cluster.local:9000
-            bucket: argo-artifacts
-            insecure: true
-            accessKeySecret:
-              name: argo-artifacts
-              key: accesskey
-            secretKeySecret:
-              name: argo-artifacts  
-              key: secretkey
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-workflows
   syncPolicy:
     automated:
       prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - Replace=true
+      - SkipDryRunOnMissingResource=true

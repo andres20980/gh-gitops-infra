@@ -11,10 +11,11 @@ spec:
     targetRevision: v1.18.2
     helm:
       values: |
+        # CONFIGURACIÓN MÍNIMA PARA DEV
         # Install CRDs automatically
         installCRDs: true
 
-        # Enable webhook for validation
+        # Webhook simplificado para dev
         webhook:
           resources:
             limits:
@@ -22,32 +23,39 @@ spec:
               memory: 128Mi
             requests:
               cpu: 25m
-              memory: 64Mi
+              memory: 32Mi
 
-        # Enable cainjector for CA injection
+        # CA injector reducido para dev
         cainjector:
           resources:
             limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 50m
+              cpu: 150m
               memory: 128Mi
+            requests:
+              cpu: 25m
+              memory: 64Mi
 
-        # Resources for development
+        # Resources mínimos para controlador
         resources:
           limits:
-            cpu: 200m
-            memory: 256Mi
-          requests:
-            cpu: 50m
+            cpu: 150m
             memory: 128Mi
+          requests:
+            cpu: 25m
+            memory: 64Mi
+            
+        # Deshabilitar métricas para dev
+        prometheus:
+          enabled: false
+          
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager
   syncPolicy:
     automated:
       prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
+      - Replace=true
+      - SkipDryRunOnMissingResource=true

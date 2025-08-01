@@ -1,52 +1,73 @@
-# KARGO TEMPORALMENTE DESHABILITADO PARA ENTORNO DEV
-# Problema: Repositorio OCI no compatible con ArgoCD actual
-# Para entorno de desarrollo se puede prescindir de promociones automáticas
-# 
-# TODO: Revisar en versiones futuras de ArgoCD o usar instalación manual
-#
-# apiVersion: argoproj.io/v1alpha1
-# kind: Application
-# metadata:
-#   name: kargo
-#   namespace: argocd
-#   finalizers:
-#     - resources-finalizer.argocd.argoproj.io
-# spec:
-#   project: default
-#   source:
-#     chart: kargo
-#     repoURL: oci://ghcr.io/akuity/kargo-charts
-#     targetRevision: 1.6.2
-#     helm:
-#       releaseName: kargo
-#       parameters:
-#         - name: "api.adminAccount.passwordHash"
-#           value: "$$2a$$10$$Zrhhie4vLz5ygtVSaif6e.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"  # admin123 (escaped)
-#         - name: "api.adminAccount.tokenSigningKey"
-#           value: "1uyxpL0en7D1cqakaYhE1NhN23CkY16F"
-#         - name: "controller.serviceAccount.create"
-#           value: "true"
-#         - name: "controller.serviceAccount.clusterWideSecretReadingEnabled"
-#           value: "true"
-#         - name: "controller.argocd.enabled"
-#           value: "true"
-#         - name: "controller.argocd.watchArgocdNamespaceOnly"
-#           value: "false"
-# 
-#   destination:
-#     server: https://kubernetes.default.svc
-#     namespace: kargo
-#   
-#   syncPolicy:
-#     automated:
-#       prune: true
-#       selfHeal: true
-#     syncOptions:
-#       - CreateNamespace=true
-#       - ServerSideApply=true
-#     retry:
-#       limit: 5
-#       backoff:
-#         duration: 5s
-#         factor: 2
-#         maxDuration: 3m
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kargo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: kargo
+    # Usar repositorio Helm tradicional en lugar de OCI
+    repoURL: https://charts.akuity.io
+    targetRevision: 1.6.2
+    helm:
+      releaseName: kargo
+      values: |
+        # Configuración simplificada para desarrollo
+        api:
+          adminAccount:
+            enabled: true
+            passwordHash: "$$2a$$10$$Zrhhie4vLz5ygtVSaif6e.qN36jgs6vjtMBdM6yrU1FOeiAAMMxOm"  # admin123
+            tokenSigningKey: "1uyxpL0en7D1cqakaYhE1NhN23CkY16F"
+          service:
+            type: ClusterIP
+            port: 8080
+          
+        # Controller simplificado
+        controller:
+          replicas: 1
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          serviceAccount:
+            create: true
+            clusterWideSecretReadingEnabled: true
+          argocd:
+            enabled: true
+            watchArgocdNamespaceOnly: false
+            namespace: argocd
+            
+        # Webhooks server simplificado
+        webhooksServer:
+          replicas: 1
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kargo
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

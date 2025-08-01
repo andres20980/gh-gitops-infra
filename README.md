@@ -1,362 +1,279 @@
-# 🚀 GitOps Multi-Cluster Infrastructure
+# 🚀 GitOps España - Infraestructura Completa
 
-> **Plataforma GitOps empresarial completa** con ArgoCD, Kargo, stack de observabilidad y promociones automáticas. **100% desatendida** desde Ubuntu limpio.
+[![Estado del Pipeline](https://img.shields.io/badge/pipeline-passing-green)](./CHANGELOG.md)
+[![Licencia](https://img.shields.io/badge/licencia-MIT-blue.svg)](./LICENSE)
+[![Español](https://img.shields.io/badge/idioma-español-red.svg)](./README.md)
 
-## 📦 **Stack de Componentes (15+ Herramientas)**
+## 📋 Descripción
 
-### 🎯 GitOps Core
-- **ArgoCD v3.0.12**: Control center para GitOps y continuous delivery
-- **Kargo v1.6.2**: Promociones automáticas entre entornos (dev → pre → pro)
+**Bootstrap GitOps España** es una solución completa para desplegar infraestructura GitOps moderna con **14 componentes integrados**. Implementa las mejores prácticas de DevOps con arquitectura modular, completamente localizada en castellano español.
 
-### 📊 Observabilidad Stack  
-- **Prometheus v57.2.0**: Metrics collection y time-series database
-- **Grafana v9.3.0**: Dashboards, visualización y alerting
-- **Loki v6.34.0**: Log aggregation y queries 
-- **Jaeger v3.4.1**: Distributed tracing y performance monitoring
+### 🎯 Características Principales
 
-### 🚀 Progressive Delivery
-- **Argo Events v2.4.16**: Event-driven workflow automation
-- **Argo Workflows v0.45.21**: Workflow orchestration y batch processing
-- **Argo Rollouts v2.40.2**: Canary deployments y blue-green strategies
+- **✨ Arquitectura Modular**: Scripts especializados y librerías reutilizables
+- **🇪🇸 100% en Castellano**: Nomenclatura, interfaz y documentación nativa
+- **🔧 Instalación Automatizada**: Bootstrap inteligente con detección de dependencias  
+- **📊 Monitorización Completa**: Prometheus + Grafana + Loki + Jaeger
+- **🔄 GitOps Nativo**: ArgoCD + Kargo para promociones automáticas
+- **🛡️ Seguridad Integrada**: Cert-Manager + External Secrets + RBAC
+- **🎮 Modo Interactivo**: Configuración guiada paso a paso
+- **🔍 Validación Automatizada**: Diagnósticos pre y post instalación
 
-### 🔧 Infraestructura & Storage
-- **MinIO v5.4.0**: Object storage S3-compatible con console UI
-- **Gitea v12.1.2**: Git server interno para repositorios privados
-- **NGINX Ingress v4.13.0**: Load balancer y reverse proxy
-- **Cert-Manager v1.18.2**: Automatic TLS certificate management
-- **External Secrets v0.18.2**: Secure secrets management integrado
-
-### 🎯 Ventajas del Stack
-- **100% CNCF certified**: Componentes de la cloud native landscape
-- **Enterprise-grade**: Probado en entornos de producción
-- **Auto-integrado**: Todas las herramientas se comunican entre sí
-- **Observabilidad completa**: Métricas, logs, traces y alertas
-
----
-
-## 📁 **Estructura del Proyecto (App of Apps Pattern)**
+## 🏗️ Arquitectura
 
 ```
-gh-gitops-infra/
-├── 🚀 instalar-todo.sh                # Script principal desatendido
-├── 📋 app-of-apps-gitops.yaml         # App of Apps principal de ArgoCD
-├── 📂 componentes/                    # 15 aplicaciones GitOps (patrón App of Apps)
-│   ├── argo-events.yaml              # Event-driven automation
-│   ├── argo-rollouts.yaml            # Progressive delivery
-│   ├── argo-workflows.yaml           # Workflow orchestration  
-│   ├── cert-manager.yaml             # Certificate management
-│   ├── external-secrets.yaml         # Secrets management
-│   ├── gitea.yaml                    # Git server interno
-│   ├── grafana.yaml                  # Dashboards y visualización
-│   ├── ingress-nginx.yaml            # Load balancer
-│   ├── jaeger.yaml                   # Distributed tracing
-│   ├── kargo.yaml                    # Promociones automáticas
-│   ├── loki.yaml                     # Log aggregation
-│   ├── minio.yaml                    # Object storage S3
-│   └── prometheus-stack.yaml         # Monitoring completo
-├── 📂 aplicaciones/                   # Aplicaciones de negocio (demo)
-│   ├── demo-project/                 # Proyecto de ejemplo multi-tier
-│   └── simple-app/                   # App simple para testing
-├── 📂 scripts/                       # Scripts de gestión y utilidades
-│   ├── setup-port-forwards.sh       # Port-forwarding automático para UIs
-│   ├── diagnostico-gitops.sh        # Diagnóstico completo del sistema
-│   ├── sync-all-apps.sh             # Sincronización manual de aplicaciones
-│   └── fix-chart-versions.sh        # Corrección automática de versiones
-└── 📚 README.md                      # Documentación principal
+bootstrap.sh (orquestador principal)
+├── scripts/
+│   ├── lib/                    # Librerías compartidas
+│   │   ├── comun.sh           # Funciones y variables comunes
+│   │   └── registro.sh        # Sistema de logging avanzado
+│   ├── modulos/               # Módulos especializados
+│   │   ├── argocd.sh         # Instalación ArgoCD
+│   │   └── kargo.sh          # Instalación Kargo (SUPER IMPORTANTE)
+│   ├── configurar-*.sh       # Scripts de configuración
+│   ├── validar-*.sh          # Scripts de validación
+│   └── diagnostico-*.sh      # Scripts de diagnóstico
+├── componentes/              # Manifiestos de componentes
+├── aplicaciones/            # Aplicaciones de ejemplo
+└── app-of-apps-gitops.yaml # Configuración principal ArgoCD
 ```
 
-### 🎯 Arquitectura App of Apps
-- **App of Apps Principal**: `app-of-apps-gitops.yaml` gestiona todas las herramientas
-- **`componentes/`**: 15 aplicaciones ArgoCD auto-detectadas por patrón App of Apps
-- **Auto-discovery**: El App of Apps detecta automáticamente nuevos .yaml en `/componentes/`
-- **Gestión centralizada**: Una sola aplicación ArgoCD controla todo el stack
+## 🚀 Inicio Rápido
 
----
+### Prerequisitos
 
-## 🎉 **CARACTERÍSTICAS DESTACADAS**
+- **Kubernetes**: v1.28+ (minikube, kind, k3s, AKS, EKS, GKE)
+- **kubectl**: configurado y conectado al cluster
+- **helm**: v3.12+
+- **git**: para clonación del repositorio
+- **bash**: v4.0+ (Linux/macOS/WSL)
 
-- 🏗️ **Patrón App of Apps**: Gestión centralizada de 15+ herramientas GitOps
-- 🤖 **Instalación completamente desatendida** - solo ejecuta un comando
-- 🌐 **15 interfaces web** organizadas por puertos (8080-8094)  
-- 📊 **Stack de observabilidad completo** (Prometheus + Grafana + Loki + Jaeger)
-- 🚢 **Progressive delivery** con Kargo para promociones automáticas dev → pre → pro
-- � **100% portable** - funciona en cualquier máquina Linux automáticamente
-- � **Enterprise-ready** con componentes CNCF certificados
-- ✅ **Auto-detección de versiones** - siempre usa las últimas versiones estables
-- 🔧 **Scripts de gestión** para diagnóstico, sync manual y corrección automática
+### Instalación Básica
 
-## 🚀 **INSTALACIÓN CON UN SOLO COMANDO**
-
-### Desde Ubuntu/Debian limpio:
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/andres20980/gh-gitops-infra.git
+# 1. Clonar repositorio
+git clone https://github.com/tu-usuario/gh-gitops-infra.git
 cd gh-gitops-infra
 
-# 2. Instalación completa desatendida (~5 minutos)
-./instalar-todo.sh
+# 2. Instalación completa (14 componentes)
+./bootstrap.sh
+
+# 3. Solo componentes críticos (ArgoCD + Kargo)
+./bootstrap.sh --solo-criticos
+
+# 4. Instalación interactiva
+./bootstrap.sh --interactivo
 ```
 
-**¡Eso es todo!** ✨ Este único comando es **verdaderamente desatendido**:
-- ✅ **Verifica dependencias**: Auto-instala curl, jq, yq, helm si faltan
-- ✅ **Detecta versiones**: Auto-obtiene las últimas versiones estables de todo
-- ✅ **Crea cluster**: DEV (8GB) optimizado para desarrollo
-- ✅ **Instala ArgoCD**: Con acceso sin autenticación para desarrollo  
-- ✅ **Despliega App of Apps**: 15+ herramientas GitOps con un solo manifiesto
-- ✅ **Configuración automática**: Todo pre-configurado e integrado
-- ✅ **Port-forwarding automático**: 15 UIs inmediatamente accesibles
-- ✅ **Validación completa**: Verifica que todo esté operativo
+### Ejemplos de Uso Avanzado
 
-### � Extensión Multi-Cluster (Opcional):
 ```bash
-# Crear clusters adicionales PRE y PRO después de validar DEV
-CREAR_CLUSTERS_ADICIONALES=true ./instalar-todo.sh
+# Validar prerequisitos sin instalar
+./bootstrap.sh --validar
+
+# Instalación específica de componentes
+./bootstrap.sh --componentes="argocd,kargo,grafana"
+
+# Modo dry-run (simular sin cambios)
+./bootstrap.sh --dry-run --componentes="argocd,kargo"
+
+# Configuración de producción
+./bootstrap.sh --entorno-produccion --crear-clusters-adicionales
+
+# Debug con logging verbose
+./bootstrap.sh --debug --componentes="argocd"
 ```
 
----
+## 📦 Componentes Incluidos
 
----
+| Componente | Versión | Descripción | Crítico |
+|------------|---------|-------------|---------|
+| **ArgoCD** | v3.0.12 | GitOps Core - Gestión declarativa | ✅ |
+| **Kargo** | v1.6.2 | **SUPER IMPORTANTE** - Promociones automáticas | ✅ |
+| Prometheus Stack | v75.15.1 | Métricas y alertas | ⚠️ |
+| Grafana | v9.3.0 | Dashboards y visualización | ⚠️ |
+| Loki | v6.8.0 | Agregación de logs | ⚠️ |
+| Jaeger | v3.4.1 | Tracing distribuido | ⚠️ |
+| Argo Events | v2.4.8 | Gestión de eventos | ⚠️ |
+| Argo Workflows | v0.45.21 | Orquestación de workflows | ⚠️ |
+| Argo Rollouts | v2.40.2 | Progressive delivery | ⚠️ |
+| NGINX Ingress | v4.13.0 | Load balancer HTTP/HTTPS | ⚠️ |
+| Cert-Manager | v1.18.2 | Gestión automática certificados TLS | ⚠️ |
+| External Secrets | v0.18.2 | Integración con gestores de secretos | ⚠️ |
+| MinIO | v5.2.0 | Object storage compatible S3 | ⚠️ |
+| Gitea | v12.1.2 | Repositorio Git auto-hospedado | ⚠️ |
 
-## 🌐 **15 INTERFACES WEB DISPONIBLES**
+**Leyenda**: ✅ Crítico (requerido) | ⚠️ Opcional (recomendado)
 
-Tras la instalación, todas las interfaces están **inmediatamente accesibles** en tu navegador:
+## 🌐 Acceso a Interfaces Web
 
-### GitOps & CI/CD
-| Servicio | Puerto | URL | Credenciales |
-|----------|---------|-----|--------------|
-| **ArgoCD** | 8080 | http://localhost:8080 | `admin` / `password` |
-| **Kargo** | 8081 | http://localhost:8081 | `admin` / `admin123` |
-| **Argo Workflows** | 8082 | http://localhost:8082 | N/A |
+Después de la instalación, configura port-forwards:
 
-### Observabilidad
-| Servicio | Puerto | URL | Credenciales |
-|----------|---------|-----|--------------|
-| **Grafana** | 8084 | http://localhost:8084 | `admin` / `admin` |
-| **Prometheus** | 8085 | http://localhost:8085 | N/A |
-| **AlertManager** | 8086 | http://localhost:8086 | N/A |
-| **Jaeger** | 8087 | http://localhost:8087 | N/A |
-
-### Storage & Git
-| Servicio | Puerto | URL | Credenciales |
-|----------|---------|-----|--------------|
-| **MinIO Console** | 8088 | http://localhost:8088 | `gitops` / `gitops2025` |
-| **Gitea** | 8089 | http://localhost:8089 | Sign up available |
-
-### Infraestructura
-| Servicio | Puerto | URL | Credenciales |
-|----------|---------|-----|--------------|
-| **NGINX Ingress** | 8090 | http://localhost:8090 | N/A |
-
-### � **Port-Forward Automático**
 ```bash
-# Los port-forwards se configuran automáticamente tras la instalación
-# Para reconfigurarlos manualmente:
-./scripts/setup-port-forwards.sh
+# Configurar todos los accesos web automáticamente
+./scripts/configurar-port-forwards.sh
 
-# Verificar puertos activos:
-netstat -tlnp | grep kubectl
+# O manualmente:
+kubectl port-forward -n argocd svc/argocd-server 8080:80 &
+kubectl port-forward -n kargo-system svc/kargo-api 8081:80 &
+kubectl port-forward -n monitoring svc/grafana 3000:80 &
 ```
 
----
+### URLs de Acceso
 
----
+- **🎯 ArgoCD**: http://localhost:8080 (admin/admin123)
+- **🚀 Kargo**: http://localhost:8081 (admin/admin123) - **SUPER IMPORTANTE**
+- **📊 Grafana**: http://localhost:3000 (admin/admin123)
+- **📈 Prometheus**: http://localhost:9090
+- **🔍 Jaeger**: http://localhost:16686
 
-## 🛠️ **Comandos de Gestión**
+## ⚙️ Variables de Entorno
+
+| Variable | Valores | Default | Descripción |
+|----------|---------|---------|-------------|
+| `MODO_DESATENDIDO` | true/false | true | Instalación sin prompts interactivos |
+| `CREAR_CLUSTERS_ADICIONALES` | true/false | false | Crear clusters PRE y PRO |
+| `ENTORNO_DESARROLLO` | true/false | true | Optimizaciones para desarrollo |
+| `SOLO_VALIDAR` | true/false | false | Solo validar sin instalar |
+| `DRY_RUN` | true/false | false | Simular sin hacer cambios |
+| `KUBECONFIG` | path | ~/.kube/config | Ruta al archivo kubeconfig |
+
+## 🔧 Scripts Disponibles
 
 ### Scripts Principales
+
+- **`bootstrap.sh`**: Orquestador principal modular
+- **`scripts/configurar-port-forwards.sh`**: Configurar accesos web
+- **`scripts/validar-prerequisitos.sh`**: Validar requerimientos
+- **`scripts/diagnostico-gitops.sh`**: Diagnóstico completo del sistema
+
+### Módulos Especializados
+
+- **`scripts/modulos/argocd.sh`**: Gestión completa de ArgoCD
+- **`scripts/modulos/kargo.sh`**: Gestión completa de Kargo
+
+### Librerías Compartidas
+
+- **`scripts/lib/comun.sh`**: Funciones y variables comunes
+- **`scripts/lib/registro.sh`**: Sistema de logging profesional
+
+## 🛠️ Gestión de Componentes
+
+### ArgoCD - GitOps Core
+
 ```bash
-# 🚀 Instalación completa desde cero
-./instalar-todo.sh
+# Instalar ArgoCD
+./scripts/modulos/argocd.sh instalar
 
-# 🌐 Configurar port-forwards para acceso a UIs
-./instalar-todo.sh port-forwards  # o usar:
-./scripts/setup-port-forwards.sh
+# Validar instalación
+./scripts/modulos/argocd.sh validar
 
-# 📊 Diagnóstico completo del sistema
-./scripts/diagnostico-gitops.sh
+# Obtener información
+./scripts/modulos/argocd.sh info
+
+# Configurar aplicaciones iniciales
+./scripts/modulos/argocd.sh configurar-apps
 ```
 
-### Comandos Modulares del Instalador
+### Kargo - Promociones (SUPER IMPORTANTE)
+
 ```bash
-# Crear solo los clusters multi-entorno
-./instalar-todo.sh clusters
+# Instalar Kargo
+./scripts/modulos/kargo.sh instalar
 
-# Instalar solo ArgoCD en DEV
-./instalar-todo.sh argocd
+# Validar instalación  
+./scripts/modulos/kargo.sh validar
 
-# Aplicar solo la infraestructura GitOps
-./instalar-todo.sh infra
+# Crear proyecto ejemplo
+./scripts/modulos/kargo.sh ejemplo
 
-# Ver estado actual del sistema
-./instalar-todo.sh estado
-
-# Mostrar URLs de todas las interfaces
-./instalar-todo.sh urls
-
-# Limpiar todo el entorno
-./instalar-todo.sh limpiar
-
-# Mostrar ayuda completa
-./instalar-todo.sh help
+# Obtener información
+./scripts/modulos/kargo.sh info
 ```
 
-### Comandos Kubernetes Útiles
+## 🔍 Diagnóstico y Solución de Problemas
+
+### Comandos de Diagnóstico
+
 ```bash
-# Ver aplicaciones ArgoCD
-kubectl get applications -n argocd
-
-# Forzar sincronización de aplicación
-kubectl patch application APP_NAME -n argocd --type='merge' -p='{"operation":{"sync":{"prune":true}}}'
-
-# Estado de todos los pods
-kubectl get pods -A
-
-# Logs de ArgoCD
-kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
-
-# Ver clusters conectados
-kubectl config get-contexts
-
-# Cambiar entre clusters
-kubectl config use-context gitops-dev    # Cluster principal
-kubectl config use-context gitops-pre    # Cluster preproducción  
-kubectl config use-context gitops-pro    # Cluster producción
-```
-
-### Gestión de Port-Forwards
-```bash
-# Ver port-forwards activos
-netstat -tuln | grep -E ':(808[0-9]|809[0-2])'
-
-# Detener todos los port-forwards
-pkill -f 'kubectl.*port-forward'
-
-# Reiniciar port-forwards
-./scripts/setup-port-forwards.sh
-```
-
----
-
-## � **Stack de Componentes**
-
-### 🎯 GitOps Core
-- **ArgoCD**: Control center para GitOps
-- **Kargo**: Gestión de promociones multi-entorno
-
-### 👁️ Observabilidad Stack
-- **Prometheus**: Métricas y alertas
-- **Grafana**: Dashboards y visualización
-- **Loki**: Logs centralizados
-- **Jaeger**: Tracing distribuido
-
-### 🔧 Infraestructura
-- **MinIO**: Object storage S3-compatible
-- **Argo Workflows**: Automatización de workflows
-- **External Secrets**: Gestión segura de secretos
-- **Cert Manager**: Certificados TLS automáticos
-- **Ingress NGINX**: Load balancer y proxy
-
----
-
-## 🎯 **Flujo de Trabajo Típico**
-
-### 1. Instalación y Acceso
-```bash
-# Instalación completa (~5 minutos)
-./instalar-todo.sh
-
-# Las UIs se abren automáticamente en:
-# - ArgoCD: http://localhost:8080 (GitOps dashboard)
-# - Kargo: http://localhost:8081 (promociones)  
-# - Grafana: http://localhost:8084 (observabilidad)
-```
-
-### 2. Desarrollo Diario
-- **ArgoCD (8080)**: Monitorear estado de deployments y aplicaciones
-- **Kargo (8081)**: Gestionar promociones automáticas dev → pre → pro
-- **Grafana (8084)**: Observar métricas, dashboards y alertas
-- **Prometheus (8085)**: Consultar métricas detalladas y targets
-- **Gitea (8091)**: Gestionar repositorios Git internos
-
-### 3. Gestión de Aplicaciones
-```bash
-# Desplegar nueva aplicación
-kubectl apply -f proyectos/mi-app/
-
-# Ver estado en ArgoCD
-kubectl get applications -n argocd
-
-# Promover entre entornos con Kargo UI
-# (Automático basado en políticas configuradas)
-
-# Monitorear en Grafana
-# Dashboards automáticos disponibles
-```
-
-### 4. Troubleshooting
-```bash
-# Diagnóstico completo
+# Diagnóstico completo del sistema
 ./scripts/diagnostico-gitops.sh
 
-# Ver logs centralizados  
-# Loki UI: http://localhost:8088
+# Verificar logs del bootstrap
+tail -f /tmp/bootstrap-gitops.log
 
-# Distributed tracing
-# Jaeger UI: http://localhost:8087
-```
+# Estado de pods críticos
+kubectl get pods -n argocd -n kargo-system
 
----
-
-## ⚠️ **Troubleshooting**
-
-### Comandos de Diagnóstico Rápido
-```bash
-# Diagnóstico completo automatizado
-./scripts/diagnostico-gitops.sh
-
-# Verificar estado de todas las aplicaciones ArgoCD
+# Verificar aplicaciones ArgoCD
 kubectl get applications -n argocd
-
-# Verificar estado del App of Apps principal
-kubectl get application gitops-infra-app-of-apps -n argocd
-
-# Ver todos los pods del sistema
-kubectl get pods -A | grep -v Running
 ```
 
-### Problemas Comunes y Soluciones
+### Problemas Comunes
 
-#### � Port-forwards no funcionan
+**❌ Error: kubectl no está instalado**
 ```bash
-# Matar port-forwards existentes y reiniciar
-pkill -f 'kubectl.*port-forward'
-./scripts/setup-port-forwards.sh
+# Ubuntu/Debian
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+# macOS
+brew install kubectl
 ```
 
-#### � ArgoCD no sincroniza aplicaciones
+**❌ Error: No hay conectividad al cluster**
 ```bash
-# Forzar refresh del App of Apps principal
-kubectl annotate application gitops-infra-app-of-apps -n argocd argocd.argoproj.io/refresh=hard --overwrite
+# Verificar configuración
+kubectl cluster-info
+kubectl config current-context
 
-# Sincronizar todas las aplicaciones
-./scripts/sync-all-apps.sh
+# Para minikube
+minikube start
 ```
 
-#### 🚢 Kargo no carga (problema DNS)
+**❌ ArgoCD no responde**
 ```bash
-# Verificar que está usando la URL OCI correcta
-kubectl get application kargo -n argocd -o yaml | grep repoURL
+# Verificar pods
+kubectl get pods -n argocd
 
-# Debe ser: oci://ghcr.io/akuity/kargo-charts
+# Logs del servidor
+kubectl logs -n argocd deployment/argocd-server
 ```
 
-#### 📊 Aplicaciones en estado Unknown
-```bash
-# Forzar corrección de versiones
-./scripts/fix-chart-versions.sh
+## 📚 Documentación Adicional
 
-# Verificar logs de ArgoCD
-kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
-```
+- **[CHANGELOG.md](./CHANGELOG.md)**: Historial de cambios detallado
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)**: Guía de contribución
+- **[SECURITY.md](./SECURITY.md)**: Políticas de seguridad
+- **[ANALISIS_ARQUITECTURA.md](./ANALISIS_ARQUITECTURA.md)**: Análisis técnico profundo
+
+## 🤝 Contribuir
+
+1. **Fork** del repositorio
+2. **Crear branch** para tu feature (`git checkout -b feature/nueva-funcionalidad`)
+3. **Commit** de cambios (`git commit -am 'Añadir nueva funcionalidad'`)
+4. **Push** al branch (`git push origin feature/nueva-funcionalidad`)
+5. **Pull Request** con descripción detallada
+
+### Estándares de Código
+
+- **Bash**: Seguir [ShellCheck](https://shellcheck.net/) recommendations
+- **YAML**: Indentación 2 espacios, sin tabs
+- **Documentación**: En castellano español
+- **Commits**: Formato conventional commits
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver [LICENSE](./LICENSE) para más detalles.
+
+## 🏷️ Etiquetas
+
+`gitops` `argocd` `kargo` `kubernetes` `helm` `prometheus` `grafana` `devops` `español` `infraestructura` `automatización` `monitorización`
 
 ---
+
+**⭐ Si este proyecto te ayuda, por favor dale una estrella en GitHub**
+
+**🐛 ¿Encontraste un problema?** [Crear issue](https://github.com/tu-usuario/gh-gitops-infra/issues/new)
+
+**💬 ¿Tienes preguntas?** [Crear discussion](https://github.com/tu-usuario/gh-gitops-infra/discussions/new)

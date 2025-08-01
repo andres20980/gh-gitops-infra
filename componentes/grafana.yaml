@@ -35,6 +35,19 @@ spec:
         persistence:
           enabled: false
         
+        # Recursos mínimos para desarrollo
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        
+        # ServiceMonitor deshabilitado
+        serviceMonitor:
+          enabled: false
+        
         # Fuentes de datos
         datasources:
           datasources.yaml:

@@ -16,15 +16,15 @@ spec:
           enabled: true
           replicas: 1
           args:
-            - --memory.max-traces=50000
+            - --memory.max-traces=10000
             - --log-level=info
           resources:
             limits:
-              cpu: 200m
-              memory: 512Mi
-            requests:
               cpu: 100m
               memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
           ingress:
             enabled: false
         
@@ -37,6 +37,10 @@ spec:
           cassandra: false
           elasticsearch: false
           kafka: false
+        
+        # Metrics deshabilitadas para desarrollo
+        hotrod:
+          enabled: false
         
         # Disable other components since all-in-one includes everything
         agent:

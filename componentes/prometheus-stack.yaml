@@ -12,8 +12,54 @@ spec:
     helm:
       # Pass all our collected fixes as values
       values: |
+        # Configuración simplificada para desarrollo
+        prometheus:
+          prometheusSpec:
+            resources:
+              limits:
+                cpu: 500m
+                memory: 1Gi
+              requests:
+                cpu: 200m
+                memory: 512Mi
+            retention: 7d
+            retentionSize: 1GB
+            
+        # AlertManager simplificado
+        alertmanager:
+          alertmanagerSpec:
+            resources:
+              limits:
+                cpu: 100m
+                memory: 128Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+                
+        # Grafana simplificado (aunque ya tenemos grafana separado)
+        grafana:
+          enabled: false
+          
+        # Node exporter optimizado
         prometheus-node-exporter:
           hostPort: 9101
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+              
+        # Kube State Metrics optimizado
+        kube-state-metrics:
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

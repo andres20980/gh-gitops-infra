@@ -27,11 +27,14 @@ spec:
         persistence:
           enabled: false  # Para desarrollo
         
-        # Resources for development
+        # Resources for development (reducidos)
         resources:
-          requests:
+          limits:
+            cpu: 200m
             memory: 256Mi
-            cpu: 100m
+          requests:
+            memory: 128Mi
+            cpu: 50m
         
         # Service configuration
         service:

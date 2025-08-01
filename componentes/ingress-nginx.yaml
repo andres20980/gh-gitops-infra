@@ -20,19 +20,34 @@ spec:
           # Enable for minikube
           hostPort:
             enabled: false
-          # Metrics for monitoring
+          # Metrics deshabilitadas para desarrollo
           metrics:
-            enabled: true
+            enabled: false
             serviceMonitor:
-              enabled: true
+              enabled: false
+          # Recursos mínimos para desarrollo
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
           # Additional configuration for development
           config:
             use-forwarded-headers: "true"
             compute-full-forwarded-for: "true"
         
-        # Enable default backend for better error handling  
+        # Default backend simplificado
         defaultBackend:
           enabled: true
+          resources:
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx

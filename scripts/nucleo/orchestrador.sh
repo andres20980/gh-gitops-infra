@@ -54,6 +54,10 @@ declare -g SKIP_VALIDATION=false
 declare -g FORCE_REINSTALL=false
 declare -g DRY_RUN_MODE=false
 
+# Cachés para módulos y instaladores (mejor performance)
+declare -A MODULE_CACHE=()
+declare -A INSTALLER_CACHE=()
+
 # Estado de fases
 declare -A PHASE_STATUS=(
     [$PHASE_VALIDATION]="$STATE_PENDING"
@@ -144,9 +148,16 @@ show_status_summary() {
 # FUNCIONES DE CARGA DE MÓDULOS
 # ============================================================================
 
-# Cargar instalador
+# Cargar instalador con caché
 load_installer() {
     local installer="$1"
+    
+    # Verificar caché primero
+    if [[ -n "${INSTALLER_CACHE[$installer]:-}" ]]; then
+        log_debug "Usando instalador desde caché: $installer"
+        return 0
+    fi
+    
     local installer_path="${SCRIPT_DIR}/../instaladores/${installer}.sh"
     
     if [[ ! -f "$installer_path" ]]; then
@@ -156,13 +167,26 @@ load_installer() {
     
     log_debug "Cargando instalador: $installer"
     # shellcheck source=/dev/null
-    source "$installer_path"
+    if source "$installer_path"; then
+        INSTALLER_CACHE[$installer]="loaded"
+        return 0
+    else
+        log_error "Error cargando instalador: $installer"
+        return 1
+    fi
 }
 
-# Cargar módulo GitOps
+# Cargar módulo GitOps con caché
 load_gitops_module() {
     local module="$1"
-    local module_path="${SCRIPT_DIR}/../modulos/${module}.sh"
+    
+    # Verificar caché primero
+    if [[ -n "${MODULE_CACHE[$module]:-}" ]]; then
+        log_debug "Usando módulo desde caché: $module"
+        return 0
+    fi
+    
+    local module_path="${SCRIPT_DIR}/../argocd/${module}.sh"
     
     if [[ ! -f "$module_path" ]]; then
         log_error "Módulo GitOps no encontrado: $module_path"
@@ -171,7 +195,13 @@ load_gitops_module() {
     
     log_debug "Cargando módulo GitOps: $module"
     # shellcheck source=/dev/null
-    source "$module_path"
+    if source "$module_path"; then
+        MODULE_CACHE[$module]="loaded"
+        return 0
+    else
+        log_error "Error cargando módulo GitOps: $module"
+        return 1
+    fi
 }
 
 # ============================================================================
@@ -196,6 +226,16 @@ phase_validation() {
     if ! validar_prerequisitos_sistema; then
         update_phase_status "$phase" "$STATE_ERROR"
         return 1
+    fi
+    
+    # Validar recursos del sistema
+    if ! validar_recursos_sistema; then
+        log_warning "Recursos del sistema por debajo de lo recomendado"
+        if [[ "${FORCE:-false}" != "true" ]]; then
+            log_info "Usa --force para continuar con recursos limitados"
+            update_phase_status "$phase" "$STATE_ERROR"
+            return 1
+        fi
     fi
     
     # En modo desde-cero, no validar herramientas que se van a instalar
@@ -257,24 +297,28 @@ phase_cluster() {
     case "$CLUSTER_PROVIDER" in
         "minikube")
             if ! configurar_cluster_minikube; then
+                cleanup_on_error "$phase"
                 update_phase_status "$phase" "$STATE_ERROR"
                 return 1
             fi
             ;;
         "kind")
             if ! configurar_cluster_kind; then
+                cleanup_on_error "$phase"
                 update_phase_status "$phase" "$STATE_ERROR"
                 return 1
             fi
             ;;
         "existente")
             if ! validar_cluster_existente; then
+                cleanup_on_error "$phase"
                 update_phase_status "$phase" "$STATE_ERROR"
                 return 1
             fi
             ;;
         *)
             log_error "Proveedor de cluster no soportado: $CLUSTER_PROVIDER"
+            cleanup_on_error "$phase"
             update_phase_status "$phase" "$STATE_ERROR"
             return 1
             ;;
@@ -459,6 +503,43 @@ phase_verification() {
 # ORCHESTRADOR PRINCIPAL
 # ============================================================================
 
+# Función de limpieza en caso de error
+cleanup_on_error() {
+    local phase="$1"
+    log_warning "Ejecutando limpieza automática tras error en fase: $phase"
+    
+    case "$phase" in
+        "$PHASE_CLUSTER")
+            # Limpiar cluster parcialmente creado
+            if command -v minikube >/dev/null 2>&1; then
+                log_info "Limpiando cluster minikube fallido..."
+                minikube delete --profile="${CLUSTER_NAME:-gitops-dev}" 2>/dev/null || true
+            fi
+            ;;
+        "$PHASE_GITOPS")
+            # Limpiar recursos de ArgoCD si falló la instalación
+            if command -v kubectl >/dev/null 2>&1; then
+                log_info "Limpiando recursos de ArgoCD fallidos..."
+                kubectl delete namespace argocd --ignore-not-found=true 2>/dev/null || true
+            fi
+            ;;
+    esac
+}
+
+# Pre-cargar módulos comunes para mejor performance
+preload_common_modules() {
+    log_debug "Pre-cargando módulos comunes..."
+    
+    # Lista de módulos que probablemente se usen
+    local common_modules=("cluster" "argocd" "actualizador-charts")
+    
+    for module in "${common_modules[@]}"; do
+        if load_gitops_module "$module" >/dev/null 2>&1; then
+            log_debug "Módulo pre-cargado: $module"
+        fi
+    done
+}
+
 # Función principal de orchestración
 run_orchestrator() {
     local modo="${1:-normal}"
@@ -519,13 +600,23 @@ run_orchestrator() {
     log_info "Fases a ejecutar: ${fases_a_ejecutar[*]}"
     echo
     
+    # Pre-cargar módulos comunes en paralelo (mejor performance)
+    preload_common_modules &
+    local preload_pid=$!
+    
     # Confirmar si no es dry-run
     if ! es_dry_run && [[ "${INTERACTIVE:-true}" == "true" ]]; then
         if ! confirmar "¿Continuar con la instalación?"; then
             log_info "Instalación cancelada por el usuario"
+            # Limpiar proceso de pre-carga
+            kill $preload_pid 2>/dev/null || true
             return 0
         fi
     fi
+    
+    # Esperar a que termine la pre-carga
+    wait $preload_pid 2>/dev/null || true
+    log_debug "Pre-carga de módulos completada"
     
     # Ejecutar fases
     local start_time

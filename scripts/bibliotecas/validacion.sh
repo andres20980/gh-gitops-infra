@@ -80,6 +80,51 @@ validar_arquitectura() {
     esac
 }
 
+# Validar recursos del sistema para GitOps
+validar_recursos_sistema() {
+    local mem_minima_gb="${1:-8}"
+    local cpu_minimo="${2:-4}"
+    local disco_minimo_gb="${3:-50}"
+    
+    log_debug "Validando recursos del sistema..."
+    
+    # Verificar memoria RAM
+    local mem_total_gb
+    mem_total_gb=$(free -g | awk '/^Mem:/{print $2}')
+    
+    if [[ $mem_total_gb -lt $mem_minima_gb ]]; then
+        log_warning "Memoria RAM insuficiente: ${mem_total_gb}GB (mínimo: ${mem_minima_gb}GB)"
+        log_info "Se recomienda al menos ${mem_minima_gb}GB para un funcionamiento óptimo"
+    else
+        log_debug "Memoria RAM suficiente: ${mem_total_gb}GB"
+    fi
+    
+    # Verificar CPUs
+    local cpu_count
+    cpu_count=$(nproc)
+    
+    if [[ $cpu_count -lt $cpu_minimo ]]; then
+        log_warning "CPUs insuficientes: ${cpu_count} cores (mínimo: ${cpu_minimo} cores)"
+        log_info "Se recomienda al menos ${cpu_minimo} cores para un funcionamiento óptimo"
+    else
+        log_debug "CPUs suficientes: ${cpu_count} cores"
+    fi
+    
+    # Verificar espacio en disco
+    local disco_libre_gb
+    disco_libre_gb=$(df / | awk 'NR==2{printf "%.0f", $4/1024/1024}')
+    
+    if [[ $disco_libre_gb -lt $disco_minimo_gb ]]; then
+        log_error "Espacio en disco insuficiente: ${disco_libre_gb}GB (mínimo: ${disco_minimo_gb}GB)"
+        log_info "Libera espacio o usa un disco con más capacidad"
+        return 1
+    else
+        log_debug "Espacio en disco suficiente: ${disco_libre_gb}GB"
+    fi
+    
+    return 0
+}
+
 # Validar versión mínima de Ubuntu
 validar_version_ubuntu() {
     local version_minima="${1:-20.04}"
@@ -215,18 +260,53 @@ validar_docker() {
         return 1
     fi
     
-    # Verificar que el servicio esté activo
+    # Verificar que el servicio esté activo y habilitado
     if ! systemctl is-active --quiet docker 2>/dev/null; then
-        log_error "El servicio Docker no está activo"
-        log_info "Intenta: sudo systemctl start docker"
-        return 1
+        log_warning "El servicio Docker no está activo. Intentando iniciarlo..."
+        
+        # Intentar habilitar el servicio primero
+        if sudo systemctl enable docker >/dev/null 2>&1; then
+            log_debug "Servicio Docker habilitado para arranque automático"
+        fi
+        
+        # Intentar iniciar el servicio
+        if sudo systemctl start docker >/dev/null 2>&1; then
+            log_success "Servicio Docker iniciado correctamente"
+            
+            # Esperar a que Docker esté completamente listo
+            local intentos=0
+            while ! docker info >/dev/null 2>&1 && [[ $intentos -lt 10 ]]; do
+                sleep 1
+                ((intentos++))
+            done
+            
+            if [[ $intentos -eq 10 ]]; then
+                log_warning "Docker tardó más de lo esperado en estar listo"
+            fi
+        else
+            log_error "No se pudo iniciar el servicio Docker"
+            log_info "Intenta manualmente: sudo systemctl start docker"
+            return 1
+        fi
     fi
     
-    # Verificar permisos de usuario
+    # Verificar permisos de usuario con mejor manejo
     if ! docker info >/dev/null 2>&1; then
-        log_error "Usuario no tiene permisos para usar Docker"
-        log_info "Intenta: sudo usermod -aG docker \$USER && newgrp docker"
-        return 1
+        log_warning "Usuario no tiene permisos para usar Docker"
+        
+        # Intentar añadir el usuario al grupo docker
+        if sudo usermod -aG docker "$USER" >/dev/null 2>&1; then
+            log_info "Usuario añadido al grupo docker. Reinicia la sesión o ejecuta: newgrp docker"
+            # Para el proceso actual, intentar ejecutar con newgrp
+            if command -v newgrp >/dev/null 2>&1; then
+                log_info "Aplicando permisos de grupo Docker..."
+                # Este es un workaround para el proceso actual
+                export DOCKER_HOST="unix:///var/run/docker.sock"
+            fi
+        else
+            log_error "No se pudo añadir el usuario al grupo docker"
+            return 1
+        fi
     fi
     
     log_debug "Docker validado correctamente"

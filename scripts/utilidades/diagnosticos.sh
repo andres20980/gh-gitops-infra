@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # Directorio base del proyecto
-readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly SCRIPTS_DIR="$PROJECT_ROOT/scripts"
 readonly BIBLIOTECAS_DIR="$SCRIPTS_DIR/bibliotecas"
 

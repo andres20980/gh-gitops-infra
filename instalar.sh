@@ -54,17 +54,17 @@ fi
 # CONFIGURACIÓN DE VARIABLES
 # ============================================================================
 
-# Control de flujo (con valores por defecto seguros)
+# Control de flujo (DESDE-CERO por defecto)
 export DRY_RUN="${DRY_RUN:-false}"
-export VERBOSE="${VERBOSE:-false}"
+export VERBOSE="${VERBOSE:-true}"    # VERBOSE SIEMPRE por defecto
 export FORCE="${FORCE:-false}"
 export INTERACTIVE="${INTERACTIVE:-true}"
 export DEBUG="${DEBUG:-false}"
 
-# Configuración del cluster
+# Configuración del cluster (CREAR SIEMPRE por defecto)
 export CLUSTER_NAME="${CLUSTER_NAME:-gitops-dev}"
 export CLUSTER_PROVIDER="${CLUSTER_PROVIDER:-minikube}"
-export CREATE_CLUSTER="${CREATE_CLUSTER:-false}"
+export CREATE_CLUSTER="${CREATE_CLUSTER:-true}"  # CREAR por defecto
 
 # Configuración de componentes (granular)
 export INSTALL_ARGOCD="${INSTALL_ARGOCD:-true}"
@@ -93,14 +93,14 @@ export TIMEOUT_DELETE="${TIMEOUT_DELETE:-120}"
 
 # Configurar modo de instalación
 configurar_modo_instalacion() {
-    local modo="${1:-normal}"
+    local modo="${1:-desde-cero}"  # DESDE-CERO por defecto
     
     case "$modo" in
-        "dependencies"|"desde-cero")
+        "dependencies"|"desde-cero"|"")  # Sin argumentos = desde-cero
             export INSTALLATION_MODE="dependencies"
             export CREATE_CLUSTER="true"
             export SKIP_VALIDATION="false"
-            log_info "Configurado para instalación desde cero con dependencias"
+            log_info "🚀 Configurado para instalación COMPLETA desde Ubuntu limpio"
             ;;
         "solo-cluster")
             export INSTALLATION_MODE="solo-cluster"
@@ -115,9 +115,16 @@ configurar_modo_instalacion() {
             export INSTALLATION_MODE="solo-componentes"
             log_info "Configurado para solo instalar componentes"
             ;;
-        "normal"|*)
+        "normal")
             export INSTALLATION_MODE="normal"
             log_info "Configurado para instalación estándar"
+            ;;
+        *)
+            # Si no reconoce, usar desde-cero por seguridad
+            export INSTALLATION_MODE="dependencies"
+            export CREATE_CLUSTER="true"
+            export SKIP_VALIDATION="false"
+            log_info "🚀 Modo desconocido, usando instalación COMPLETA desde cero"
             ;;
     esac
 }
@@ -188,15 +195,20 @@ mostrar_ayuda() {
 GitOps España Infrastructure - Instalador Principal
 
 SINTAXIS:
-  ./instalador.sh [MODO] [OPCIONES]
+  ./instalar.sh                    # ← ¡SÚPER SIMPLE! (TODO desde cero)
+  ./instalar.sh [MODO] [OPCIONES]
+
+🚀 USO RECOMENDADO:
+  ./instalar.sh                    # TODO automático desde Ubuntu limpio
 
 MODOS DE INSTALACIÓN:
-  dependencies            Instalación completa desde Ubuntu limpio (26k dependencias)
-  desde-cero              Instalación completa desde cero (incluye dependencias del sistema)
+  (ninguno)               Instalación COMPLETA desde Ubuntu limpio (POR DEFECTO)
+  desde-cero              Instalación completa desde cero (igual que sin argumentos)
+  dependencies            Instalación completa desde cero  
   solo-cluster            Solo crear/configurar cluster Kubernetes
   solo-gitops             Solo instalar ArgoCD y Kargo (core GitOps)
   solo-componentes        Solo instalar componentes adicionales
-  normal                  Instalación estándar (por defecto)
+  normal                  Instalación estándar (sin dependencias del sistema)
 
 OPCIONES PRINCIPALES:
   --crear-cluster         Crear nuevo cluster (destruye el existente)
@@ -278,13 +290,19 @@ mostrar_banner_inicial() {
 
 # Procesar argumentos de línea de comandos
 procesar_argumentos() {
-    local modo_instalacion="normal"
+    local modo_instalacion="desde-cero"  # DESDE-CERO por defecto
+    
+    # Si no hay argumentos, usar desde-cero directamente
+    if [[ $# -eq 0 ]]; then
+        configurar_modo_instalacion "desde-cero"
+        return 0
+    fi
     
     while [[ $# -gt 0 ]]; do
         case $1 in
             # Modos de instalación
             desde-cero|--desde-cero|dependencies|--dependencies)
-                modo_instalacion="dependencies"
+                modo_instalacion="desde-cero"
                 shift
                 ;;
             solo-cluster|--solo-cluster)

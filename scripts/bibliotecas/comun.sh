@@ -120,6 +120,109 @@ COMPONENTES_CRITICOS=(
 # Alias para compatibilidad
 CRITICAL_COMPONENTS=("${COMPONENTES_CRITICOS[@]}")
 
+# Función para instalar dependencias desde cero en Ubuntu/WSL
+instalar_dependencias_ubuntu() {
+    log_seccion "Instalación de Dependencias desde Cero"
+    
+    # Detectar si estamos en Ubuntu/WSL
+    if ! grep -q "Ubuntu" /etc/os-release 2>/dev/null; then
+        log_warning "Esta función está optimizada para Ubuntu/Ubuntu WSL"
+    fi
+    
+    # Actualizar sistema
+    log_info "Actualizando sistema base..."
+    ejecutar_comando "sudo apt update && sudo apt upgrade -y" "Actualizando paquetes del sistema"
+    
+    # Instalar herramientas básicas
+    log_info "Instalando herramientas básicas..."
+    ejecutar_comando "sudo apt install -y curl wget apt-transport-https ca-certificates gnupg lsb-release jq git" "Instalando herramientas básicas"
+    
+    # Instalar Docker si no existe
+    if ! comando_existe docker; then
+        log_info "Instalando Docker..."
+        ejecutar_comando "curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh" "Instalando Docker"
+        ejecutar_comando "sudo usermod -aG docker \$USER" "Añadiendo usuario al grupo docker"
+        log_warning "Necesitarás reiniciar la sesión para usar Docker sin sudo"
+    else
+        log_exito "Docker ya está instalado"
+    fi
+    
+    # Instalar kubectl
+    if ! comando_existe kubectl; then
+        log_info "Instalando kubectl..."
+        ejecutar_comando "curl -LO \"https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\"" "Descargando kubectl"
+        ejecutar_comando "sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl" "Instalando kubectl"
+        ejecutar_comando "rm kubectl" "Limpiando archivos temporales"
+    else
+        log_exito "kubectl ya está instalado"
+    fi
+    
+    # Instalar Helm
+    if ! comando_existe helm; then
+        log_info "Instalando Helm..."
+        ejecutar_comando "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash" "Instalando Helm"
+    else
+        log_exito "Helm ya está instalado"
+    fi
+    
+    # Instalar minikube
+    if ! comando_existe minikube; then
+        log_info "Instalando minikube..."
+        ejecutar_comando "curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64" "Descargando minikube"
+        ejecutar_comando "sudo install minikube /usr/local/bin/" "Instalando minikube"
+        ejecutar_comando "rm minikube" "Limpiando archivos temporales"
+    else
+        log_exito "minikube ya está instalado"
+    fi
+    
+    log_exito "Todas las dependencias han sido instaladas correctamente"
+}
+
+# Función para crear cluster minikube optimizado para GitOps
+crear_cluster_gitops() {
+    log_seccion "Creación de Cluster GitOps"
+    
+    # Verificar si minikube ya está ejecutándose
+    if minikube status >/dev/null 2>&1; then
+        log_info "Cluster minikube ya está ejecutándose"
+        return 0
+    fi
+    
+    # Configuración del cluster para GitOps
+    log_info "Creando cluster minikube optimizado para GitOps..."
+    local comando_minikube="minikube start \
+        --memory=8192 \
+        --cpus=4 \
+        --disk-size=50g \
+        --driver=docker \
+        --kubernetes-version=stable \
+        --extra-config=apiserver.service-node-port-range=1-65535"
+    
+    if ejecutar_comando "$comando_minikube" "Iniciando cluster minikube"; then
+        log_exito "Cluster minikube creado exitosamente"
+    else
+        log_error "Error creando cluster minikube"
+        return 1
+    fi
+    
+    # Verificar conectividad
+    log_info "Verificando conectividad al cluster..."
+    if ejecutar_comando "kubectl cluster-info" "Verificando cluster"; then
+        log_exito "Cluster accesible correctamente"
+    else
+        log_error "Error de conectividad al cluster"
+        return 1
+    fi
+    
+    # Habilitar addons útiles para GitOps
+    log_info "Habilitando addons de minikube..."
+    ejecutar_comando "minikube addons enable ingress" "Habilitando ingress"
+    ejecutar_comando "minikube addons enable metrics-server" "Habilitando metrics-server"
+    ejecutar_comando "minikube addons enable dashboard" "Habilitando dashboard"
+    
+    log_exito "Cluster GitOps listo para usar"
+}
+
 # Función para verificar si estamos en modo dry-run
 es_dry_run() {
     [[ "${DRY_RUN:-false}" == "true" ]]

@@ -6,19 +6,28 @@
 
 # Importar librerías
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/comun.sh"
-source "${SCRIPT_DIR}/../lib/registro.sh"
+BIBLIOTECAS_DIR="$(dirname "$SCRIPT_DIR")/bibliotecas"
+
+# shellcheck source=../bibliotecas/base.sh
+source "$BIBLIOTECAS_DIR/base.sh"
+# shellcheck source=../bibliotecas/logging.sh
+source "$BIBLIOTECAS_DIR/logging.sh"
+# shellcheck source=../bibliotecas/comun.sh
+source "$BIBLIOTECAS_DIR/comun.sh"
+# shellcheck source=../bibliotecas/registro.sh
+source "$BIBLIOTECAS_DIR/registro.sh"
+# shellcheck source=../bibliotecas/versiones.sh
+source "$BIBLIOTECAS_DIR/versiones.sh"
 
 # Configuración específica de ArgoCD
-ARGOCD_VERSION="${VERSIONES_COMPONENTES[argocd]}"
 ARGOCD_NAMESPACE="argocd"
-ARGOCD_REPO_URL="${REPOSITORIOS_HELM[argo]}"
+ARGOCD_REPO_URL="https://argoproj.github.io/argo-helm"
 ARGOCD_CHART_NAME="argo-cd"
 
 # Función principal para instalar ArgoCD
 instalar_argocd() {
-    log_seccion "INSTALACIÓN DE ARGOCD"
-    log_inicio_operacion "Instalación de ArgoCD v${ARGOCD_VERSION}"
+    log_section "🎯 INSTALACIÓN DE ARGOCD"
+    log_info "Instalación de ArgoCD v${ARGOCD_VERSION}"
     
     # Verificar si ya está instalado
     if componente_instalado "argocd" "$ARGOCD_NAMESPACE"; then

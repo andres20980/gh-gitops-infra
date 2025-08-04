@@ -1,0 +1,358 @@
+apiVersion: v1
+kind: List
+items:
+# ==========================================
+# INFRAESTRUCTURA BASE - FASE 1
+# ==========================================
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: cert-manager
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: security
+      fase: "1-base"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/cert-manager
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: cert-manager
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: ingress-nginx
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/component: networking
+      fase: "1-base"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/ingress-nginx
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: ingress-nginx
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+# ==========================================
+# ALMACENAMIENTO - FASE 2
+# ==========================================
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: minio
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/component: storage
+      fase: "2-storage"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/minio
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: minio
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+# ==========================================
+# OBSERVABILIDAD - FASE 3
+# ==========================================
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: prometheus-stack
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: prometheus-stack
+      app.kubernetes.io/component: monitoring
+      fase: "3-observability"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/prometheus-stack
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: monitoring
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: grafana
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: grafana
+      app.kubernetes.io/component: monitoring
+      fase: "3-observability"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/grafana
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: monitoring
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: loki
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: loki
+      app.kubernetes.io/component: logging
+      fase: "3-observability"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/loki
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: logging
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: jaeger
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: jaeger
+      app.kubernetes.io/component: tracing
+      fase: "3-observability"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/jaeger
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: tracing
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+# ==========================================
+# GITOPS AVANZADO - FASE 4
+# ==========================================
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: argo-workflows
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: argo-workflows
+      app.kubernetes.io/component: workflows
+      fase: "4-gitops"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/argo-workflows
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: argo-workflows
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: argo-rollouts
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: argo-rollouts
+      app.kubernetes.io/component: deployments
+      fase: "4-gitops"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/argo-rollouts
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: argo-rollouts
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: argo-events
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: argo-events
+      app.kubernetes.io/component: events
+      fase: "4-gitops"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/argo-events
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: argo-events
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: kargo
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: kargo
+      app.kubernetes.io/component: promotion
+      fase: "4-gitops"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/kargo
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: kargo
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+# ==========================================
+# REPOSITORIOS - FASE 5
+# ==========================================
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: gitea
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: gitea
+      app.kubernetes.io/component: repository
+      fase: "5-repos"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/gitea
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: gitea
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+
+# ==========================================
+# SEGURIDAD - FASE 6
+# ==========================================
+- apiVersion: argoproj.io/v1alpha1
+  kind: Application
+  metadata:
+    name: external-secrets
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: external-secrets
+      app.kubernetes.io/component: security
+      fase: "6-security"
+  spec:
+    project: default
+    source:
+      path: herramientas-gitops/external-secrets
+      repoURL: https://github.com/asanchez-dev/gh-gitops-infra
+      targetRevision: HEAD
+    destination:
+      namespace: external-secrets
+      server: https://kubernetes.default.svc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true

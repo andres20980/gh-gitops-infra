@@ -1,13 +1,119 @@
-# IDE and Editor files
+# ==========================================
+# INFRAESTRUCTURA GITOPS - .gitignore
+# ==========================================
+
+# ==========================================
+# IDE y Editores
+# ==========================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.tmp
 
-# OS generated files
+# ==========================================
+# Sistema Operativo
+# ==========================================
 .DS_Store
 .DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==========================================
+# Logs y Archivos Temporales
+# ==========================================
+logs/*.log
+logs/*.gz
+*.log
+*.pid
+*.seed
+*.backup
+*.bak
+*.tmp
+*.cache
+
+# ==========================================
+# Configuraciones Locales
+# ==========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+config/local.yaml
+config/secrets.yaml
+kubeconfig*
+.kube/config.bak
+
+# ==========================================
+# Kubernetes y Docker
+# ==========================================
+*.kubeconfig
+*-kubeconfig
+helm-charts/*/charts/
+helm-charts/*/Chart.lock
+.helmignore
+
+# ==========================================
+# Archivos de Estado
+# ==========================================
+.terraform/
+*.tfstate
+*.tfstate.backup
+terraform.tfvars
+
+# ==========================================
+# Dependencias y Paquetes
+# ==========================================
+node_modules/
+vendor/
+.vendor/
+
+# ==========================================
+# Archivos de Testing
+# ==========================================
+coverage/
+.nyc_output/
+test-results/
+*.test
+*.spec
+
+# ==========================================
+# Archivos Sensibles
+# ==========================================
+secrets/
+certificates/
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+
+# ==========================================
+# Archivos de Desarrollo Local
+# ==========================================
+*-local.*
+*-dev.*
+*-test.*
+scratch/
+sandbox/
+playground/
+
+# ==========================================
+# Respaldos y Archivos Obsoletos
+# ==========================================
+*.orig
+*.old
+*-backup
+*-bak
+*-anterior
+*-nuevo
+*-OLD
+*-NEW
 ._*
 .Spotlight-V100
 .Trashes

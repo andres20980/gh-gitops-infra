@@ -6,7 +6,7 @@
 
 # Variables de configuración de logging
 NIVEL_LOG=${NIVEL_LOG:-"INFO"}
-ARCHIVO_LOG="${ARCHIVO_LOG:-/tmp/bootstrap-gitops.log}"
+ARCHIVO_LOG="${ARCHIVO_LOG:-/tmp/instalador-gitops.log}"
 LOG_CON_TIMESTAMP=${LOG_CON_TIMESTAMP:-true}
 LOG_CON_COLOR=${LOG_CON_COLOR:-true}
 
@@ -278,7 +278,7 @@ log_system_status() { log_estado_sistema "$@"; }
 # Función para configurar logging
 configurar_logging() {
     local nivel=${1:-"INFO"}
-    local archivo=${2:-"/tmp/bootstrap-gitops.log"}
+    local archivo=${2:-"/tmp/instalador-gitops.log"}
     local con_timestamp=${3:-true}
     local con_color=${4:-true}
     

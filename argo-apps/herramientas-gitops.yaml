@@ -1,16 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: gitops-infra-app-of-apps
+  name: herramientas-gitops
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/name: herramientas-gitops
+    app.kubernetes.io/component: gitops-infrastructure
 spec:
   project: default
   source:
-    repoURL: https://github.com/andres20980/gh-gitops-infra.git
+    repoURL: https://github.com/asanchez-dev/gh-gitops-infra
     targetRevision: HEAD
-    path: componentes
+    path: herramientas-gitops
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -20,3 +21,5 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true

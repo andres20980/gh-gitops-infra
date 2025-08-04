@@ -1,197 +1,359 @@
-# Scripts de Gestión GitOps
+# 🔧 Scripts Hipermodulares GitOps
 
-Esta carpeta contiene scripts de utilidad para la gestión y mantenimiento de la infraestructura GitOps.
+> **Sistema de scripts modular organizados jerárquicamente** para la gestión completa de infraestructura GitOps en español.
 
-## 📋 Scripts Disponibles
+## 📂 **Organización Modular**
 
-### 🚀 `deploy-with-dependencies.sh`
-Despliega aplicaciones respetando las dependencias entre componentes.
-
-**Uso:**
-```bash
-./scripts/deploy-with-dependencies.sh [aplicacion]
+```
+📁 scripts/
+├── 📚 bibliotecas/                     # Librerías fundamentales (6)
+├── 🧠 nucleo/                          # Orquestador principal (1)
+├── ⚙️ instaladores/                    # Instaladores especializados (1)
+├── 🎯 argocd/                          # Bootstrap GitOps (3)
+└── 🔨 utilidades/                      # Utilidades de gestión (3)
 ```
 
-**Funcionalidad:**
-- Verifica dependencias antes del despliegue
-- Garantiza orden correcto de instalación
-- Manejo de errores y rollback automático
+## 📚 **Bibliotecas Fundamentales**
 
-### 🔍 `diagnostico-gitops.sh`
-Ejecuta un diagnóstico completo del estado de la infraestructura GitOps.
-
-**Uso:**
+### **base.sh**
+Configuración global y variables del proyecto
 ```bash
-./scripts/diagnostico-gitops.sh
+source scripts/bibliotecas/base.sh
+
+# Funciones disponibles:
+configurar_entorno_base()              # Setup inicial
+obtener_ruta_proyecto()                # Ruta del proyecto
+configurar_variables_globales()        # Variables del sistema
 ```
 
-**Verifica:**
-- Estado de todas las aplicaciones ArgoCD
-- Conectividad entre componentes
-- Recursos disponibles en el cluster
-- Configuraciones críticas
-
-### 🔧 `fix-chart-versions.sh`
-Corrige y actualiza las versiones de los charts Helm automáticamente.
-
-**Uso:**
+### **logging.sh**
+Sistema de logging avanzado multi-nivel
 ```bash
-./scripts/fix-chart-versions.sh
+source scripts/bibliotecas/logging.sh
+
+# Uso básico:
+log_info "Mensaje informativo"
+log_warn "Advertencia del sistema"
+log_error "Error crítico"
+log_debug "Información de debugging"
 ```
 
-**Funciones:**
-- Detecta versiones desactualizadas
-- Actualiza a versiones estables más recientes
-- Valida compatibilidad entre componentes
-- Genera backup antes de cambios
-
-### 🌐 `setup-port-forwards.sh`
-Configura port-forwards para acceder a las interfaces web de todos los componentes.
-
-**Uso:**
+### **validacion.sh**
+Validación de prerequisitos del sistema
 ```bash
-./scripts/setup-port-forwards.sh
+source scripts/bibliotecas/validacion.sh
+
+# Validaciones principales:
+validar_sistema()                      # Validación completa
+validar_recursos()                     # RAM, CPU, disco
+validar_permisos()                     # sudo, docker group
+validar_conectividad()                 # Red e internet
 ```
 
-**Puertos configurados:**
-- ArgoCD: `http://localhost:8080`
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Kargo: `http://localhost:8081` (SUPER IMPORTANTE)
-- Jaeger: `http://localhost:16686`
-- Y otros componentes...
-
-### 🔄 `sync-all-apps.sh`
-Sincroniza todas las aplicaciones ArgoCD de forma ordenada.
-
-**Uso:**
+### **versiones.sh**
+Gestión automática de versiones compatibles
 ```bash
-./scripts/sync-all-apps.sh [--force]
+source scripts/bibliotecas/versiones.sh
+
+# Gestión de versiones:
+obtener_version_kubernetes_estable()   # K8s compatible con minikube
+obtener_version_helm_compatible()      # Helm v3 estable
+verificar_compatibilidad_versiones()   # Cross-validation
 ```
 
-**Opciones:**
-- `--force`: Fuerza la sincronización incluso con conflictos
-- Sin parámetros: Sincronización estándar respetando políticas
-
-## 🛠️ Uso Común
-
-### Instalación Completa
+### **comun.sh**
+Funciones compartidas entre módulos
 ```bash
-# 1. Instalar toda la infraestructura
-./instalar-todo.sh
+source scripts/bibliotecas/comun.sh
 
-# 2. Verificar estado
-./scripts/diagnostico-gitops.sh
-
-# 3. Configurar accesos web
-./scripts/setup-port-forwards.sh
+# Utilidades comunes:
+mostrar_banner()                       # Banner del proyecto
+confirmar_accion()                     # Confirmación interactiva
+verificar_comando()                    # Verificar si comando existe
 ```
 
-### Mantenimiento Diario
+### **registro.sh**
+Sistema de registro de operaciones
 ```bash
-# Verificar estado
-./scripts/diagnostico-gitops.sh
+source scripts/bibliotecas/registro.sh
 
-# Sincronizar si es necesario
-./scripts/sync-all-apps.sh
-
-# Actualizar versiones si hay disponibles
-./scripts/fix-chart-versions.sh
+# Registro de operaciones:
+registrar_inicio_operacion()          # Log inicio
+registrar_fin_operacion()             # Log finalización
+obtener_resumen_operaciones()         # Resumen del proceso
 ```
 
-### Resolución de Problemas
+## 🧠 **Núcleo Orquestador**
+
+### **orchestrador.sh**
+Motor de 7 fases para instalación completa
 ```bash
-# 1. Diagnóstico completo
-./scripts/diagnostico-gitops.sh
+# Ejecución desde instalador.sh:
+source scripts/nucleo/orchestrador.sh
+ejecutar_orquestacion_completa
 
-# 2. Sincronización forzada si es necesario
-./scripts/sync-all-apps.sh --force
-
-# 3. Verificar con port-forwards
-./scripts/setup-port-forwards.sh
+# Fases ejecutadas:
+# FASE 1: Validación del sistema
+# FASE 2: Instalación de dependencias
+# FASE 3: Creación del cluster
+# FASE 4: Instalación GitOps
+# FASE 5: Despliegue de componentes
+# FASE 6: Clusters adicionales
+# FASE 7: Verificación final
 ```
 
-## 📝 Notas Importantes
+## ⚙️ **Instaladores Especializados**
 
-### Permisos
-Todos los scripts requieren permisos de ejecución:
+### **dependencias.sh**
+Instalador de dependencias del sistema
 ```bash
-chmod +x scripts/*.sh
+# Uso directo:
+scripts/instaladores/dependencias.sh
+
+# Dependencias gestionadas:
+- Docker Engine
+- Minikube
+- kubectl (compatible)
+- Helm v3
+- ArgoCD CLI
+
+# Funciones disponibles:
+instalar_docker()
+instalar_minikube()
+instalar_kubectl()
+instalar_helm()
+instalar_argocd_cli()
 ```
 
-### Dependencias
-Los scripts asumen que tienes instalado:
-- `kubectl` configurado correctamente
-- `helm` (para algunos scripts)
-- `jq` (para procesamiento JSON)
-- `curl` (para verificaciones HTTP)
+## 🛠️ **Herramientas GitOps**
 
-### Variables de Entorno
-Algunos scripts pueden usar estas variables:
+### **argocd.sh**
+Instalador y configurador de ArgoCD
 ```bash
-export KUBECONFIG=/path/to/your/kubeconfig
-export ARGOCD_NAMESPACE=argocd
-export KARGO_NAMESPACE=kargo-system
+# Ejecución:
+scripts/herramientas-gitops/argocd.sh
+
+# Funcionalidades:
+- Instalación de ArgoCD core
+- Configuración de CLI
+- Setup de port-forwarding
+- Configuración de App-of-Apps
 ```
 
-## 🔒 Seguridad
-
-### Credenciales
-Los scripts pueden mostrar información sensible. En entornos de producción:
-- Revisa logs antes de compartir
-- No ejecutes con logging verbose en entornos compartidos
-- Usa credenciales específicas por entorno
-
-### Ejecución
-- Ejecuta siempre desde la raíz del proyecto
-- Verifica el contexto de kubectl antes de ejecutar
-- Usa `--dry-run` cuando esté disponible para validar cambios
-
-## 🐛 Resolución de Problemas
-
-### Errores Comunes
-
-**Error: "kubectl not found"**
+### **kargo.sh**
+Instalador de Kargo para promoción de entornos
 ```bash
-# Instalar kubectl
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-chmod +x kubectl
-sudo mv kubectl /usr/local/bin/
+# Ejecución:
+scripts/herramientas-gitops/kargo.sh
+
+# Funcionalidades:
+- Instalación de Kargo
+- Configuración de pipelines
+- Setup de promoción automática
 ```
 
-**Error: "No context configured"**
-```bash
-# Verificar contexto
-kubectl config current-context
+## 🔧 **Módulos Funcionales**
 
-# Configurar si es necesario
-kubectl config use-context [tu-contexto]
+### **cluster.sh**
+Gestión completa de clusters Kubernetes
+```bash
+# Uso directo:
+scripts/modulos/cluster.sh crear_cluster "gitops-dev"
+
+# Funciones principales:
+crear_cluster()                        # Crear cluster minikube
+configurar_cluster()                   # Post-configuración
+habilitar_addons()                     # metrics-server, dashboard
+crear_clusters_adicionales()           # Pre/Pro clusters
 ```
 
-**Error: "Permission denied"**
+### **argocd-modular.sh**
+ArgoCD modular con App-of-Apps
 ```bash
-# Dar permisos de ejecución
-chmod +x scripts/*.sh
+# Uso desde orquestador:
+scripts/modulos/argocd-modular.sh
+
+# Funcionalidades:
+- Setup de App-of-Apps jerárquico
+- Configuración de ApplicationSets
+- Gestión de sincronización automática
 ```
 
-### Logs y Debug
-Para debug detallado, ejecuta los scripts con:
+## 🔨 **Utilidades de Gestión**
+
+### **configuracion.sh**
+Configuración inicial y personalización
 ```bash
-bash -x scripts/[script-name].sh
+# Uso directo:
+./scripts/utilidades/configuracion.sh
+
+# Opciones disponibles:
+--inicial                              # Configuración completa inicial
+--dashboard                            # Solo configuración de dashboards
+--port-forwarding                      # Solo port-forwarding
+--backup                               # Backup de configuraciones
+--restaurar [archivo]                  # Restaurar desde backup
 ```
 
-## 📚 Documentación Adicional
+### **diagnosticos.sh**
+Sistema de diagnósticos y verificación
+```bash
+# Uso directo:
+./scripts/utilidades/diagnosticos.sh
 
-- [README.md principal](../README.md) - Documentación completa del proyecto
-- [STATUS.md](../STATUS.md) - Estado actual de componentes
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Guía de contribución
-- [CHANGELOG.md](../CHANGELOG.md) - Historial de cambios
+# Opciones de diagnóstico:
+--rapido                               # Verificación básica (2-3 min)
+--completo                             # Análisis exhaustivo (5-10 min)
+--recursos                             # Solo uso de recursos
+--conectividad                         # Solo conectividad de servicios
+--logs [servicio]                      # Logs específicos
+--reporte                              # Generar reporte completo
+```
+
+### **mantenimiento.sh**
+Mantenimiento automático del sistema
+```bash
+# Uso directo:
+./scripts/utilidades/mantenimiento.sh
+
+# Tareas de mantenimiento:
+--limpiar                              # Limpieza general del sistema
+--actualizar                           # Actualización de componentes
+--optimizar                            # Optimización de recursos
+--rotar-logs                           # Rotación de logs
+--backup-automatico                    # Backup automático
+--verificar-salud                      # Verificación de salud
+```
+
+## 🔄 **Flujo de Ejecución Típico**
+
+### **1. Instalación Completa**
+```bash
+# Desde el instalador principal:
+sudo ./instalador.sh
+
+# Esto ejecuta internamente:
+source scripts/bibliotecas/*.sh       # Carga bibliotecas
+scripts/nucleo/orchestrador.sh        # Ejecuta 7 fases
+```
+
+### **2. Uso Individual de Módulos**
+```bash
+# Crear solo un cluster:
+scripts/modulos/cluster.sh crear_cluster "mi-cluster"
+
+# Solo diagnósticos:
+scripts/utilidades/diagnosticos.sh --completo
+
+# Solo mantenimiento:
+scripts/utilidades/mantenimiento.sh --limpiar
+```
+
+### **3. Personalización Avanzada**
+```bash
+# Configuración personalizada:
+scripts/utilidades/configuracion.sh --inicial
+
+# Instalación de dependencias específicas:
+scripts/instaladores/dependencias.sh instalar_helm
+
+# ArgoCD standalone:
+scripts/herramientas-gitops/argocd.sh
+```
+
+## 📋 **Convenciones de Código**
+
+### **Nomenclatura en Español**
+```bash
+# Variables
+CLUSTER_PRINCIPAL="gitops-dev"
+RUTA_CONFIGURACION="/tmp/gitops-config"
+ARCHIVO_LOG="instalacion.log"
+
+# Funciones
+configurar_entorno()
+validar_prerequisitos()
+instalar_dependencia()
+```
+
+### **Estructura de Funciones**
+```bash
+function nombre_funcion() {
+    # Descripción de la función
+    local parametro_local="$1"
+    
+    log_info "Iniciando ${FUNCNAME[0]}"
+    
+    # Validación de parámetros
+    [ -z "$parametro_local" ] && {
+        log_error "Parámetro requerido no proporcionado"
+        return 1
+    }
+    
+    # Lógica principal
+    # ...
+    
+    log_info "Completado ${FUNCNAME[0]}"
+    return 0
+}
+```
+
+### **Gestión de Errores**
+```bash
+# Cada función debe manejar errores:
+comando_critico || {
+    log_error "Fallo en comando crítico"
+    return 1
+}
+
+# Verificación de prerequisitos:
+command -v docker >/dev/null 2>&1 || {
+    log_warn "Docker no encontrado, instalando..."
+    instalar_docker
+}
+```
+
+## 🧪 **Testing de Módulos**
+
+### **Validación Individual**
+```bash
+# Test de un módulo específico:
+scripts/modulos/cluster.sh --test
+
+# Test de biblioteca:
+source scripts/bibliotecas/validacion.sh
+validar_sistema --dry-run
+```
+
+### **Testing Completo**
+```bash
+# Desde el directorio principal:
+./instalador.sh --test-modules
+
+# Esto valida todos los módulos sin ejecutar
+```
+
+## 📞 **Soporte y Debugging**
+
+### **Logs Detallados**
+```bash
+# Habilitar debugging:
+export GITOPS_DEBUG=true
+./instalador.sh
+
+# Logs se guardan en:
+logs/instalacion-$(date +%Y%m%d).log
+```
+
+### **Debugging de Módulos**
+```bash
+# Debug de módulo específico:
+bash -x scripts/modulos/cluster.sh crear_cluster "test"
+
+# Verificar bibliotecas cargadas:
+scripts/utilidades/diagnosticos.sh --modulos
+```
 
 ---
 
-**💡 Tip**: Para un uso eficiente, crea aliases para los scripts más usados:
-```bash
-alias gitops-diag='./scripts/diagnostico-gitops.sh'
-alias gitops-sync='./scripts/sync-all-apps.sh'
-alias gitops-ports='./scripts/setup-port-forwards.sh'
-```
+> **Estos scripts representan la base de la arquitectura hipermodular GitOps, diseñados para máxima flexibilidad, mantenibilidad y facilidad de uso en español.**

@@ -2,8 +2,41 @@
 
 Todos los cambios notables de este proyecto se documentarán en este archivo.
 
-El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-y este proyecto se adhiere al [Versionado Semántico](https://semver.org/spec/v2.0.0.html).
+El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
+y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
+
+## [3.0.0] - 2025-08-04
+
+### 🆕 Añadido
+- **🏗️ Arquitectura Hipermodular Completa** - Separación radical de responsabilidades
+- **🇪🇸 Documentación 100% en Español** - Coherencia total del proyecto
+- **📦 App-of-Apps por Fases** - Despliegue ordenado de herramientas GitOps (6 fases)
+- **🔧 3 Utilidades de Gestión** - configuracion.sh, diagnosticos.sh, mantenimiento.sh
+- **📚 6 Bibliotecas Fundamentales** - base.sh, logging.sh, validacion.sh, versiones.sh, comun.sh, registro.sh
+- **🎯 Instalador Único** - instalador.sh como punto de entrada autónomo
+- **📊 Métricas-Server Automático** - Habilitación automática en todos los clusters
+- **🌍 Multi-Entorno** - Soporte para gitops-dev, gitops-pre, gitops-pro
+
+### 🔄 Cambiado
+- **📁 Reorganización Completa** - Estructura GitOps estándar con argo-apps/
+- **🗂️ Limpieza de Repositorio** - Eliminación de duplicados y archivos obsoletos
+- **📖 Documentación Optimizada** - README principal, guías técnicas, arquitectura
+- **🔧 Scripts Modulares** - Cada módulo con responsabilidad específica
+- **🎨 Nomenclatura Española** - Variables, funciones y directorios en español
+
+### 🗑️ Eliminado
+- **📂 Directorio componentes/** - Consolidado en herramientas-gitops/
+- **📄 Archivos duplicados** - READMEs obsoletos, documentos repetidos
+- **🔧 Scripts monolíticos** - Reemplazados por arquitectura hipermodular
+- **🌐 Nomenclatura mixta** - Todo unificado en español
+
+### 🔧 Corregido
+- **⚙️ Compatibilidad Kubernetes** - Versión 'stable' compatible con minikube
+- **🐛 Dependencias de Instalación** - Orden correcto de instalación
+- **📊 Recursos del Sistema** - Validación mejorada de RAM, CPU, disco
+- **🔄 Sincronización ArgoCD** - App-of-Apps con dependencias ordenadas
+
+---
 
 ## [2.2.0] - 2025-08-01
 

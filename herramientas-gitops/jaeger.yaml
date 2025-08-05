@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: jaeger
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
@@ -11,51 +13,54 @@ spec:
     targetRevision: 3.4.1
     helm:
       values: |
-        # Use all-in-one deployment for simplicity
+        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
+        
+        # All-in-one deployment para desarrollo
         allInOne:
           enabled: true
-          replicas: 1
-          args:
-            - --memory.max-traces=10000
-            - --log-level=info
           resources:
             limits:
               cpu: 100m
-              memory: 256Mi
+              memory: 128Mi
             requests:
               cpu: 50m
-              memory: 128Mi
+              memory: 64Mi
+          
+          securityContext:
+            runAsUser: 10001
+            runAsNonRoot: true
+          
           ingress:
-            enabled: false
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - host: jaeger.local
+                paths:
+                  - path: /
+                    pathType: Prefix
+          
+          # Configuración de memoria para desarrollo
+          args:
+            - --memory.max-traces=10000
         
-        # Use memory storage (no persistence needed for demo)
-        storage:
-          type: memory
-        
-        # Disable data store provisioning since we use memory
-        provisionDataStore:
-          cassandra: false
-          elasticsearch: false
-          kafka: false
-        
-        # Metrics deshabilitadas para desarrollo
-        hotrod:
-          enabled: false
-        
-        # Disable other components since all-in-one includes everything
+        # Deshabilitar componentes separados
         agent:
           enabled: false
         collector:
           enabled: false
         query:
           enabled: false
+        
+        # Storage en memoria para desarrollo
+        storage:
+          type: memory
+          
   destination:
     server: https://kubernetes.default.svc
-    namespace: monitoring
+    namespace: observability
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-      - PruneLast=true
+    - CreateNamespace=true

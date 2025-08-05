@@ -3,52 +3,55 @@ kind: Application
 metadata:
   name: argo-workflows
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-workflows
-    targetRevision: 0.45.21  # Chart version correcta (app version v3.7.0)
+    targetRevision: 0.45.21
     helm:
       values: |
-        # CONFIGURACIÓN MÍNIMA PARA DEV
-        server:
-          enabled: true
-          serviceType: ClusterIP
-          servicePort: 2746
+        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
+        
+        controller:
+          replicas: 1
           resources:
             limits:
-              cpu: 200m
-              memory: 256Mi
+              cpu: 100m
+              memory: 128Mi
             requests:
               cpu: 50m
               memory: 64Mi
-          # Sin autenticación para desarrollo
-          extraArgs:
-          - --auth-mode=server
-          - --secure=false
+          
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 8737
+          
+          metricsConfig:
+            enabled: false
         
-        controller:
+        server:
           enabled: true
           replicas: 1
           resources:
             limits:
-              cpu: 200m
-              memory: 256Mi
+              cpu: 100m
+              memory: 128Mi
             requests:
               cpu: 50m
               memory: 64Mi
-          # Solo namespace propio para dev
-          workflowNamespaces:
-          - argo-workflows
-        
-        # Configuración simple sin persistencia de artefactos
-        useDefaultArtifactRepo: false
-        useStaticCredentials: false
-        
-        # Deshabilitar artefactos S3 para dev
-        artifactRepository: {}
-        
+          
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - host: argo-workflows.local
+                paths:
+                  - path: /
+                    pathType: Prefix
+          
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-workflows
@@ -57,6 +60,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-      - Replace=true
-      - SkipDryRunOnMissingResource=true
+    - CreateNamespace=true

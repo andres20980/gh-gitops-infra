@@ -3,39 +3,21 @@ kind: Application
 metadata:
   name: grafana
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
     repoURL: https://grafana.github.io/helm-charts
     chart: grafana
-    targetRevision: 9.3.0
+    targetRevision: 9.3.1
     helm:
       values: |
-        # Configuración para acceso COMPLETAMENTE anónimo (sin login)
-        grafana.ini:
-          auth.anonymous:
-            enabled: true
-            org_name: "Organización Principal"
-            org_role: Admin
-            hide_version: false
-          auth:
-            disable_login_form: true
-            disable_signout_menu: true
-          security:
-            allow_embedding: true
-            disable_initial_admin_creation: true
-          users:
-            allow_sign_up: false
-            allow_org_create: false
-            viewers_can_edit: true
-          dashboards:
-            default_home_dashboard_path: ""
+        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         
-        # Sin persistencia para desarrollo
-        persistence:
-          enabled: false
+        adminUser: admin
+        adminPassword: admin123
         
-        # Recursos mínimos para desarrollo
         resources:
           limits:
             cpu: 200m
@@ -44,49 +26,54 @@ spec:
             cpu: 100m
             memory: 128Mi
         
-        # ServiceMonitor deshabilitado
-        serviceMonitor:
-          enabled: false
+        persistence:
+          enabled: true
+          size: 1Gi
         
-        # Fuentes de datos
+        service:
+          type: ClusterIP
+          port: 80
+        
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            - grafana.local
+        
         datasources:
           datasources.yaml:
             apiVersion: 1
             datasources:
             - name: Prometheus
               type: prometheus
-              url: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
-              isDefault: true
+              url: http://prometheus-stack-kube-prom-prometheus:9090
               access: proxy
+              isDefault: true
             - name: Loki
               type: loki
-              url: http://loki-gateway.monitoring.svc.cluster.local
+              url: http://loki:3100
               access: proxy
         
-        # Proveedores de dashboards
-        dashboardProviders:
-          dashboardproviders.yaml:
-            apiVersion: 1
-            providers:
-            - name: 'default'
-              orgId: 1
-              folder: ''
-              type: file
-              disableDeletion: false
-              editable: true
-              options:
-                path: /var/lib/grafana/dashboards/default
+        dashboards:
+          default:
+            kubernetes-cluster-monitoring:
+              gnetId: 7249
+              revision: 1
+              datasource: Prometheus
         
-        # Servicio
-        service:
-          type: ClusterIP
-          port: 80
-          
+        grafana.ini:
+          server:
+            root_url: http://grafana.local
+          auth.anonymous:
+            enabled: true
+            org_role: Viewer
+            
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
   syncPolicy:
     automated:
       prune: true
+      selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+    - CreateNamespace=true

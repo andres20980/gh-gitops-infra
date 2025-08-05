@@ -3,16 +3,21 @@ kind: Application
 metadata:
   name: prometheus-stack
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack
-    targetRevision: 75.15.1
+    targetRevision: 75.15.2
     helm:
-      # Pass all our collected fixes as values
       values: |
-        # Configuración simplificada para desarrollo
+        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
+        
+        grafana:
+          enabled: false  # Tenemos instancia separada
+          
         prometheus:
           prometheusSpec:
             resources:
@@ -23,9 +28,17 @@ spec:
                 cpu: 200m
                 memory: 512Mi
             retention: 7d
-            retentionSize: 1GB
+            retentionSize: 2GB
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 5Gi
+            scrapeInterval: 60s
+            evaluationInterval: 60s
             
-        # AlertManager simplificado
         alertmanager:
           alertmanagerSpec:
             resources:
@@ -35,14 +48,26 @@ spec:
               requests:
                 cpu: 50m
                 memory: 64Mi
-                
-        # Grafana simplificado (aunque ya tenemos grafana separado)
-        grafana:
-          enabled: false
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 1Gi
+        
+        nodeExporter:
+          enabled: true
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
           
-        # Node exporter optimizado
-        prometheus-node-exporter:
-          hostPort: 9101
+        kubeStateMetrics:
+          enabled: true
           resources:
             limits:
               cpu: 100m
@@ -51,15 +76,31 @@ spec:
               cpu: 50m
               memory: 64Mi
               
-        # Kube State Metrics optimizado
-        kube-state-metrics:
+        prometheusOperator:
           resources:
             limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
               cpu: 100m
               memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
+        
+        # Componentes mínimos
+        coreDns:
+          enabled: true
+        kubeDns:
+          enabled: false
+        kubeApiServer:
+          enabled: true
+        kubeControllerManager:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeProxy:
+          enabled: false
+        kubeEtcd:
+          enabled: false
+          
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
@@ -67,7 +108,6 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    # Use ServerSideApply to handle large CRDs correctly
     syncOptions:
     - CreateNamespace=true
     - ServerSideApply=true

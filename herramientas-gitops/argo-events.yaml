@@ -3,44 +3,35 @@ kind: Application
 metadata:
   name: argo-events
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
     repoURL: https://argoproj.github.io/argo-helm
-    targetRevision: 2.4.8
     chart: argo-events
+    targetRevision: 2.4.16
     helm:
       values: |
-        # CONFIGURACIÓN MÍNIMA PARA DEV - Single replica
-        controller:
-          enabled: true
-          replicas: 1
-          resources:
-            limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
+        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         
-        # Webhook simplificado
-        webhook:
-          enabled: true
+        controller:
+          replicaCount: 1
           resources:
             limits:
               cpu: 100m
               memory: 128Mi
             requests:
-              cpu: 25m
-              memory: 32Mi
-        
-        # Deshabilitar métricas para dev
-        serviceMonitor:
-          enabled: false
+              cpu: 50m
+              memory: 64Mi
           
-        # Deshabilitar RBAC cluster-wide para dev
-        createAggregateRoles: false
-        
+          metrics:
+            enabled: false
+          
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 9731
+            
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-events
@@ -49,6 +40,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-      - Replace=true
-      - SkipDryRunOnMissingResource=true
+    - CreateNamespace=true

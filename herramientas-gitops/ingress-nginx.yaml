@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: ingress-nginx
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
@@ -11,21 +13,10 @@ spec:
     targetRevision: 4.13.0
     helm:
       values: |
+        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
+        
         controller:
-          service:
-            type: NodePort
-            nodePorts:
-              http: 30080
-              https: 30443
-          # Enable for minikube
-          hostPort:
-            enabled: false
-          # Metrics deshabilitadas para desarrollo
-          metrics:
-            enabled: false
-            serviceMonitor:
-              enabled: false
-          # Recursos mínimos para desarrollo
+          replicaCount: 1
           resources:
             limits:
               cpu: 200m
@@ -33,26 +24,47 @@ spec:
             requests:
               cpu: 100m
               memory: 128Mi
-          # Additional configuration for development
+          
+          service:
+            type: NodePort
+            ports:
+              http: 80
+              https: 443
+            nodePorts:
+              http: 30080
+              https: 30443
+          
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+          
           config:
-            use-forwarded-headers: "true"
-            compute-full-forwarded-for: "true"
-        
-        # Default backend simplificado
-        defaultBackend:
+            log-format-upstream: '$remote_addr - $request - $status'
+            worker-processes: "1"
+            worker-connections: "1024"
+            
+        admissionWebhooks:
           enabled: true
-          resources:
-            limits:
-              cpu: 50m
-              memory: 64Mi
-            requests:
-              cpu: 25m
-              memory: 32Mi
+          patch:
+            enabled: true
+            resources:
+              limits:
+                cpu: 50m
+                memory: 64Mi
+              requests:
+                cpu: 25m
+                memory: 32Mi
+        
+        defaultBackend:
+          enabled: false
+          
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx
   syncPolicy:
     automated:
       prune: true
+      selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+    - CreateNamespace=true

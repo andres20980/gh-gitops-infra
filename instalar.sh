@@ -414,10 +414,54 @@ actualizar_y_desplegar_herramientas() {
     fi
     
     # ========================================================================
+    # 2.1. COMMIT Y PUSH AUTOMÁTICO DE CAMBIOS
+    # ========================================================================
+    log_info "📡 Commiteando y pusheando cambios para ArgoCD..."
+    
+    if es_dry_run; then
+        log_info "[DRY-RUN] Ejecutaría commit y push de cambios optimizados"
+    else
+        # Verificar si hay cambios
+        if git diff --quiet && git diff --cached --quiet; then
+            log_info "ℹ️ No hay cambios para commitear"
+        else
+            # Agregar todos los cambios
+            git add herramientas-gitops/ argo-apps/
+            
+            # Commit con mensaje descriptivo
+            local commit_msg="🔧 Auto-optimización GitOps: actualización de herramientas y configuraciones
+
+- Optimización de 13 herramientas GitOps con mejores prácticas
+- Actualización de versiones de Helm charts
+- Configuraciones mínimas para desarrollo
+- Generado automáticamente por instalar.sh"
+
+            git commit -m "$commit_msg"
+            
+            # Push a GitHub
+            if git push origin main; then
+                log_success "✅ Cambios pusheados a GitHub - ArgoCD puede sincronizar"
+                # Dar tiempo a ArgoCD para detectar cambios en GitHub
+                log_info "⏳ Esperando que ArgoCD detecte cambios en GitHub..."
+                sleep 15
+            else
+                log_warning "⚠️ Error pusheando a GitHub - ArgoCD podría no sincronizar correctamente"
+                log_info "💡 Puedes hacer push manual después: git push origin main"
+            fi
+        fi
+    fi
+    
+    # ========================================================================
     # 3. DESPLEGAR HERRAMIENTAS VIA ARGOCD
     # ========================================================================
-    log_info "🚀 Desplegando herramientas GitOps via ArgoCD..."
-    kubectl apply -f herramientas-gitops/app-of-apps.yaml
+    log_info "🚀 Desplegando herramientas GitOps..."
+    kubectl apply -f argo-apps/app-of-tools-gitops.yaml
+    
+    log_info "⏳ Esperando que ArgoCD sincronice las herramientas..."
+    sleep 10
+    
+    log_info "🔧 Desplegando ApplicationSet para aplicaciones custom..."
+    kubectl apply -f argo-apps/appset-aplicaciones-custom.yaml
     
     # Esperar a que todas las aplicaciones estén synced
     log_info "⏳ Esperando que todas las herramientas estén synced y healthy..."
@@ -484,8 +528,8 @@ desplegar_aplicaciones_custom() {
         return 0
     fi
     
-    # Aplicar app-of-apps para aplicaciones
-    kubectl apply -f argo-apps/app-of-apps.yaml
+    # Aplicar ApplicationSet para aplicaciones custom
+    kubectl apply -f argo-apps/appset-aplicaciones-custom.yaml
     
     # Esperar a que estén synced
     log_info "⏳ Esperando que aplicaciones custom estén synced..."

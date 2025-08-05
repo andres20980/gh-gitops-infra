@@ -8,88 +8,69 @@ metadata:
 spec:
   project: default
   source:
-    # Repositorio Git directo desde GitHub
+    # Usando repositorio Git directo con chart oficial
     repoURL: https://github.com/akuity/kargo.git
     targetRevision: v1.6.2
     path: charts/kargo
     helm:
-      parameters:
-        - name: api.enabled
-          value: "true"
-        - name: api.replicas
-          value: "1"
-        - name: api.resources.requests.memory
-          value: "128Mi"
-        - name: api.resources.requests.cpu
-          value: "100m"
-        - name: api.resources.limits.memory
-          value: "256Mi"
-        - name: api.resources.limits.cpu
-          value: "200m"
-        - name: controller.enabled
-          value: "true"
-        - name: controller.replicas
-          value: "1"
-        - name: controller.resources.requests.memory
-          value: "128Mi"
-        - name: controller.resources.requests.cpu
-          value: "100m"
-        - name: controller.resources.limits.memory
-          value: "256Mi"
-        - name: controller.resources.limits.cpu
-          value: "200m"
-        - name: managementController.enabled
-          value: "true"
-        - name: managementController.replicas
-          value: "1"
-        - name: managementController.resources.requests.memory
-          value: "128Mi"
-        - name: managementController.resources.requests.cpu
-          value: "100m"
-        - name: managementController.resources.limits.memory
-          value: "256Mi"
-        - name: managementController.resources.limits.cpu
-          value: "200m"
-        - name: webhooksServer.enabled
-          value: "true"
-        - name: webhooksServer.replicas
-          value: "1"
-        - name: webhooksServer.resources.requests.memory
-          value: "64Mi"
-        - name: webhooksServer.resources.requests.cpu
-          value: "50m"
-        - name: webhooksServer.resources.limits.memory
-          value: "128Mi"
-        - name: webhooksServer.resources.limits.cpu
-          value: "100m"
-        - name: garbageCollector.enabled
-          value: "true"
-        - name: garbageCollector.replicas
-          value: "1"
-        - name: garbageCollector.resources.requests.memory
-          value: "64Mi"
-        - name: garbageCollector.resources.requests.cpu
-          value: "50m"
-        - name: garbageCollector.resources.limits.memory
-          value: "128Mi"
-        - name: garbageCollector.resources.limits.cpu
-          value: "100m"
-        - name: image.tag
-          value: "v1.6.2"
-        - name: controller.argocd.namespace
-          value: "argocd"
-        - name: api.adminAccount.enabled
-          value: "true"
-        - name: api.adminAccount.passwordHash
-          value: "$2a$10$5LZHS0xL0lUEE2Rp6gJ1LO6zBN80JSXbTQ8P7VzpAdIe7w.e8vJeK"
-        - name: api.adminAccount.tokenSigningKey
-          value: "iwishtowashmyirishwristwatch"
+      values: |
+        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
+        
+        # API Server
+        api:
+          enabled: true
+          replicas: 1
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          
+          service:
+            type: ClusterIP
+            port: 80
+          
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - host: kargo.local
+                paths:
+                  - path: /
+                    pathType: Prefix
+        
+        # Controller
+        controller:
+          enabled: true
+          replicas: 1
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+        
+        # Webhook
+        webhook:
+          enabled: true
+          replicas: 1
+          resources:
+            limits:
+              cpu: 50m
+              memory: 64Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+          
   destination:
     server: https://kubernetes.default.svc
-    namespace: kargo-system
+    namespace: kargo
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+    - CreateNamespace=true

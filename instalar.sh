@@ -65,6 +65,7 @@ export INTERACTIVE="${INTERACTIVE:-false}"  # NO INTERACTIVO por defecto
 export DEBUG="${DEBUG:-false}"
 export SKIP_DEPS="${SKIP_DEPS:-false}"
 export SOLO_DEV="${SOLO_DEV:-false}"
+export FORCE="${FORCE:-false}"
 
 # Configuración del proceso GitOps (MÚLTIPLES CLUSTERS)
 export CLUSTER_DEV_NAME="${CLUSTER_DEV_NAME:-gitops-dev}"
@@ -107,6 +108,15 @@ export TIMEOUT_READY="${TIMEOUT_READY:-300}"
 export TIMEOUT_DELETE="${TIMEOUT_DELETE:-120}"
 
 # ============================================================================
+# FUNCIONES AUXILIARES
+# ============================================================================
+
+# Verificar si está en modo dry-run
+es_dry_run() {
+    [[ "$DRY_RUN" == "true" ]]
+}
+
+# ============================================================================
 # FUNCIONES DE CONFIGURACIÓN
 # ============================================================================
 
@@ -125,8 +135,9 @@ configurar_logging_instalador() {
     local nivel="${LOG_LEVEL:-INFO}"
     local archivo="${LOG_FILE:-/tmp/gitops-instalador-$(date +%Y%m%d-%H%M%S).log}"
     
-    # Configurar sistema de logging
-    configurar_logging "$nivel" "$archivo"
+    # Configurar variables de entorno para logging
+    export LOG_LEVEL="$nivel"
+    export LOG_FILE="$archivo"
     
     # Configurar debug si está habilitado
     if [[ "$DEBUG" == "true" ]]; then
@@ -246,13 +257,9 @@ ejecutar_instalacion_dependencias() {
         return 0
     fi
     
-    # Ejecutar con los mismos parámetros de verbosidad
-    local args=()
-    [[ "$VERBOSE" == "true" ]] && args+=("--verbose")
-    [[ "$DRY_RUN" == "true" ]] && args+=("--dry-run")
-    [[ "$FORCE" == "true" ]] && args+=("--force")
-    
-    if ! bash "$instalador_deps" "${args[@]}"; then
+    # Ejecutar instalación de dependencias sin parámetros adicionales
+    # (el script de dependencias no maneja parámetros de línea de comandos)
+    if ! bash "$instalador_deps"; then
         log_error "Error en la instalación de dependencias del sistema"
         return 1
     fi
@@ -604,11 +611,11 @@ EOF
 # Mostrar banner inicial mejorado
 mostrar_banner_inicial() {
     clear
-    mostrar_banner
+    log_section "🚀 GitOps España - Instalador v${SCRIPT_VERSION}"
     
     # Información adicional del sistema
     log_info "Sistema: $(uname -s) $(uname -m)"
-    log_info "Usuario: $(usuario_actual)"
+    log_info "Usuario: $(whoami)"
     if es_wsl; then
         log_info "Entorno: WSL detectado"
     fi

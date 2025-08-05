@@ -291,13 +291,26 @@ crear_cluster_gitops_dev() {
     
     # Crear cluster con capacidad completa
     log_info "🏗️ Creando cluster $CLUSTER_DEV_NAME..."
-    if ! minikube start \
-        --profile="$CLUSTER_DEV_NAME" \
-        --cpus="$CLUSTER_DEV_CPUS" \
-        --memory="$CLUSTER_DEV_MEMORY" \
-        --disk-size="$CLUSTER_DEV_DISK" \
-        --driver=docker \
-        --kubernetes-version=stable; then
+    
+    # Configurar argumentos según el usuario
+    local minikube_args=(
+        "--profile=$CLUSTER_DEV_NAME"
+        "--cpus=$CLUSTER_DEV_CPUS"
+        "--memory=$CLUSTER_DEV_MEMORY"
+        "--disk-size=$CLUSTER_DEV_DISK"
+        "--kubernetes-version=stable"
+    )
+    
+    # Detectar si se ejecuta como root y ajustar driver
+    if [[ "$EUID" -eq 0 ]]; then
+        log_warning "⚠️ Ejecutándose como root, usando driver 'none'"
+        minikube_args+=("--driver=none" "--force")
+    else
+        log_info "👤 Ejecutándose como usuario normal, usando driver 'docker'"
+        minikube_args+=("--driver=docker")
+    fi
+    
+    if ! minikube start "${minikube_args[@]}"; then
         log_error "Error creando cluster $CLUSTER_DEV_NAME"
         return 1
     fi
@@ -360,12 +373,49 @@ actualizar_y_desplegar_herramientas() {
     log_info "📊 Actualizando helm charts y desplegando herramientas GitOps..."
     
     if es_dry_run; then
+        log_info "[DRY-RUN] Ejecutaría optimización de herramientas"
         log_info "[DRY-RUN] Ejecutaría actualización de helm charts"
         log_info "[DRY-RUN] Ejecutaría despliegue de herramientas via ArgoCD"
         return 0
     fi
     
-    # Aplicar app-of-apps para herramientas
+    # ========================================================================
+    # 1. OPTIMIZAR CONFIGURACIONES DE HERRAMIENTAS
+    # ========================================================================
+    log_info "🔧 Optimizando configuraciones de herramientas GitOps para desarrollo..."
+    local optimizador_script="$COMUN_DIR/optimizar-dev.sh"
+    
+    if [[ -f "$optimizador_script" ]]; then
+        if "$optimizador_script" herramientas-gitops; then
+            log_success "✅ Herramientas optimizadas con configuraciones mínimas"
+        else
+            log_error "❌ Error optimizando herramientas GitOps"
+            return 1
+        fi
+    else
+        log_warning "⚠️ Script optimizador no encontrado: $optimizador_script"
+        log_info "Continuando con configuraciones por defecto..."
+    fi
+    
+    # ========================================================================
+    # 2. ACTUALIZAR HELM CHARTS
+    # ========================================================================
+    log_info "📊 Actualizando versiones de helm charts..."
+    local helm_updater_script="$COMUN_DIR/helm-updater.sh"
+    
+    if [[ -f "$helm_updater_script" ]]; then
+        if "$helm_updater_script" herramientas-gitops; then
+            log_success "✅ Helm charts actualizados a últimas versiones"
+        else
+            log_warning "⚠️ Error actualizando helm charts (continuando...)"
+        fi
+    else
+        log_info "ℹ️ Actualizador de helm charts no encontrado (usando versiones fijas)"
+    fi
+    
+    # ========================================================================
+    # 3. DESPLEGAR HERRAMIENTAS VIA ARGOCD
+    # ========================================================================
     log_info "🚀 Desplegando herramientas GitOps via ArgoCD..."
     kubectl apply -f herramientas-gitops/app-of-apps.yaml
     
@@ -739,9 +789,16 @@ main() {
     fi
     echo
     
-    # Mostrar versiones si está en modo debug
+    # Mostrar información adicional si está en modo debug
     if [[ "$DEBUG" == "true" ]]; then
-        show_all_versions
+        log_debug "=== INFORMACIÓN DEL SISTEMA ==="
+        log_debug "Usuario: $(whoami)"
+        log_debug "UID: $EUID"
+        log_debug "PWD: $PWD"
+        log_debug "Docker: $(command -v docker || echo 'No instalado')"
+        log_debug "Kubectl: $(command -v kubectl || echo 'No instalado')"
+        log_debug "Minikube: $(command -v minikube || echo 'No instalado')"
+        log_debug "Helm: $(command -v helm || echo 'No instalado')"
     fi
     
     # ========================================================================
@@ -794,14 +851,14 @@ main() {
     log_success "✅ FASE 3 completada: ArgoCD instalado y configurado"
     
     # ========================================================================
-    # FASE 4: ACTUALIZAR HELM CHARTS Y DESPLEGAR HERRAMIENTAS
+    # FASE 4: OPTIMIZAR Y DESPLEGAR HERRAMIENTAS GITOPS
     # ========================================================================
-    log_section "📊 FASE 4: Actualizar Helm Charts y Desplegar Herramientas GitOps"
+    log_section "📊 FASE 4: Optimizar Configuraciones y Desplegar Herramientas GitOps"
     if ! actualizar_y_desplegar_herramientas; then
         log_error "Error desplegando herramientas GitOps"
         exit 1
     fi
-    log_success "✅ FASE 4 completada: Todas las herramientas synced y healthy"
+    log_success "✅ FASE 4 completada: Herramientas optimizadas y desplegadas"
     
     # ========================================================================
     # FASE 5: VERIFICAR QUE TODO ESTÉ SYNCED Y HEALTHY

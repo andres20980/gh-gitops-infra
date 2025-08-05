@@ -393,6 +393,11 @@ main() {
             exit 1
         fi
         log_success "✅ FASE 2 completada: Dependencias actualizadas"
+        
+        # Si estamos como root después de instalar dependencias, cambiar a usuario normal para clusters
+        if [[ "$EUID" -eq 0 ]]; then
+            gestionar_permisos_inteligente "clusters"
+        fi
     else
         log_section "📦 FASE 2: Verificar Dependencias Críticas (--skip-deps)"
         if ! verificar_dependencias_criticas; then

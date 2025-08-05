@@ -1,0 +1,465 @@
+# ============================================================================
+# APLICACIÓN demo-backend - MANIFIESTOS GITOPS COMPLETOS
+# ============================================================================
+# Generado automáticamente con integración completa de herramientas GitOps:
+# • Argo Rollouts (progressive delivery)
+# • Prometheus + Grafana (monitoring & alerting)
+# • Jaeger (distributed tracing)
+# • Loki (log aggregation)
+# • External Secrets (secrets management)
+# • Cert Manager (TLS certificates)
+# • Argo Workflows (CI/CD)
+# • Kargo (promotion pipeline)
+# • Ingress NGINX (traffic routing)
+# ============================================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-project
+  labels:
+    name: demo-project
+    monitoring: enabled
+    logging: enabled
+    tracing: enabled
+    gitops: enabled
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: demo-backend
+  namespace: demo-project
+  labels:
+    app: demo-backend
+    deployment-strategy: progressive
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+      - setWeight: 20
+      - pause: {duration: 30s}
+      - setWeight: 50
+      - pause: {duration: 30s}
+      - setWeight: 80
+      - pause: {duration: 30s}
+      canaryService: demo-backend-canary
+      stableService: demo-backend-stable
+      trafficRouting:
+        nginx:
+          stableIngress: demo-backend-ingress
+          annotationPrefix: nginx.ingress.kubernetes.io
+      analysis:
+        templates:
+        - templateName: demo-backend-analysis
+        startingStep: 2
+        args:
+        - name: service-name
+          value: demo-backend
+  selector:
+    matchLabels:
+      app: demo-backend
+  template:
+    metadata:
+      labels:
+        app: demo-backend
+        version: stable
+      annotations:
+        # Jaeger tracing
+        sidecar.jaegertracing.io/inject: "true"
+        # Prometheus monitoring
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        # Loki logging
+        logging.coreos.com/enabled: "true"
+    spec:
+      containers:
+      - name: demo-backend
+        image: node:18-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: metrics
+        env:
+        - name: JAEGER_AGENT_HOST
+          value: "jaeger-agent.observability.svc.cluster.local"
+        - name: JAEGER_SERVICE_NAME
+          value: "demo-backend"
+        - name: OTEL_EXPORTER_JAEGER_ENDPOINT
+          value: "http://jaeger-collector.observability.svc.cluster.local:14268/api/traces"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-backend-stable
+  namespace: demo-project
+  labels:
+    app: demo-backend
+    service: stable
+spec:
+  selector:
+    app: demo-backend
+  ports:
+  - port: 80
+    targetPort: http
+    name: http
+  - port: 8081
+    targetPort: metrics
+    name: metrics
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-backend-canary
+  namespace: demo-project
+  labels:
+    app: demo-backend
+    service: canary
+spec:
+  selector:
+    app: demo-backend
+  ports:
+  - port: 80
+    targetPort: http
+    name: http
+  - port: 8081
+    targetPort: metrics
+    name: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: demo-backend-metrics
+  namespace: demo-project
+  labels:
+    app: demo-backend
+    monitoring: enabled
+spec:
+  selector:
+    matchLabels:
+      app: demo-backend
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: demo-backend-alerts
+  namespace: demo-project
+  labels:
+    app: demo-backend
+    alerting: enabled
+spec:
+  groups:
+  - name: demo-backend.rules
+    rules:
+    - alert: Demo-backendHighErrorRate
+      expr: rate(http_requests_total{job="demo-backend",code=~"5.."}[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        app: demo-backend
+      annotations:
+        summary: "High error rate detected for demo-backend"
+        description: "Error rate is {{ $value }} errors per second"
+    
+    - alert: Demo-backendHighLatency
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="demo-backend"}[5m])) > 0.5
+      for: 5m
+      labels:
+        severity: warning
+        app: demo-backend
+      annotations:
+        summary: "High latency detected for demo-backend"
+        description: "95th percentile latency is {{ $value }}s"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: demo-backend-analysis
+  namespace: demo-project
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: success-rate
+    interval: 60s
+    count: 5
+    successCondition: result[0] >= 0.95
+    provider:
+      prometheus:
+        address: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{job="{{args.service-name}}",code!~"5.."}[5m])) /
+          sum(rate(http_requests_total{job="{{args.service-name}}"}[5m]))
+  
+  - name: avg-response-time
+    interval: 60s
+    count: 5
+    successCondition: result[0] <= 0.5
+    provider:
+      prometheus:
+        address: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="{{args.service-name}}"}[5m])) by (le)
+          )
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: demo-backend-config
+  namespace: demo-project
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault-backend
+    kind: SecretStore
+  target:
+    name: demo-backend-secret
+    creationPolicy: Owner
+  data:
+  - secretKey: database-url
+    remoteRef:
+      key: demo-backend/database
+      property: url
+  - secretKey: api-key
+    remoteRef:
+      key: demo-backend/api
+      property: key
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: demo-backend-tls
+  namespace: demo-project
+spec:
+  secretName: demo-backend-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - demo-backend.local
+  - www.demo-backend.local
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-backend-ingress
+  namespace: demo-project
+  annotations:
+    # Ingress NGINX
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    
+    # Cert Manager
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    
+    # Argo Rollouts traffic splitting
+    nginx.ingress.kubernetes.io/canary: "false"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    
+    # Prometheus monitoring
+    nginx.ingress.kubernetes.io/enable-metrics: "true"
+spec:
+  tls:
+  - hosts:
+    - demo-backend.local
+    secretName: demo-backend-tls-secret
+  rules:
+  - host: demo-backend.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: demo-backend-stable
+            port:
+              number: 80
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: demo-backend-cicd
+  namespace: demo-project
+spec:
+  entrypoint: build-test-deploy
+  arguments:
+    parameters:
+    - name: git-repo
+      value: https://github.com/andres20980/gh-gitops-infra.git
+    - name: git-branch
+      value: main
+    - name: image-tag
+      value: latest
+  
+  templates:
+  - name: build-test-deploy
+    dag:
+      tasks:
+      - name: git-clone
+        template: git-clone
+        arguments:
+          parameters:
+          - name: repo
+            value: "{{workflow.parameters.git-repo}}"
+          - name: branch
+            value: "{{workflow.parameters.git-branch}}"
+      
+      - name: run-tests
+        template: run-tests
+        dependencies: [git-clone]
+      
+      - name: build-image
+        template: build-image
+        dependencies: [run-tests]
+        arguments:
+          parameters:
+          - name: tag
+            value: "{{workflow.parameters.image-tag}}"
+      
+      - name: security-scan
+        template: security-scan
+        dependencies: [build-image]
+      
+      - name: deploy-staging
+        template: deploy-staging
+        dependencies: [security-scan]
+      
+      - name: integration-tests
+        template: integration-tests
+        dependencies: [deploy-staging]
+      
+      - name: promote-production
+        template: promote-production
+        dependencies: [integration-tests]
+
+  - name: git-clone
+    inputs:
+      parameters:
+      - name: repo
+      - name: branch
+    container:
+      image: alpine/git
+      command: [sh, -c]
+      args: ["git clone {{inputs.parameters.repo}} /workspace && cd /workspace && git checkout {{inputs.parameters.branch}}"]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+
+  - name: run-tests
+    container:
+      image: node:18-alpine
+      command: [sh, -c]
+      args: ["cd /workspace && npm test"]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+
+  - name: build-image
+    inputs:
+      parameters:
+      - name: tag
+    container:
+      image: gcr.io/kaniko-project/executor:latest
+      command: [/kaniko/executor]
+      args:
+      - --dockerfile=/workspace/Dockerfile
+      - --context=/workspace
+      - --destination=registry.local/demo-backend:{{inputs.parameters.tag}}
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+
+  - name: security-scan
+    container:
+      image: aquasec/trivy
+      command: [trivy]
+      args: [image, registry.local/demo-backend:{{workflow.parameters.image-tag}}]
+
+  - name: deploy-staging
+    resource:
+      action: apply
+      manifest: |
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: demo-backend-staging
+          namespace: argocd
+        spec:
+          project: default
+          source:
+            repoURL: {{workflow.parameters.git-repo}}
+            targetRevision: {{workflow.parameters.git-branch}}
+            path: manifests/staging
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: demo-project-staging
+
+  - name: integration-tests
+    container:
+      image: postman/newman
+      command: [newman]
+      args: [run, /workspace/tests/integration.postman_collection.json]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+
+  - name: promote-production
+    resource:
+      action: apply
+      manifest: |
+        apiVersion: kargo.akuity.io/v1alpha1
+        kind: Promotion
+        metadata:
+          name: demo-backend-to-production
+          namespace: demo-project
+        spec:
+          stage: production
+          freight: "{{workflow.parameters.image-tag}}"
+
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 1Gi

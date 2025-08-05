@@ -404,7 +404,7 @@ actualizar_y_desplegar_herramientas() {
     local helm_updater_script="$COMUN_DIR/helm-updater.sh"
     
     if [[ -f "$helm_updater_script" ]]; then
-        if "$helm_updater_script" herramientas-gitops; then
+        if "$helm_updater_script" update herramientas-gitops; then
             log_success "✅ Helm charts actualizados a últimas versiones"
         else
             log_warning "⚠️ Error actualizando helm charts (continuando...)"

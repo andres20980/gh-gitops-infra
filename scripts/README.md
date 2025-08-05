@@ -1,359 +1,547 @@
-# 🔧 Scripts Hipermodulares GitOps
+# 📁 Scripts GitOps - Arquitectura Hipermodular
 
-> **Sistema de scripts modular organizados jerárquicamente** para la gestión completa de infraestructura GitOps en español.
+> **Sistema modular de scripts** para gestión automatizada de infraestructura GitOps en español castellano.
 
-## 📂 **Organización Modular**
+[![Bash](https://img.shields.io/badge/Shell-Bash_5.0+-red?logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Arquitectura](https://img.shields.io/badge/Arquitectura-Hipermodular-blue)](README.md)
+[![Español](https://img.shields.io/badge/Idioma-Español🇪🇸-green)](README.md)
+[![Calidad](https://img.shields.io/badge/Calidad-ShellCheck-yellow)](https://www.shellcheck.net/)
+
+## 📋 Tabla de Contenidos
+
+- [🏗️ Estructura Modular](#️-estructura-modular)
+- [🚀 Orquestador Principal](#-orquestador-principal)
+- [📦 Módulos Especializados](#-módulos-especializados)
+- [🔧 Funciones Principales](#-funciones-principales)
+- [🎯 Modos de Ejecución](#-modos-de-ejecución)
+- [📊 Sistema de Logging](#-sistema-de-logging)
+- [🔍 Debugging y Troubleshooting](#-debugging-y-troubleshooting)
+- [📖 Guías de Desarrollo](#-guías-de-desarrollo)
+
+## 🏗️ Estructura Modular
+
+### 📁 **Organización por Responsabilidades**
 
 ```
 📁 scripts/
-├── 📚 bibliotecas/                     # Librerías fundamentales (6)
-├── 🧠 nucleo/                          # Orquestador principal (1)
-├── ⚙️ instaladores/                    # Instaladores especializados (1)
-├── 🎯 argocd/                          # Bootstrap GitOps (3)
-└── 🔨 utilidades/                      # Utilidades de gestión (3)
+├── 📄 README.md                    # Esta documentación
+├── 📄 orquestador.sh              # 🎯 Coordinador principal
+│
+├── 📁 comun/                      # 🔧 Módulos base compartidos
+│   ├── 📄 base.sh                 # Funciones fundamentales
+│   └── 📄 validacion.sh           # Validación de prerrequisitos
+│
+├── 📁 instalacion/                # 📦 Gestión de dependencias
+│   └── 📄 dependencias.sh         # Instalación automática de herramientas
+│
+└── 📁 cluster/                    # ☸️ Gestión de clusters Kubernetes
+    └── 📄 gestor.sh               # Minikube, Kind, configuración
 ```
 
-## 📚 **Bibliotecas Fundamentales**
+### 🎯 **Principios de Diseño**
 
-### **base.sh**
-Configuración global y variables del proyecto
+| Principio | Descripción | Implementación |
+|-----------|-------------|----------------|
+| **Modularidad** | Cada script tiene una responsabilidad específica | Separación por funcionalidad |
+| **Reutilización** | Funciones comunes centralizadas | Módulo `comun/base.sh` |
+| **Idioma** | Todo en español castellano | Variables, funciones, mensajes |
+| **Calidad** | Cumple estándares de Shell scripting | ShellCheck + mejores prácticas |
+| **Mantenibilidad** | Código fácil de leer y modificar | Documentación inline |
+
+## 🚀 Orquestador Principal
+
+### 🎼 **orquestador.sh - El Director de Orquesta**
+
+El `orquestador.sh` es el cerebro del sistema que:
+
 ```bash
-source scripts/bibliotecas/base.sh
-
-# Funciones disponibles:
-configurar_entorno_base()              # Setup inicial
-obtener_ruta_proyecto()                # Ruta del proyecto
-configurar_variables_globales()        # Variables del sistema
+# Funciones principales del orquestador
+✅ Coordina todas las fases de instalación
+✅ Gestiona la carga dinámica de módulos
+✅ Maneja errores con limpieza automática
+✅ Proporciona logging detallado y estructurado
+✅ Soporta múltiples modos de ejecución
+✅ Valida dependencias entre módulos
 ```
 
-### **logging.sh**
-Sistema de logging avanzado multi-nivel
-```bash
-source scripts/bibliotecas/logging.sh
+### 🔄 **Fases del Proceso Automatizado**
 
-# Uso básico:
-log_info "Mensaje informativo"
-log_warn "Advertencia del sistema"
-log_error "Error crítico"
-log_debug "Información de debugging"
+| Fase | Responsable | Función | Estado |
+|------|-------------|---------|--------|
+| **1️⃣ Validación** | `comun/validacion.sh` | Verificar prerrequisitos del sistema | ✅ |
+| **2️⃣ Dependencias** | `instalacion/dependencias.sh` | Instalar herramientas base | ✅ |
+| **3️⃣ Cluster** | `cluster/gestor.sh` | Configurar cluster Kubernetes | ✅ |
+| **4️⃣ GitOps** | `instalar.sh` | Instalar herramientas GitOps | ✅ |
+| **5️⃣ Componentes** | `instalar.sh` | Desplegar stack de observabilidad | ✅ |
+| **6️⃣ Verificación** | `instalar.sh` | Validar estado final del sistema | ✅ |
+
+### 🎮 **Interface de Control**
+
+```bash
+# Ejecutar proceso completo (recomendado)
+./orquestador.sh
+
+# Modo debug con salida detallada
+./orquestador.sh --debug
+
+# Solo validar prerrequisitos
+./orquestador.sh --solo-validacion
+
+# Reinstalar desde dependencias
+./orquestador.sh --desde-cero
+```
+- **solo-cluster**: Solo configuración del cluster
+- **solo-gitops**: Solo herramientas GitOps
+- **solo-componentes**: Solo componentes adicionales
+
+## 📦 Módulos Especializados
+
+### 🔧 **comun/base.sh - Funciones Fundamentales**
+
+```bash
+# 🎨 Sistema de Logging Avanzado
+log_success "✅ Operación completada"
+log_error "❌ Error crítico detectado"
+log_warning "⚠️ Advertencia importante"
+log_info "ℹ️ Información general"
+log_debug "🔍 Detalles técnicos"
+log_section "📋 Nueva Sección"
+
+# 🔍 Validaciones del Sistema
+comando_existe "docker"         # Verificar si comando está disponible
+es_root                          # Verificar privilegios de administrador
+es_wsl                          # Detectar entorno WSL
+tiene_systemd                   # Verificar soporte systemd
+verificar_internet              # Conectividad a internet
+
+# 🛠️ Utilidades Generales
+confirmar "¿Continuar con la instalación?"
+obtener_distribucion            # Detectar distribución Linux
+verificar_recursos 4 10         # Validar 4GB RAM, 10GB disco
+ejecutar_con_retry "comando" 3 5 # 3 intentos, 5s entre intentos
+limpiar_al_salir               # Limpieza automática en caso de error
 ```
 
-### **validacion.sh**
-Validación de prerequisitos del sistema
-```bash
-source scripts/bibliotecas/validacion.sh
+### 🔍 **comun/validacion.sh - Verificación de Prerrequisitos**
 
-# Validaciones principales:
-validar_sistema()                      # Validación completa
-validar_recursos()                     # RAM, CPU, disco
-validar_permisos()                     # sudo, docker group
-validar_conectividad()                 # Red e internet
+```bash
+# 🖥️ Validaciones del Sistema Operativo
+validar_sistema_operativo       # Ubuntu/Debian/CentOS compatible
+validar_dependencias_basicas    # curl, wget, git, etc.
+validar_recursos_sistema        # RAM, CPU, disco suficientes
+validar_conectividad           # Acceso a repositorios externos
+
+# ☸️ Validaciones GitOps Específicas
+validar_herramientas_gitops     # kubectl, helm, etc.
+validar_puertos_disponibles     # Puertos para servicios GitOps
+validar_docker_funcional        # Docker daemon operativo
+
+# 🎯 Validación Completa
+validar_prerequisitos_completos # Ejecuta todas las validaciones
+generar_reporte_validacion      # Informe detallado del estado
 ```
 
-### **versiones.sh**
-Gestión automática de versiones compatibles
-```bash
-source scripts/bibliotecas/versiones.sh
+### 📦 **instalacion/dependencias.sh - Gestión de Herramientas**
 
-# Gestión de versiones:
-obtener_version_kubernetes_estable()   # K8s compatible con minikube
-obtener_version_helm_compatible()      # Helm v3 estable
-verificar_compatibilidad_versiones()   # Cross-validation
+```bash
+# 🐳 Instalación de Docker
+instalar_docker_ubuntu          # Instalación específica para Ubuntu
+instalar_docker_debian          # Instalación específica para Debian
+configurar_docker_usuario       # Añadir usuario al grupo docker
+verificar_docker_funcional      # Test de funcionamiento
+
+# ☸️ Herramientas Kubernetes
+instalar_kubectl_compatible     # kubectl compatible con minikube
+instalar_minikube_ultima        # Última versión estable de minikube
+instalar_helm_v3                # Helm v3 para gestión de charts
+instalar_argocd_cli             # Cliente de línea de comandos ArgoCD
+
+# 🔄 Instalación Inteligente
+auto_detectar_e_instalar        # Detecta herramientas faltantes
+actualizar_herramientas         # Actualiza a últimas versiones
+verificar_compatibilidad        # Verifica compatibilidad entre versiones
 ```
 
-### **comun.sh**
-Funciones compartidas entre módulos
-```bash
-source scripts/bibliotecas/comun.sh
+### ☸️ **cluster/gestor.sh - Gestión de Clusters**
 
-# Utilidades comunes:
-mostrar_banner()                       # Banner del proyecto
-confirmar_accion()                     # Confirmación interactiva
-verificar_comando()                    # Verificar si comando existe
+```bash
+# 🏗️ Creación de Clusters
+crear_cluster_desarrollo        # Cluster con capacidad completa
+crear_cluster_preproduccion     # Cluster con recursos mínimos
+crear_cluster_produccion        # Cluster optimizado para producción
+
+# ⚙️ Configuración Avanzada
+configurar_addons_esenciales    # metrics-server, ingress, dns
+configurar_storage_classes      # Clases de almacenamiento
+configurar_network_policies     # Políticas de red
+configurar_rbac                 # Control de acceso basado en roles
+
+# 🔧 Gestión y Mantenimiento
+validar_cluster_healthy         # Verificar estado del cluster
+obtener_informacion_cluster     # Información detallada del cluster
+cambiar_contexto_cluster        # Cambiar entre clusters
+eliminar_cluster_seguro         # Eliminación con confirmación
 ```
 
-### **registro.sh**
-Sistema de registro de operaciones
-```bash
-source scripts/bibliotecas/registro.sh
+## 🔧 Funciones Principales
 
-# Registro de operaciones:
-registrar_inicio_operacion()          # Log inicio
-registrar_fin_operacion()             # Log finalización
-obtener_resumen_operaciones()         # Resumen del proceso
+### 🎯 **Modos de Ejecución Disponibles**
+
+| Modo | Comando | Descripción | Uso |
+|------|---------|-------------|-----|
+| **Proceso Completo** | `./orquestador.sh` | Instalación autónoma completa | Producción |
+| **Solo Validación** | `./orquestador.sh --validar` | Solo verificar prerrequisitos | Diagnóstico |
+| **Desde Cero** | `./orquestador.sh --desde-cero` | Incluye instalación de dependencias | Primera vez |
+| **Solo Cluster** | `./orquestador.sh --solo-cluster` | Solo configurar cluster K8s | Testing |
+| **Dry Run** | `./orquestador.sh --dry-run` | Simular sin ejecutar | Planificación |
+| **Debug** | `./orquestador.sh --debug` | Salida detallada | Troubleshooting |
+
+### 🔄 **Flujo de Ejecución**
+
+```mermaid
+graph TD
+    A[Inicio] --> B[Cargar Módulos Base]
+    B --> C[Validar Prerrequisitos]
+    C --> D{¿Desde Cero?}
+    D -->|Sí| E[Instalar Dependencias]
+    D -->|No| F[Verificar Herramientas]
+    E --> F
+    F --> G[Configurar Cluster]
+    G --> H[Instalar GitOps]
+    H --> I[Desplegar Componentes]
+    I --> J[Verificación Final]
+    J --> K[Éxito]
 ```
 
-## 🧠 **Núcleo Orquestador**
+## 🎯 Modos de Ejecución
 
-### **orchestrador.sh**
-Motor de 7 fases para instalación completa
+### 🚀 **Modo Producción (Recomendado)**
 ```bash
-# Ejecución desde instalador.sh:
-source scripts/nucleo/orchestrador.sh
-ejecutar_orquestacion_completa
+# Instalación completa desatendida
+./orquestador.sh
 
-# Fases ejecutadas:
-# FASE 1: Validación del sistema
-# FASE 2: Instalación de dependencias
-# FASE 3: Creación del cluster
-# FASE 4: Instalación GitOps
-# FASE 5: Despliegue de componentes
-# FASE 6: Clusters adicionales
-# FASE 7: Verificación final
+# Características:
+✅ Instalación autónoma sin intervención
+✅ Validación completa de prerrequisitos
+✅ Configuración optimizada para GitOps
+✅ Verificación automática del estado final
 ```
 
-## ⚙️ **Instaladores Especializados**
-
-### **dependencias.sh**
-Instalador de dependencias del sistema
+### 🔍 **Modo Diagnóstico**
 ```bash
-# Uso directo:
-scripts/instaladores/dependencias.sh
+# Solo validar el sistema
+./orquestador.sh --validar
 
-# Dependencias gestionadas:
-- Docker Engine
-- Minikube
-- kubectl (compatible)
-- Helm v3
-- ArgoCD CLI
+# Generar reporte completo
+./orquestador.sh --validar --reporte
 
-# Funciones disponibles:
-instalar_docker()
-instalar_minikube()
-instalar_kubectl()
-instalar_helm()
-instalar_argocd_cli()
+# Características:
+✅ No ejecuta instalaciones
+✅ Verifica todos los prerrequisitos
+✅ Genera reporte detallado
+✅ Ideal para troubleshooting
 ```
 
-## 🛠️ **Herramientas GitOps**
-
-### **argocd.sh**
-Instalador y configurador de ArgoCD
+### 🧪 **Modo Testing**
 ```bash
-# Ejecución:
-scripts/herramientas-gitops/argocd.sh
+# Simular instalación completa
+./orquestador.sh --dry-run
 
-# Funcionalidades:
-- Instalación de ArgoCD core
-- Configuración de CLI
-- Setup de port-forwarding
-- Configuración de App-of-Apps
+# Solo cluster para desarrollo
+./orquestador.sh --solo-cluster --perfil dev
+
+# Características:
+✅ Seguro para testing
+✅ No modifica el sistema
+✅ Muestra todos los comandos
+✅ Perfecto para desarrollo
 ```
 
-### **kargo.sh**
-Instalador de Kargo para promoción de entornos
-```bash
-# Ejecución:
-scripts/herramientas-gitops/kargo.sh
+## 📊 Sistema de Logging
 
-# Funcionalidades:
-- Instalación de Kargo
-- Configuración de pipelines
-- Setup de promoción automática
+### 🎨 **Niveles de Log Estructurados**
+
+```bash
+# Ejemplo de salida con colores y símbolos
+[2024-08-05 10:30:45] 📋 SECCIÓN: Configurando Docker
+[2024-08-05 10:30:46] ℹ️  INFO: Verificando Docker daemon...
+[2024-08-05 10:30:47] ✅ SUCCESS: Docker está funcionando correctamente
+[2024-08-05 10:30:48] ⚠️  WARNING: Puerto 8080 ya está en uso
+[2024-08-05 10:30:49] ❌ ERROR: No se pudo conectar a Docker daemon
+[2024-08-05 10:30:50] 🔍 DEBUG: Ejecutando comando: docker info
 ```
 
-## 🔧 **Módulos Funcionales**
+### 📁 **Gestión de Logs**
 
-### **cluster.sh**
-Gestión completa de clusters Kubernetes
 ```bash
-# Uso directo:
-scripts/modulos/cluster.sh crear_cluster "gitops-dev"
+# Configuración automática de logging
+export LOG_FILE="/tmp/gitops-instalador-$(date +%Y%m%d-%H%M%S).log"
+export LOG_LEVEL="INFO"  # ERROR, WARNING, INFO, DEBUG, TRACE
+export SHOW_TIMESTAMP="true"
+export LOG_TO_FILE="true"
 
-# Funciones principales:
-crear_cluster()                        # Crear cluster minikube
-configurar_cluster()                   # Post-configuración
-habilitar_addons()                     # metrics-server, dashboard
-crear_clusters_adicionales()           # Pre/Pro clusters
+# Logs estructurados por componente
+logs/
+├── sistema-$(date).log      # Logs del sistema
+├── docker-$(date).log       # Logs específicos de Docker
+├── kubernetes-$(date).log   # Logs del cluster K8s
+└── gitops-$(date).log       # Logs de herramientas GitOps
 ```
 
-### **argocd-modular.sh**
-ArgoCD modular con App-of-Apps
-```bash
-# Uso desde orquestador:
-scripts/modulos/argocd-modular.sh
+## 🔍 Debugging y Troubleshooting
 
-# Funcionalidades:
-- Setup de App-of-Apps jerárquico
-- Configuración de ApplicationSets
-- Gestión de sincronización automática
+### 🛠️ **Herramientas de Debug**
+
+```bash
+# Activar modo debug global
+export DEBUG="true"
+export VERBOSE="true"
+
+# Debug específico por módulo
+export DEBUG_DOCKER="true"
+export DEBUG_KUBERNETES="true"
+export DEBUG_GITOPS="true"
+
+# Ejecutar con máximo detalle
+./orquestador.sh --debug --verbose --trace
 ```
 
-## 🔨 **Utilidades de Gestión**
+### 🚨 **Diagnóstico de Problemas Comunes**
 
-### **configuracion.sh**
-Configuración inicial y personalización
+| Problema | Diagnóstico | Solución |
+|----------|-------------|----------|
+| Docker no funciona | `verificar_docker_funcional` | Reiniciar daemon, verificar permisos |
+| kubectl no conecta | `validar_cluster_healthy` | Verificar contexto, certificados |
+| Recursos insuficientes | `validar_recursos_sistema` | Liberar memoria, aumentar límites |
+| Red no accesible | `validar_conectividad` | Verificar DNS, proxy, firewall |
+
+### 📋 **Scripts de Utilidad**
+
 ```bash
-# Uso directo:
-./scripts/utilidades/configuracion.sh
+# Verificar estado completo del sistema
+./utilidades/verificar-estado-completo.sh
 
-# Opciones disponibles:
---inicial                              # Configuración completa inicial
---dashboard                            # Solo configuración de dashboards
---port-forwarding                      # Solo port-forwarding
---backup                               # Backup de configuraciones
---restaurar [archivo]                  # Restaurar desde backup
+# Limpiar instalación fallida
+./utilidades/limpiar-instalacion-fallida.sh
+
+# Generar reporte de diagnóstico
+./utilidades/generar-reporte-diagnostico.sh
+
+# Backup de configuraciones críticas
+./utilidades/backup-configuraciones.sh
 ```
 
-### **diagnosticos.sh**
-Sistema de diagnósticos y verificación
+## 📖 Guías de Desarrollo
+
+### 🔧 **Estándares de Código**
+
 ```bash
-# Uso directo:
-./scripts/utilidades/diagnosticos.sh
+# Nomenclatura en español
+function instalar_docker() {        # ✅ Función en español
+    local nombre_usuario="$1"       # ✅ Variable en español
+    log_info "Instalando Docker..." # ✅ Mensaje en español
+}
 
-# Opciones de diagnóstico:
---rapido                               # Verificación básica (2-3 min)
---completo                             # Análisis exhaustivo (5-10 min)
---recursos                             # Solo uso de recursos
---conectividad                         # Solo conectividad de servicios
---logs [servicio]                      # Logs específicos
---reporte                              # Generar reporte completo
-```
-
-### **mantenimiento.sh**
-Mantenimiento automático del sistema
-```bash
-# Uso directo:
-./scripts/utilidades/mantenimiento.sh
-
-# Tareas de mantenimiento:
---limpiar                              # Limpieza general del sistema
---actualizar                           # Actualización de componentes
---optimizar                            # Optimización de recursos
---rotar-logs                           # Rotación de logs
---backup-automatico                    # Backup automático
---verificar-salud                      # Verificación de salud
-```
-
-## 🔄 **Flujo de Ejecución Típico**
-
-### **1. Instalación Completa**
-```bash
-# Desde el instalador principal:
-sudo ./instalador.sh
-
-# Esto ejecuta internamente:
-source scripts/bibliotecas/*.sh       # Carga bibliotecas
-scripts/nucleo/orchestrador.sh        # Ejecuta 7 fases
-```
-
-### **2. Uso Individual de Módulos**
-```bash
-# Crear solo un cluster:
-scripts/modulos/cluster.sh crear_cluster "mi-cluster"
-
-# Solo diagnósticos:
-scripts/utilidades/diagnosticos.sh --completo
-
-# Solo mantenimiento:
-scripts/utilidades/mantenimiento.sh --limpiar
-```
-
-### **3. Personalización Avanzada**
-```bash
-# Configuración personalizada:
-scripts/utilidades/configuracion.sh --inicial
-
-# Instalación de dependencias específicas:
-scripts/instaladores/dependencias.sh instalar_helm
-
-# ArgoCD standalone:
-scripts/herramientas-gitops/argocd.sh
-```
-
-## 📋 **Convenciones de Código**
-
-### **Nomenclatura en Español**
-```bash
-# Variables
-CLUSTER_PRINCIPAL="gitops-dev"
-RUTA_CONFIGURACION="/tmp/gitops-config"
-ARCHIVO_LOG="instalacion.log"
-
-# Funciones
-configurar_entorno()
-validar_prerequisitos()
-instalar_dependencia()
-```
-
-### **Estructura de Funciones**
-```bash
-function nombre_funcion() {
-    # Descripción de la función
-    local parametro_local="$1"
-    
-    log_info "Iniciando ${FUNCNAME[0]}"
-    
-    # Validación de parámetros
-    [ -z "$parametro_local" ] && {
-        log_error "Parámetro requerido no proporcionado"
+# Validación de entrada
+function validar_parametros() {
+    [[ $# -lt 1 ]] && {
+        log_error "Se requiere al menos un parámetro"
         return 1
     }
+}
+
+# Manejo de errores
+function ejecutar_comando_critico() {
+    local comando="$1"
     
-    # Lógica principal
-    # ...
+    if ! $comando; then
+        log_error "Error ejecutando: $comando"
+        limpiar_al_salir
+        return 1
+    fi
+}
+```
+
+### 📝 **Plantilla para Nuevos Módulos**
+
+```bash
+#!/bin/bash
+
+# ============================================================================
+# MÓDULO: [Nombre del Módulo]
+# DESCRIPCIÓN: [Descripción clara de la funcionalidad]
+# AUTOR: [Tu nombre]
+# VERSIÓN: 1.0.0
+# ============================================================================
+
+set -euo pipefail
+
+# Cargar módulos base si no están cargados
+if [[ -z "${GITOPS_BASE_LOADED:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "$SCRIPT_DIR/../comun/base.sh"
+fi
+
+# ============================================================================
+# FUNCIONES PRINCIPALES
+# ============================================================================
+
+# Función principal del módulo
+function main() {
+    log_section "🚀 [Nombre del Módulo]"
     
-    log_info "Completado ${FUNCNAME[0]}"
-    return 0
+    # Tu código aquí
+    
+    log_success "✅ [Módulo] completado exitosamente"
+}
+
+# ============================================================================
+# EJECUCIÓN
+# ============================================================================
+
+# Ejecutar si es llamado directamente
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
+```
+
+### 🧪 **Testing y Validación**
+
+```bash
+# Tests unitarios para funciones
+function test_instalar_docker() {
+    log_section "🧪 Testing: instalar_docker"
+    
+    # Mock de comandos para testing
+    function docker() { echo "Docker version 20.10.0"; }
+    
+    # Ejecutar función
+    if instalar_docker; then
+        log_success "✅ Test pasado: instalar_docker"
+    else
+        log_error "❌ Test falló: instalar_docker"
+        return 1
+    fi
+}
+
+# Ejecutar todos los tests
+function ejecutar_tests() {
+    test_instalar_docker
+    test_configurar_cluster
+    test_validar_sistema
 }
 ```
 
-### **Gestión de Errores**
+### 📚 **Documentación de Funciones**
+
 ```bash
-# Cada función debe manejar errores:
-comando_critico || {
-    log_error "Fallo en comando crítico"
-    return 1
+# ============================================================================
+# FUNCIÓN: instalar_docker
+# DESCRIPCIÓN: Instala Docker Engine en el sistema
+# PARÁMETROS:
+#   $1 - Distribución Linux (ubuntu|debian|centos)
+#   $2 - Versión específica (opcional, default: latest)
+# RETORNA:
+#   0 - Instalación exitosa
+#   1 - Error en la instalación
+# EJEMPLO:
+#   instalar_docker "ubuntu" "20.10.0"
+# ============================================================================
+function instalar_docker() {
+    local distribucion="${1:-ubuntu}"
+    local version="${2:-latest}"
+    
+    log_info "Instalando Docker $version en $distribucion..."
+    
+    # Tu implementación aquí
 }
-
-# Verificación de prerequisitos:
-command -v docker >/dev/null 2>&1 || {
-    log_warn "Docker no encontrado, instalando..."
-    instalar_docker
-}
 ```
 
-## 🧪 **Testing de Módulos**
+## 🤝 Contribución al Proyecto
 
-### **Validación Individual**
+### 📋 **Guías de Contribución**
+
+1. **Fork y Clone**: Crear fork del repositorio
+2. **Rama Feature**: Crear rama para nueva funcionalidad
+3. **Estándares**: Seguir nomenclatura en español
+4. **Testing**: Añadir tests para nuevas funciones
+5. **Documentación**: Actualizar README.md si es necesario
+6. **Pull Request**: Solicitar revisión de cambios
+
+### 🔧 **Configuración de Desarrollo**
+
 ```bash
-# Test de un módulo específico:
-scripts/modulos/cluster.sh --test
+# Configurar entorno de desarrollo
+git clone https://github.com/tu-usuario/gh-gitops-infra.git
+cd gh-gitops-infra/scripts
 
-# Test de biblioteca:
-source scripts/bibliotecas/validacion.sh
-validar_sistema --dry-run
-```
+# Configurar hooks de pre-commit
+cp utilidades/pre-commit.sh .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
 
-### **Testing Completo**
-```bash
-# Desde el directorio principal:
-./instalador.sh --test-modules
-
-# Esto valida todos los módulos sin ejecutar
-```
-
-## 📞 **Soporte y Debugging**
-
-### **Logs Detallados**
-```bash
-# Habilitar debugging:
-export GITOPS_DEBUG=true
-./instalador.sh
-
-# Logs se guardan en:
-logs/instalacion-$(date +%Y%m%d).log
-```
-
-### **Debugging de Módulos**
-```bash
-# Debug de módulo específico:
-bash -x scripts/modulos/cluster.sh crear_cluster "test"
-
-# Verificar bibliotecas cargadas:
-scripts/utilidades/diagnosticos.sh --modulos
+# Ejecutar validaciones
+./utilidades/validar-codigo.sh
+./utilidades/ejecutar-tests.sh
 ```
 
 ---
 
-> **Estos scripts representan la base de la arquitectura hipermodular GitOps, diseñados para máxima flexibilidad, mantenibilidad y facilidad de uso en español.**
+<div align="center">
+
+**🚀 Arquitectura Hipermodular para GitOps en Español 🇪🇸**
+
+*Desarrollado con las mejores prácticas de Shell scripting*
+
+[⬆️ Volver al README principal](../README.md)
+
+</div>
+source "$SCRIPTS_DIR/orquestador.sh"
+run_orchestrator "$MODO_INSTALACION"
+```
+
+## 🚧 Desarrollo Futuro
+
+### Módulos Pendientes
+
+- **gitops/**: Instalación y configuración de ArgoCD, Kargo, etc.
+- **componentes/**: Prometheus, Grafana, External Secrets, Cert-Manager
+- **utilidades/**: Scripts de mantenimiento, backup, update, etc.
+
+### Mejoras Planificadas
+
+- **Tests automatizados**: Suite de tests para cada módulo
+- **Documentación**: Documentación detallada de cada función
+- **CI/CD**: Integración continua para validar cambios
+- **Métricas**: Recopilación de métricas de instalación
+
+## 📖 Uso
+
+### Instalación Completa
+
+```bash
+# Usar a través del instalador principal
+./instalar.sh normal
+
+# O directamente el orquestador
+./scripts-new/orquestador.sh normal
+```
+
+### Uso Modular
+
+```bash
+# Solo validar prerequisitos
+source ./scripts-new/comun/validacion.sh
+validar_prerequisitos
+
+# Solo crear cluster
+source ./scripts-new/cluster/gestor.sh
+crear_cluster_minikube "mi-cluster"
+
+# Solo instalar dependencias
+source ./scripts-new/instalacion/dependencias.sh
+instalar_dependencias
+```
+
+---
+
+**📝 Nota**: Esta es la nueva estructura modular que reemplaza la organización anterior. Los scripts antiguos se mantendrán temporalmente para compatibilidad hacia atrás, pero se recomienda migrar a esta nueva estructura.

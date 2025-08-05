@@ -506,17 +506,80 @@ verificar_sistema_gitops_healthy() {
         return 1
     fi
     
-    # Verificar aplicaciones
-    local failed_apps
-    failed_apps=$(kubectl get applications -n argocd -o jsonpath='{.items[?(@.status.health.status!="Healthy")].metadata.name}' 2>/dev/null || echo "")
+    # Lista de herramientas GitOps críticas que DEBEN estar healthy
+    local herramientas_criticas=(
+        "argo-events"
+        "argo-rollouts"
+        "argo-workflows"
+        "cert-manager"
+        "external-secrets"
+        "gitea"
+        "grafana"
+        "ingress-nginx"
+        "jaeger"
+        "kargo"
+        "loki"
+        "minio"
+        "prometheus-stack"
+    )
     
-    if [[ -n "$failed_apps" ]]; then
-        log_error "Aplicaciones no healthy: $failed_apps"
-        return 1
-    fi
+    log_info "🔍 Verificando estado de ${#herramientas_criticas[@]} herramientas GitOps críticas..."
     
-    log_success "✅ Sistema GitOps completamente healthy"
-    return 0
+    local max_intentos=10
+    local intento=1
+    
+    while [[ $intento -le $max_intentos ]]; do
+        log_info "🔄 Intento $intento/$max_intentos - Verificando herramientas GitOps..."
+        
+        local herramientas_no_healthy=()
+        local herramientas_no_synced=()
+        
+        # Verificar cada herramienta crítica
+        for herramienta in "${herramientas_criticas[@]}"; do
+            local health_status
+            local sync_status
+            
+            health_status=$(kubectl get application "$herramienta" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+            sync_status=$(kubectl get application "$herramienta" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            
+            if [[ "$health_status" != "Healthy" ]]; then
+                herramientas_no_healthy+=("$herramienta($health_status)")
+            fi
+            
+            if [[ "$sync_status" != "Synced" ]]; then
+                herramientas_no_synced+=("$herramienta($sync_status)")
+            fi
+        done
+        
+        # Si todas están healthy y synced, success
+        if [[ ${#herramientas_no_healthy[@]} -eq 0 ]] && [[ ${#herramientas_no_synced[@]} -eq 0 ]]; then
+            log_success "✅ TODAS las herramientas GitOps están Healthy y Synced"
+            log_info "🎯 ${#herramientas_criticas[@]} herramientas críticas verificadas correctamente"
+            return 0
+        fi
+        
+        # Mostrar herramientas problemáticas
+        if [[ ${#herramientas_no_healthy[@]} -gt 0 ]]; then
+            log_warning "⚠️ Herramientas no healthy: ${herramientas_no_healthy[*]}"
+        fi
+        
+        if [[ ${#herramientas_no_synced[@]} -gt 0 ]]; then
+            log_warning "⚠️ Herramientas no synced: ${herramientas_no_synced[*]}"
+        fi
+        
+        # Esperar antes del siguiente intento
+        if [[ $intento -lt $max_intentos ]]; then
+            log_info "⏳ Esperando 30 segundos antes del siguiente intento..."
+            sleep 30
+        fi
+        
+        ((intento++))
+    done
+    
+    # Si llegamos aquí, hay problemas
+    log_error "❌ Sistema GitOps NO está completamente healthy después de $max_intentos intentos"
+    log_error "❌ Herramientas con problemas detectadas - revisar con: kubectl get applications -n argocd"
+    return 1
 }
 
 # Desplegar aplicaciones custom
@@ -528,8 +591,107 @@ desplegar_aplicaciones_custom() {
         return 0
     fi
     
+    # VERIFICACIÓN CRÍTICA: Las herramientas GitOps DEBEN estar 100% operativas
+    log_info "🔒 VERIFICACIÓN CRÍTICA: Herramientas GitOps deben estar 100% operativas"
+    log_info "📋 Requisito: TODAS las tools deben estar Synced AND Healthy simultáneamente"
+    
+    if ! verificar_sistema_gitops_healthy; then
+        log_error "❌ BLOQUEADO: Las herramientas GitOps NO están completamente healthy"
+        log_error "❌ NO se desplegarán aplicaciones custom hasta que las tools estén operativas"
+        log_info "💡 Ejecuta 'kubectl get applications -n argocd' para revisar el estado"
+        log_info "💡 TODAS las tools críticas deben estar Synced + Healthy antes de continuar"
+        log_info "📊 Estado requerido por herramienta:"
+        log_info "   • argo-events: Synced + Healthy (event-driven workflows)"
+        log_info "   • argo-rollouts: Synced + Healthy (progressive delivery)"
+        log_info "   • argo-workflows: Synced + Healthy (CI/CD workflows)"
+        log_info "   • cert-manager: Synced + Healthy (TLS certificates)"
+        log_info "   • external-secrets: Synced + Healthy (secrets management)"
+        log_info "   • gitea: Synced + Healthy (git repository)"
+        log_info "   • grafana: Synced + Healthy (monitoring dashboards)"
+        log_info "   • ingress-nginx: Synced + Healthy (traffic ingress)"
+        log_info "   • jaeger: Synced + Healthy (distributed tracing)"
+        log_info "   • kargo: Synced + Healthy (promotion pipeline)"
+        log_info "   • loki: Synced + Healthy (log aggregation)"
+        log_info "   • minio: Synced + Healthy (object storage)"
+        log_info "   • prometheus-stack: Synced + Healthy (metrics & alerting)"
+        return 1
+    fi
+    
+    log_success "✅ VERIFICACIÓN PASADA: TODAS las herramientas GitOps están Synced + Healthy"
+    log_info "🎯 13 herramientas GitOps críticas verificadas y operativas"
+    log_info "🚀 Procediendo con despliegue de aplicaciones custom integradas..."
+    
     # Aplicar ApplicationSet para aplicaciones custom
+    log_info "📦 Aplicando ApplicationSet para aplicaciones custom con integración GitOps..."
     kubectl apply -f argo-apps/appset-aplicaciones-custom.yaml
+    
+    # REGENERAR APLICACIONES CUSTOM CON INTEGRACIÓN GITOPS COMPLETA
+    log_info "🔧 Regenerando aplicaciones custom con integración GitOps completa..."
+    local generador_script="$COMUN_DIR/generar-apps-gitops-completas.sh"
+    
+    if [[ -f "$generador_script" ]]; then
+        # Regenerar demo-project con todas las integraciones GitOps
+        log_info "🚀 Regenerando demo-project con integración completa..."
+        "$generador_script" generar demo-backend demo-project "node:18-alpine" "demo-backend.local" \
+            "https://github.com/andres20980/gh-gitops-infra.git" \
+            "./aplicaciones/demo-project/manifests-gitops"
+        
+        "$generador_script" generar demo-frontend demo-project "nginx:alpine" "demo-frontend.local" \
+            "https://github.com/andres20980/gh-gitops-infra.git" \
+            "./aplicaciones/demo-project/manifests-gitops"
+        
+        "$generador_script" generar demo-database demo-project "postgres:15" "demo-db.local" \
+            "https://github.com/andres20980/gh-gitops-infra.git" \
+            "./aplicaciones/demo-project/manifests-gitops"
+        
+        # Regenerar simple-app con todas las integraciones GitOps
+        log_info "🚀 Regenerando simple-app con integración completa..."
+        "$generador_script" generar nginx-simple simple-app "nginx:alpine" "nginx.local" \
+            "https://github.com/andres20980/gh-gitops-infra.git" \
+            "./aplicaciones/simple-app/manifests-gitops"
+        
+        "$generador_script" generar redis-simple simple-app "redis:alpine" "redis.local" \
+            "https://github.com/andres20980/gh-gitops-infra.git" \
+            "./aplicaciones/simple-app/manifests-gitops"
+        
+        log_success "✅ Aplicaciones custom regeneradas con integración GitOps completa"
+        log_info "📊 Integraciones aplicadas a todas las custom apps:"
+        log_info "   🔄 Argo Rollouts - Progressive delivery automático"
+        log_info "   📈 Prometheus - Metrics y ServiceMonitor"
+        log_info "   📊 Grafana - Dashboards y alerting rules"
+        log_info "   🔍 Jaeger - Distributed tracing automático"
+        log_info "   📋 Loki - Log aggregation automático"
+        log_info "   🔐 External Secrets - Gestión segura de secretos"
+        log_info "   🔒 Cert Manager - TLS certificates automáticos"
+        log_info "   ⚙️ Argo Workflows - CI/CD pipeline completo"
+        log_info "   🚀 Kargo - Promotion pipeline entre entornos"
+        log_info "   🌐 Ingress NGINX - Traffic routing optimizado"
+        
+        # Commit y push de las nuevas configuraciones
+        log_info "📡 Commiteando aplicaciones custom mejoradas..."
+        git add aplicaciones/
+        git commit -m "🚀 Apps Custom con Integración GitOps Completa
+
+- Regeneración completa de demo-project y simple-app
+- Integración con todas las herramientas GitOps:
+  * Argo Rollouts para progressive delivery
+  * Prometheus + Grafana para monitoring
+  * Jaeger para distributed tracing  
+  * Loki para log aggregation
+  * External Secrets para gestión de secretos
+  * Cert Manager para TLS automático
+  * Argo Workflows para CI/CD
+  * Kargo para promotion pipeline
+  * Ingress NGINX para traffic routing
+- Configuraciones production-ready
+- Generado automáticamente por instalar.sh"
+        
+        git push origin main
+        log_success "✅ Aplicaciones custom mejoradas pusheadas a GitHub"
+        
+    else
+        log_warning "⚠️ Generador de apps GitOps no encontrado, usando configuraciones básicas"
+    fi
     
     # Esperar a que estén synced
     log_info "⏳ Esperando que aplicaciones custom estén synced..."

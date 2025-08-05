@@ -13,8 +13,12 @@ set -euo pipefail
 # CONFIGURACIÓN GLOBAL
 # ============================================================================
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly SCRIPTS_ROOT="$SCRIPT_DIR"
+# Evitar redefinición de variables si ya están cargadas desde orquestador
+if [[ -z "${GITOPS_ORQUESTADOR_LOADED:-}" ]]; then
+    readonly GITOPS_ORQUESTADOR_LOADED="true"
+    readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    readonly SCRIPTS_ROOT="$SCRIPT_DIR"
+fi
 
 # Cargar módulos comunes
 # shellcheck source=comun/base.sh

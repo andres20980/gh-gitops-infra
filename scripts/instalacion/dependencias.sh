@@ -8,10 +8,10 @@
 
 set -euo pipefail
 
-# Cargar módulo base
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./base.sh
-source "$SCRIPT_DIR/base.sh"
+# Cargar funciones comunes
+DEPENDENCIAS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../comun/base.sh
+source "$DEPENDENCIAS_SCRIPT_DIR/../comun/base.sh"
 
 # ============================================================================
 # INSTALACIÓN DE DOCKER

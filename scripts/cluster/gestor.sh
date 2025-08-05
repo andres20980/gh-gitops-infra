@@ -9,13 +9,12 @@
 
 set -euo pipefail
 
-# Cargar módulos comunes
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMUN_DIR="$(dirname "$SCRIPT_DIR")/comun"
+# Cargar módulo base
+GESTOR_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../comun/base.sh
-source "$COMUN_DIR/base.sh"
+source "$GESTOR_SCRIPT_DIR/../comun/base.sh"
 # shellcheck source=../instalacion/dependencias.sh
-source "$(dirname "$SCRIPT_DIR")/instalacion/dependencias.sh"
+source "$GESTOR_SCRIPT_DIR/../instalacion/dependencias.sh"
 
 # ============================================================================
 # CONFIGURACIÓN DE MINIKUBE

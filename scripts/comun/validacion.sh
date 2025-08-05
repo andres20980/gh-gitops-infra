@@ -10,9 +10,9 @@
 set -euo pipefail
 
 # Cargar módulo base
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VALIDACION_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./base.sh
-source "$SCRIPT_DIR/base.sh"
+source "$VALIDACION_SCRIPT_DIR/base.sh"
 
 # ============================================================================
 # VALIDACIÓN DE SISTEMA OPERATIVO

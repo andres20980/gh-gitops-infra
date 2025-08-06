@@ -41,12 +41,17 @@ configurar_docker_automatico() {
         # Iniciar dockerd en background
         log_info "Iniciando dockerd en background..."
         if es_dry_run; then
-            log_info "[DRY-RUN] Ejecutaría: sudo dockerd > /tmp/docker.log 2>&1 &"
+            log_info "[DRY-RUN] Ejecutaría: sudo dockerd > logs/docker.log 2>&1 &"
             return 0
         fi
         
+        # Crear directorio de logs si no existe y archivo de log con permisos correctos
+        mkdir -p "${PROJECT_ROOT}/logs" 2>/dev/null || true
+        local docker_log="${PROJECT_ROOT}/logs/docker-$(date +%Y%m%d-%H%M%S).log"
+        touch "$docker_log" && chmod 666 "$docker_log" 2>/dev/null || docker_log="/dev/null"
+        
         # Iniciar Docker daemon
-        sudo dockerd > /tmp/docker.log 2>&1 &
+        sudo dockerd > "$docker_log" 2>&1 &
         local dockerd_pid=$!
         
         # Esperar hasta que Docker esté listo (máximo 30 segundos)
@@ -62,11 +67,15 @@ configurar_docker_automatico() {
         
         if docker info >/dev/null 2>&1; then
             log_success "Docker daemon iniciado correctamente (PID: $dockerd_pid)"
-            log_info "Log de Docker disponible en: /tmp/docker.log"
+            if [[ "$docker_log" != "/dev/null" ]]; then
+                log_info "Log de Docker disponible en: $docker_log"
+            fi
             return 0
         else
             log_error "No se pudo iniciar Docker daemon"
-            log_info "Revisa el log en: /tmp/docker.log"
+            if [[ "$docker_log" != "/dev/null" ]]; then
+                log_info "Revisa el log en: $docker_log"
+            fi
             return 1
         fi
     else

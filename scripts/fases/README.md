@@ -31,7 +31,7 @@ scripts/
 
 #### 1. **Instalador Modular** (RECOMENDADO)
 ```bash
-./instalar-modular.sh               # Nueva arquitectura modular v3.0.0
+./instalar.sh                       # Arquitectura modular v3.0.0 con soporte por fases
 ```
 
 #### 2. **Instalador Clásico** (Mantenido por compatibilidad)
@@ -124,14 +124,40 @@ scripts/
 
 ### **Ejecución por Fases Individuales**
 ```bash
-# Cargar módulos base
-source scripts/comun/base.sh
+```bash
+# Proceso completo desatendido
+./instalar.sh --dry-run
 
-# Cargar fase específica
-source scripts/fases/fase-03-clusters.sh
+# Solo clusters para testing
+./instalar.sh fase-03 --verbose
 
-# Ejecutar función específica
-crear_cluster_gitops_dev
+# Debug completo
+./instalar.sh --debug --log-file debug-modular.log
+```
+
+## 🔧 **Desarrollar Nueva Fase**
+
+Para añadir una nueva fase al sistema:
+
+1. Crear script `scripts/fases/fase-XX-nombre.sh`
+2. Implementar función principal `nombre_principal()`
+3. Agregar a lista de fases en instalar.sh
+4. Documentar en este README
+
+## 📊 **Logging y Debugging**
+
+- Logs centralizados en `PROJECT_ROOT/logs/`
+- Soporte para dry-run en todas las fases
+- Debug granular por fase individual
+- Logging estructurado con timestamps
+
+## 🎯 **Uso Recomendado**
+
+**Para desarrollo/testing:**
+- Fases individuales: `./instalar.sh fase-XX`
+- Rangos de fases: `./instalar.sh fase-01-04`
+
+**Para nuevas instalaciones:** Usar `./instalar.sh`
 ```
 
 ### **Testing de Fases**

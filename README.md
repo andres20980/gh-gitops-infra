@@ -2,7 +2,7 @@
 
 > **Plataforma GitOps completa y totalmente autónoma** - Entorno de desarrollo, preproducción y producción con un solo comando desde Ubuntu WSL limpio.
 
-[![Versión](https://img.shields.io/badge/Versión-2.4.0-blue)](https://github.com/andres20980/gh-gitops-infra/releases)
+[![Versión](https://img.shields.io/badge/Versión-3.0.0-blue)](https://github.com/andres20980/gh-gitops-infra/releases)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.29+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![ArgoCD](https://img.shields.io/badge/ArgoCD-Última-00D4AA?logo=argo&logoColor=white)](https://argoproj.github.io/cd/)
 [![Minikube](https://img.shields.io/badge/Minikube-Compatible-FF6D01?logo=kubernetes&logoColor=white)](https://minikube.sigs.k8s.io/)
@@ -13,7 +13,8 @@
 
 - [� Características Principales](#-características-principales)
 - [⚡ Instalación Súper Simple](#-instalación-súper-simple)
-- [🏗️ Arquitectura del Sistema](#️-arquitectura-del-sistema)
+- [� Instalación por Fases](#-instalación-por-fases)
+- [�🏗️ Arquitectura del Sistema](#️-arquitectura-del-sistema)
 - [🔧 Componentes Incluidos](#-componentes-incluidos)
 - [📊 Monitorización y Observabilidad](#-monitorización-y-observabilidad)
 - [🌍 Entornos Multi-Cluster](#-entornos-multi-cluster)
@@ -29,11 +30,17 @@
 - **Sin interacción humana**: Proceso completamente autónomo
 - **Compatible con versiones**: Instala las últimas versiones compatibles
 
-### �️ **Arquitectura Hipermodular**
-- **Scripts organizados**: Estructura modular en español
+### 🎯 **Instalación Flexible por Fases**
+- **Fases individuales**: `./instalar.sh fase-03` para testing específico
+- **Rangos de fases**: `./instalar.sh fase-01-04` para procesos parciales
+- **Debug granular**: Logging y dry-run por fase individual
+- **Desarrollo ágil**: Iteración rápida en componentes específicos
+
+### �️ **Arquitectura Hipermodular v3.0.0**
+- **Scripts organizados**: Estructura modular en español con 7 fases especializadas
 - **Funciones especializadas**: Cada módulo tiene una responsabilidad específica
 - **Código mantenible**: Fácil de entender, modificar y extender
-- **Estándares de calidad**: Siguiendo mejores prácticas de Shell scripting
+- **Estándares de calidad**: Siguiendo mejores prácticas de Shell scripting modular
 
 ### 🔄 **GitOps Nativo Completo**
 - **ArgoCD maestro**: Controla los 3 clusters desde gitops-dev
@@ -85,6 +92,52 @@ cd gh-gitops-infra
 # Debug completo con log
 ./instalar.sh --debug --log-file debug.log
 ```
+
+## 🎯 Instalación por Fases
+
+### 🎪 **Ejecución de Fases Individuales**
+
+La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrollo, testing y debugging granular:
+
+```bash
+# Fases individuales (ideal para desarrollo)
+./instalar.sh fase-01            # Solo gestión de permisos
+./instalar.sh fase-02            # Solo dependencias del sistema
+./instalar.sh fase-03            # Solo Docker + clusters
+./instalar.sh fase-04            # Solo ArgoCD
+./instalar.sh fase-05            # Solo herramientas GitOps
+./instalar.sh fase-06            # Solo aplicaciones custom
+./instalar.sh fase-07            # Solo finalización + accesos
+
+# Rangos de fases (ideal para testing parcial)
+./instalar.sh fase-01-03         # Infraestructura base (permisos → clusters)
+./instalar.sh fase-04-07         # Plataforma GitOps (ArgoCD → finalización)
+```
+
+### 🔍 **Debugging por Fases**
+
+```bash
+# Testing específico con dry-run
+./instalar.sh fase-03 --dry-run --verbose
+
+# Debug completo de una fase
+./instalar.sh fase-05 --debug --log-file herramientas-debug.log
+
+# Rango con logging personalizado
+./instalar.sh fase-01-04 --verbose --log-file infraestructura.log
+```
+
+### 📋 **Arquitectura de Fases**
+
+| Fase | Descripción | Scripts | Funciones Principales |
+|------|-------------|---------|----------------------|
+| **01** | Gestión de Permisos | `fase-01-permisos.sh` | Auto-escalation/de-escalation inteligente |
+| **02** | Dependencias | `fase-02-dependencias.sh` | Verificación/instalación de herramientas |
+| **03** | Docker + Clusters | `fase-03-clusters.sh` | Configuración Docker, creación gitops-dev |
+| **04** | ArgoCD | `fase-04-argocd.sh` | Instalación y configuración ArgoCD maestro |
+| **05** | Herramientas GitOps | `fase-05-herramientas.sh` | Despliegue Prometheus, Grafana, etc. |
+| **06** | Aplicaciones Custom | `fase-06-aplicaciones.sh` | Apps de demostración y ejemplos |
+| **07** | Finalización | `fase-07-finalizacion.sh` | Clusters promoción, información accesos |
 
 ## 🏗️ Arquitectura del Sistema
 

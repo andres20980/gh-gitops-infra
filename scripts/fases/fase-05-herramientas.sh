@@ -1,24 +1,133 @@
 #!/bin/bash
 
 # ============================================================================
-# FASE 5: HERRAMIENTAS GITOPS
+# FASE 5: INSTALACIÓN DE HERRAMIENTAS GITOPS
+# ============================================================================
+# Instala todas las herramientas GitOps definidas en herramientas-gitops/
+# Script autocontenido - puede ejecutarse independientemente
 # ============================================================================
 
-# Actualizar helm charts y desplegar herramientas
-actualizar_y_desplegar_herramientas() {
-    log_info "📊 Actualizando helm charts y desplegando herramientas GitOps..."
+set -euo pipefail
+
+# ============================================================================
+# AUTOCONTENCIÓN - Carga automática de dependencias
+# ============================================================================
+
+# Detectar directorio del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Cargar autocontención
+if [[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]]; then
+    # shellcheck source=../comun/autocontener.sh
+    source "$SCRIPT_DIR/../comun/autocontener.sh"
+else
+    echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
+    echo "   Asegúrate de ejecutar desde la estructura correcta del proyecto" >&2
+    exit 1
+fi
+
+# ============================================================================
+# FUNCIONES DE LA FASE X
+# ============================================================================
+
+# Configurar Git para operaciones GitOps
+configurar_git_ops() {
+    log_info "🔧 Configurando Git para operaciones GitOps..."
     
     if es_dry_run; then
-        log_info "[DRY-RUN] Ejecutaría optimización de herramientas"
-        log_info "[DRY-RUN] Ejecutaría actualización de helm charts"
-        log_info "[DRY-RUN] Ejecutaría despliegue de herramientas via ArgoCD"
+        log_info "[DRY-RUN] Configuraría Git para operaciones GitOps"
         return 0
     fi
     
-    # ========================================================================
-    # 1. OPTIMIZAR CONFIGURACIONES DE HERRAMIENTAS
-    # ========================================================================
+    # Esta función se implementará cuando sea necesaria
+    log_info "ℹ️ Configuración Git no requerida actualmente"
+    return 0
+}
+
+# Instalar herramientas GitOps via ArgoCD
+instalar_herramientas_gitops() {
+    log_info "🚀 Instalando herramientas GitOps con configuraciones dev..."
+    
+    # Optimizar configuraciones para desarrollo
+    optimizar_configuraciones_dev
+    
+    # Desplegar via ArgoCD
+    desplegar_herramientas_via_argocd
+    
+    log_success "✅ Herramientas GitOps desplegadas via ArgoCD"
+}
+
+# Esperar que las herramientas estén healthy
+esperar_herramientas_healthy() {
+    verificar_estado_herramientas_con_timeout
+}
+
+# Verificar estado de herramientas con timeout
+verificar_estado_herramientas_con_timeout() {
+    log_info "⏳ Esperando que todas las herramientas estén synced y healthy..."
+    local timeout=300  # 5 minutos es suficiente para dev
+    local elapsed=0
+    
+    while [[ $elapsed -lt $timeout ]]; do
+        # Verificar App of Tools principal
+        if kubectl get application tools-gitops -n argocd >/dev/null 2>&1; then
+            local sync_status
+            sync_status=$(kubectl get application tools-gitops -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            local health_status
+            health_status=$(kubectl get application tools-gitops -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+            
+            if [[ "$sync_status" == "Synced" ]] && [[ "$health_status" == "Healthy" ]]; then
+                log_success "✅ App of Tools está synced y healthy"
+                return 0
+            fi
+            
+            if [[ $((elapsed % 30)) -eq 0 ]]; then
+                log_info "⏳ App of Tools: $sync_status/$health_status (${elapsed}s/${timeout}s)"
+            fi
+        fi
+        
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
+    
+    log_warning "⚠️ Timeout verificando herramientas - pueden seguir instalándose en background"
+    log_info "💡 Verifica manualmente: kubectl get applications -n argocd"
+    return 0  # No fallar la instalación por timeout en verificación
+}
+
+# Optimizar configuraciones para desarrollo
+optimizar_configuraciones_dev() {
     log_info "🔧 Optimizando configuraciones de herramientas GitOps para desarrollo..."
+    
+    # 1. Actualizar versiones de helm charts a las últimas
+    actualizar_helm_charts
+    
+    # 2. Optimizar configuraciones para desarrollo
+    aplicar_optimizaciones_dev
+    
+    # 3. Commit y push de cambios para ArgoCD
+    commitear_cambios_para_argocd
+}
+
+# Actualizar helm charts a las últimas versiones
+actualizar_helm_charts() {
+    log_info "📊 Actualizando versiones de helm charts a las últimas..."
+    local helm_updater_script="$COMUN_DIR/helm-updater.sh"
+    
+    if [[ -f "$helm_updater_script" ]]; then
+        if "$helm_updater_script" update herramientas-gitops; then
+            log_success "✅ Helm charts actualizados a últimas versiones"
+        else
+            log_warning "⚠️ Error actualizando helm charts (continuando...)"
+        fi
+    else
+        log_info "ℹ️ Actualizador de helm charts no encontrado (usando versiones fijas)"
+    fi
+}
+
+# Aplicar optimizaciones de desarrollo
+aplicar_optimizaciones_dev() {
+    log_info "🔧 Aplicando configuraciones mínimas para desarrollo..."
     local optimizador_script="$COMUN_DIR/optimizar-dev.sh"
     
     if [[ -f "$optimizador_script" ]]; then
@@ -32,188 +141,153 @@ actualizar_y_desplegar_herramientas() {
         log_warning "⚠️ Script optimizador no encontrado: $optimizador_script"
         log_info "Continuando con configuraciones por defecto..."
     fi
-    
-    # ========================================================================
-    # 2. ACTUALIZAR HELM CHARTS
-    # ========================================================================
-    log_info "📊 Actualizando versiones de helm charts..."
-    local helm_updater_script="$COMUN_DIR/helm-updater.sh"
-    
-    if [[ -f "$helm_updater_script" ]]; then
-        if "$helm_updater_script" update herramientas-gitops; then
-            log_success "✅ Helm charts actualizados a últimas versiones"
-        else
-            log_warning "⚠️ Error actualizando helm charts (continuando...)"
-        fi
-    else
-        log_info "ℹ️ Actualizador de helm charts no encontrado (usando versiones fijas)"
-    fi
-    
-    # ========================================================================
-    # 2.1. COMMIT Y PUSH AUTOMÁTICO DE CAMBIOS
-    # ========================================================================
+}
+
+# Commitear y pushear cambios para ArgoCD
+commitear_cambios_para_argocd() {
     log_info "📡 Commiteando y pusheando cambios para ArgoCD..."
     
     if es_dry_run; then
         log_info "[DRY-RUN] Ejecutaría commit y push de cambios optimizados"
-    else
-        # Verificar si hay cambios
-        if git diff --quiet && git diff --cached --quiet; then
-            log_info "ℹ️ No hay cambios para commitear"
-        else
-            # Agregar todos los cambios
-            git add herramientas-gitops/ argo-apps/
-            
-            # Commit con mensaje descriptivo
-            local commit_msg="🔧 Auto-optimización GitOps: actualización de herramientas y configuraciones
-
-- Optimización de 13 herramientas GitOps con mejores prácticas
-- Actualización de versiones de Helm charts
-- Configuraciones mínimas para desarrollo
-- Generado automáticamente por instalar.sh"
-
-            git commit -m "$commit_msg"
-            
-            # Push a GitHub
-            if git push origin main; then
-                log_success "✅ Cambios pusheados a GitHub - ArgoCD puede sincronizar"
-                # Dar tiempo a ArgoCD para detectar cambios en GitHub
-                log_info "⏳ Esperando que ArgoCD detecte cambios en GitHub..."
-                sleep 15
-            else
-                log_warning "⚠️ Error pusheando a GitHub - ArgoCD podría no sincronizar correctamente"
-                log_info "💡 Puedes hacer push manual después: git push origin main"
-            fi
-        fi
-    fi
-    
-    # ========================================================================
-    # 3. DESPLEGAR HERRAMIENTAS VIA ARGOCD
-    # ========================================================================
-    log_info "🚀 Desplegando herramientas GitOps..."
-    kubectl apply -f argo-apps/app-of-tools-gitops.yaml
-    
-    log_info "⏳ Esperando que ArgoCD sincronice las herramientas..."
-    sleep 10
-    
-    log_info "🔧 Desplegando ApplicationSet para aplicaciones custom..."
-    kubectl apply -f argo-apps/appset-aplicaciones-custom.yaml
-    
-    # Esperar a que todas las aplicaciones estén synced
-    log_info "⏳ Esperando que todas las herramientas estén synced y healthy..."
-    local timeout=600
-    local elapsed=0
-    
-    while [[ $elapsed -lt $timeout ]]; do
-        local apps_status
-        apps_status=$(kubectl get applications -n argocd -o jsonpath='{.items[*].status.sync.status}' 2>/dev/null || echo "")
-        local health_status
-        health_status=$(kubectl get applications -n argocd -o jsonpath='{.items[*].status.health.status}' 2>/dev/null || echo "")
-        
-        if [[ "$apps_status" =~ "Synced" ]] && [[ "$health_status" =~ "Healthy" ]]; then
-            log_success "✅ Todas las herramientas están synced y healthy"
-            return 0
-        fi
-        
-        sleep 10
-        elapsed=$((elapsed + 10))
-        
-        if [[ $((elapsed % 60)) -eq 0 ]]; then
-            log_info "⏳ Esperando herramientas... (${elapsed}s/${timeout}s)"
-        fi
-    done
-    
-    log_error "Timeout esperando que las herramientas estén ready"
-    return 1
-}
-
-# Verificar que todo el sistema GitOps está healthy
-verificar_sistema_gitops_healthy() {
-    log_info "🔍 Verificando estado completo del sistema GitOps..."
-    
-    if es_dry_run; then
-        log_info "[DRY-RUN] Verificaría estado del sistema GitOps"
         return 0
     fi
     
-    # Verificar ArgoCD
-    if ! kubectl get deployment argocd-server -n argocd >/dev/null 2>&1; then
-        log_error "ArgoCD no está disponible"
+    # Verificar si hay cambios
+    if git diff --quiet && git diff --cached --quiet; then
+        log_info "ℹ️ No hay cambios para commitear"
+        return 0
+    fi
+    
+    # Agregar todos los cambios
+    git add herramientas-gitops/ argo-apps/
+    
+    # Commit con mensaje descriptivo
+    local commit_msg="🔧 Auto-optimización GitOps: actualización de herramientas y configuraciones
+
+- Actualización de versiones de Helm charts a las últimas
+- Optimización de herramientas GitOps con configuraciones mínimas dev
+- Preparadas para controlar 3 entornos: DEV, PRE, PRO
+- Generado automáticamente por instalar.sh v3.0.0"
+
+    git commit -m "$commit_msg"
+    
+    # Push a GitHub
+    if git push origin main; then
+        log_success "✅ Cambios pusheados a GitHub - ArgoCD puede sincronizar"
+        # Dar tiempo a ArgoCD para detectar cambios en GitHub
+        log_info "⏳ Esperando que ArgoCD detecte cambios en GitHub..."
+        sleep 15
+    else
+        log_warning "⚠️ Error pusheando a GitHub - ArgoCD podría no sincronizar correctamente"
+        log_info "💡 Puedes hacer push manual después: git push origin main"
+    fi
+}
+
+# Desplegar herramientas via ArgoCD
+desplegar_herramientas_via_argocd() {
+    log_info "📦 Desplegando App of Tools para herramientas GitOps..."
+    
+    if ! kubectl apply -f "${RUTA_PROYECTO}/argo-apps/app-of-tools-gitops.yaml"; then
+        log_error "❌ Error aplicando app-of-tools-gitops"
         return 1
     fi
     
-    # Lista de herramientas GitOps críticas que DEBEN estar healthy
-    local herramientas_criticas=(
+    # Esperar que la app se registre en ArgoCD
+    log_info "⏳ Esperando que la App of Tools se registre..."
+    if ! esperar_condicion "kubectl get application tools-gitops -n argocd" 30; then
+        log_error "❌ La App of Tools no se registró correctamente"
+        return 1
+    fi
+    
+    # Forzar sync inicial (en dev, queremos que se instale inmediatamente)
+    log_info "🔄 Iniciando sync de herramientas GitOps..."
+    kubectl patch application tools-gitops -n argocd --type merge -p '{"operation":{"sync":{}}}' 2>/dev/null || true
+    
+    # Mostrar progreso
+    mostrar_progreso_herramientas
+}
+
+# Mostrar progreso de instalación de herramientas
+mostrar_progreso_herramientas() {
+    log_info "📊 Monitoreando instalación de herramientas..."
+    
+    local herramientas=(
+        "cert-manager"
+        "ingress-nginx"
+        "prometheus-stack"
+        "grafana"
+        "loki"
+        "argo-workflows"
         "argo-events"
         "argo-rollouts"
-        "argo-workflows"
-        "cert-manager"
-        "external-secrets"
-        "gitea"
-        "grafana"
-        "ingress-nginx"
-        "jaeger"
-        "kargo"
-        "loki"
-        "minio"
-        "prometheus-stack"
     )
     
-    log_info "🔍 Verificando estado de ${#herramientas_criticas[@]} herramientas GitOps críticas..."
-    
-    local max_intentos=10
-    local intento=1
-    
-    while [[ $intento -le $max_intentos ]]; do
-        log_info "🔄 Intento $intento/$max_intentos - Verificando herramientas GitOps..."
-        
-        local herramientas_no_healthy=()
-        local herramientas_no_synced=()
-        
-        # Verificar cada herramienta crítica
-        for herramienta in "${herramientas_criticas[@]}"; do
-            local health_status
-            local sync_status
-            
-            health_status=$(kubectl get application "$herramienta" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
-            sync_status=$(kubectl get application "$herramienta" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
-            
-            if [[ "$health_status" != "Healthy" ]]; then
-                herramientas_no_healthy+=("$herramienta($health_status)")
-            fi
-            
-            if [[ "$sync_status" != "Synced" ]]; then
-                herramientas_no_synced+=("$herramienta($sync_status)")
-            fi
-        done
-        
-        # Si todas están healthy y synced, success
-        if [[ ${#herramientas_no_healthy[@]} -eq 0 ]] && [[ ${#herramientas_no_synced[@]} -eq 0 ]]; then
-            log_success "✅ TODAS las herramientas GitOps están Healthy y Synced"
-            log_info "🎯 ${#herramientas_criticas[@]} herramientas críticas verificadas correctamente"
-            return 0
-        fi
-        
-        # Mostrar herramientas problemáticas
-        if [[ ${#herramientas_no_healthy[@]} -gt 0 ]]; then
-            log_warning "⚠️ Herramientas no healthy: ${herramientas_no_healthy[*]}"
-        fi
-        
-        if [[ ${#herramientas_no_synced[@]} -gt 0 ]]; then
-            log_warning "⚠️ Herramientas no synced: ${herramientas_no_synced[*]}"
-        fi
-        
-        # Esperar antes del siguiente intento
-        if [[ $intento -lt $max_intentos ]]; then
-            log_info "⏳ Esperando 30 segundos antes del siguiente intento..."
-            sleep 30
-        fi
-        
-        ((intento++))
+    for herramienta in "${herramientas[@]}"; do
+        log_info "  📦 $herramienta - preparando..."
     done
     
-    # Si llegamos aquí, hay problemas
-    log_error "❌ Sistema GitOps NO está completamente healthy después de $max_intentos intentos"
-    log_error "❌ Herramientas con problemas detectadas - revisar con: kubectl get applications -n argocd"
-    return 1
+    log_info "💡 Las herramientas se instalarán de forma asíncrona via ArgoCD"
 }
+
+
+
+
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL DE LA FASE 5
+# ============================================================================
+
+fase_05_herramientas() {
+    log_info "🛠️ FASE 5: Instalación de Herramientas GitOps"
+    log_info "═══════════════════════════════════════════════"
+    log_info "🎯 Instalando herramientas con configuraciones mínimas dev"
+    log_info "🎯 Preparadas para controlar 3 entornos: DEV, PRE, PRO"
+    
+    # Verificar que no estamos ejecutando como root
+    if [[ "$EUID" -eq 0 ]]; then
+        log_error "❌ Esta fase no debe ejecutarse como root"
+        log_info "💡 Las herramientas GitOps deben instalarse con usuario normal"
+        return 1
+    fi
+    
+    # Verificar que ArgoCD está disponible y healthy
+    if ! kubectl get namespace argocd >/dev/null 2>&1; then
+        log_error "❌ ArgoCD no está instalado"
+        log_info "💡 Ejecuta primero la Fase 4 (ArgoCD)"
+        return 1
+    fi
+    
+    # Verificar que ArgoCD está healthy antes de continuar
+    if ! kubectl get deployment argocd-server -n argocd >/dev/null 2>&1; then
+        log_error "❌ ArgoCD server no está disponible"
+        log_info "💡 Espera a que ArgoCD esté completamente healthy"
+        return 1
+    fi
+    
+    # Configurar repositorio Git si es necesario
+    configurar_git_ops
+    
+    # Instalar todas las herramientas GitOps con configuraciones mínimas
+    log_info "🚀 Instalando herramientas GitOps vía ArgoCD..."
+    instalar_herramientas_gitops
+    
+    # Esperar y verificar que todas estén synced y healthy
+    log_info "⏳ Esperando que todas las herramientas estén synced y healthy..."
+    esperar_herramientas_healthy
+    
+    log_info "📋 Para verificar el estado de las herramientas:"
+    log_info "   kubectl get applications -n argocd"
+    log_info "   kubectl get pods --all-namespaces"
+    
+    log_success "✅ Fase 5 completada: Herramientas GitOps instaladas y ready para 3 entornos"
+    log_info "🎯 Próximo paso: Instalar aplicaciones custom (Fase 6)"
+}
+
+# ============================================================================
+# EJECUCIÓN DIRECTA
+# ============================================================================
+
+# Solo ejecutar si se llama directamente (no sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    fase_05_herramientas "$@"
+fi

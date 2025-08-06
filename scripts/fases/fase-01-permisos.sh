@@ -3,6 +3,32 @@
 # ============================================================================
 # FASE 1: GESTIÓN INTELIGENTE DE PERMISOS
 # ============================================================================
+# Gestiona automáticamente los permisos necesarios para la instalación
+# Script autocontenido - puede ejecutarse independientemente
+# ============================================================================
+
+set -euo pipefail
+
+# ============================================================================
+# AUTOCONTENCIÓN - Carga automática de dependencias
+# ============================================================================
+
+# Detectar directorio del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Cargar autocontención
+if [[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]]; then
+    # shellcheck source=../comun/autocontener.sh
+    source "$SCRIPT_DIR/../comun/autocontener.sh"
+else
+    echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
+    echo "   Asegúrate de ejecutar desde la estructura correcta del proyecto" >&2
+    exit 1
+fi
+
+# ============================================================================
+# FUNCIONES DE LA FASE 1
+# ============================================================================
 
 # Gestión inteligente de permisos para proceso totalmente desatendido
 gestionar_permisos_inteligente() {
@@ -89,3 +115,48 @@ verificar_contexto_permisos() {
     
     return 0
 }
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL DE LA FASE 1
+# ============================================================================
+
+fase_01_permisos() {
+    log_info "🔐 FASE 1: Gestión Inteligente de Permisos"
+    log_info "════════════════════════════════════════"
+    
+    # Verificar permisos actuales
+    log_info "👤 Usuario actual: $(whoami)"
+    log_info "🆔 UID: $EUID"
+    
+    if [[ "$EUID" -eq 0 ]]; then
+        log_info "🔑 Ejecutándose con privilegios de root"
+    else
+        log_info "👤 Ejecutándose como usuario normal"
+    fi
+    
+    # Verificar sudo disponible
+    if command -v sudo >/dev/null 2>&1; then
+        log_info "✅ Comando sudo disponible"
+        if sudo -n true 2>/dev/null; then
+            log_info "✅ Permisos sudo configurados (sin contraseña)"
+        else
+            log_info "⚠️ Permisos sudo requieren contraseña"
+        fi
+    else
+        log_warning "⚠️ Comando sudo no disponible"
+    fi
+    
+    # Gestionar permisos inteligentemente
+    gestionar_permisos_inteligente "permisos"
+    
+    log_info "✅ Fase 1 completada: Permisos verificados"
+}
+
+# ============================================================================
+# EJECUCIÓN DIRECTA
+# ============================================================================
+
+# Solo ejecutar si se llama directamente (no sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    fase_01_permisos "$@"
+fi

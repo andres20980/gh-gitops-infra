@@ -1,16 +1,22 @@
 # ==========================================
 # INFRAESTRUCTURA GITOPS - .gitignore
 # ==========================================
+# Best practices para repositorios GitOps
+# Actualizado: 2025-08-06
+# ==========================================
 
 # ==========================================
 # IDE y Editores
 # ==========================================
 .vscode/
+.vscode-server/
 .idea/
 *.swp
 *.swo
 *~
 *.tmp
+*.bak
+*.orig
 
 # ==========================================
 # Sistema Operativo
@@ -18,6 +24,100 @@
 .DS_Store
 .DS_Store?
 ._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==========================================
+# Logs y Archivos Temporales
+# ==========================================
+*.log
+logs/*.log
+logs/docker-*.log
+logs/kubectl-*.log
+logs/minikube-*.log
+*.pid
+*.out
+*.err
+
+# ==========================================
+# Secrets y Configuraciones Sensibles
+# ==========================================
+*.key
+*.pem
+*.p12
+*.crt
+*.csr
+secrets/
+.env
+.env.local
+.env.*.local
+kubeconfig*
+*-secret.yaml
+*-secrets.yaml
+
+# ==========================================
+# Archivos de Estado y Cache
+# ==========================================
+.terraform/
+terraform.tfstate*
+.terraform.lock.hcl
+*.tfvars
+.vagrant/
+.ansible/
+.helm/cache/
+.kube/cache/
+
+# ==========================================
+# Builds y Distribuciones
+# ==========================================
+dist/
+build/
+target/
+bin/
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+
+# ==========================================
+# Dependencias y Packages
+# ==========================================
+node_modules/
+vendor/
+.pip/
+.npm/
+.yarn/
+
+# ==========================================
+# Testing y Coverage
+# ==========================================
+coverage/
+.nyc_output/
+.coverage
+htmlcov/
+.pytest_cache/
+test-results/
+*.cover
+
+# ==========================================
+# Documentación Generada
+# ==========================================
+_site/
+.jekyll-cache/
+.jekyll-metadata
+
+# ==========================================
+# Archivos de Desarrollo Local
+# ==========================================
+*.local
+*-local.*
+*-dev.*
+*-test.*
+scratch/
+playground/
+sandbox/
 .Spotlight-V100
 .Trashes
 ehthumbs.db

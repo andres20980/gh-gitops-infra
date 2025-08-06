@@ -51,7 +51,7 @@ log_message() {
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
-    echo -e "${color}[${timestamp}] ${symbol} [${level}] ${message}${COLOR_RESET}"
+    printf '%s[%s] %s [%s] %s%s\n' "${color}" "${timestamp}" "${symbol}" "${level}" "${message}" "${COLOR_RESET}"
 }
 
 # Funciones específicas de logging
@@ -71,9 +71,28 @@ log_section() {
     local title="$1"
     echo
     echo "================================================================================"
-    echo -e "${COLOR_CYAN}→ ${title}${COLOR_RESET}"
+    printf '%s→ %s%s\n' "${COLOR_CYAN}" "${title}" "${COLOR_RESET}"
     echo "================================================================================"
     echo
+}
+
+# ============================================================================
+# FUNCIONES DE CONTROL
+# ============================================================================
+
+# Verificar si está en modo dry-run
+es_dry_run() {
+    [[ "${DRY_RUN:-false}" == "true" ]]
+}
+
+# Verificar si está en modo verbose
+es_verbose() {
+    [[ "${VERBOSE:-false}" == "true" ]]
+}
+
+# Verificar si está en modo debug
+es_debug() {
+    [[ "${DEBUG:-false}" == "true" ]]
 }
 
 # ============================================================================
@@ -182,15 +201,26 @@ verificar_recursos() {
 
 # Ejecutar comando con reintentos
 ejecutar_con_retry() {
-    local comando="$1"
-    local max_intentos="${2:-3}"
-    local espera="${3:-5}"
+    local -a comando=("$@")
+    local max_intentos="${MAX_RETRY_INTENTOS:-3}"
+    local espera="${RETRY_ESPERA:-5}"
     local intento=1
     
+    # Extraer parámetros opcionales si están al final
+    if [[ "${!#}" =~ ^[0-9]+$ ]] && [[ $# -gt 1 ]]; then
+        espera="${!#}"
+        unset 'comando[-1]'
+    fi
+    
+    if [[ "${!#}" =~ ^[0-9]+$ ]] && [[ $# -gt 2 ]]; then
+        max_intentos="${comando[-1]}"
+        unset 'comando[-1]'
+    fi
+    
     while [[ $intento -le $max_intentos ]]; do
-        log_debug "Intento $intento de $max_intentos: $comando"
+        log_debug "Intento $intento de $max_intentos: ${comando[*]}"
         
-        if eval "$comando"; then
+        if "${comando[@]}"; then
             return 0
         fi
         

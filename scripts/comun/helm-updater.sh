@@ -5,12 +5,20 @@
 # ============================================================================
 # Actualiza automáticamente las versiones de helm charts en las aplicaciones
 # ArgoCD basándose en los repositorios oficiales
+# 
+# Uso:
+#   ./helm-updater.sh [check|update|versions|validate] [directorio]
+#
+# Ejemplos:
+#   ./helm-updater.sh check                    # Verificar versiones
+#   ./helm-updater.sh update                   # Actualizar todas
+#   UPDATE_CHARTS=true ./helm-updater.sh check # Auto-actualizar
 # ============================================================================
 
 set -euo pipefail
 
 # Cargar módulo base
-HELM_UPDATER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly HELM_UPDATER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./base.sh
 source "$HELM_UPDATER_SCRIPT_DIR/base.sh"
 
@@ -46,23 +54,32 @@ readonly CHART_MAPPINGS=(
 )
 
 # ============================================================================
-# FUNCIONES DE HELM
+# FUNCIONES DE HELM OPTIMIZADAS
 # ============================================================================
 
+# Configurar repositorios de Helm
+# Parámetros: ninguno
+# Retorna: 0 en éxito, 1 en error
 setup_helm_repos() {
     log_section "📦 Configurando repositorios de Helm"
     
-    # Actualizar lista de repos
-    helm repo update >/dev/null 2>&1 || true
+    # Actualizar lista de repos existentes
+    if ! helm repo update >/dev/null 2>&1; then
+        log_warning "⚠️ No se pudieron actualizar repos existentes (continuando...)"
+    fi
     
     # Agregar repositorios necesarios
+    local repo_entry repo_name repo_url
     for repo_entry in "${HELM_REPOS[@]}"; do
-        local repo_name="${repo_entry%%|*}"
-        local repo_url="${repo_entry##*|}"
+        repo_name="${repo_entry%%|*}"
+        repo_url="${repo_entry##*|}"
         
-        if ! helm repo list | grep -q "^$repo_name"; then
+        if ! helm repo list 2>/dev/null | grep -q "^$repo_name"; then
             log_info "➕ Agregando repositorio: $repo_name"
-            helm repo add "$repo_name" "$repo_url" >/dev/null 2>&1
+            if ! helm repo add "$repo_name" "$repo_url" >/dev/null 2>&1; then
+                log_error "❌ Error agregando repositorio $repo_name"
+                return 1
+            fi
         else
             log_debug "✅ Repositorio ya existe: $repo_name"
         fi
@@ -70,43 +87,79 @@ setup_helm_repos() {
     
     # Actualizar todos los repositorios
     log_info "🔄 Actualizando repositorios..."
-    helm repo update >/dev/null 2>&1
+    if ! helm repo update >/dev/null 2>&1; then
+        log_error "❌ Error actualizando repositorios Helm"
+        return 1
+    fi
     
     log_success "✅ Repositorios de Helm configurados"
 }
 
+# Obtener la última versión de un chart
+# Parámetros: repo_name chart_name
+# Retorna: versión en stdout, 1 en error
 get_latest_chart_version() {
     local repo_name="$1"
     local chart_name="$2"
     
-    # Obtener la última versión del chart
+    # Validar parámetros
+    if [[ -z "$repo_name" || -z "$chart_name" ]]; then
+        log_error "❌ Parámetros requeridos: repo_name chart_name"
+        return 1
+    fi
+    
+    # Buscar la última versión del chart (excluyendo deprecated)
     local latest_version
-    latest_version=$(helm search repo "$repo_name/$chart_name" --versions | grep -v "DEPRECATED" | head -2 | tail -1 | awk '{print $2}')
+    latest_version=$(helm search repo "$repo_name/$chart_name" --versions 2>/dev/null | \
+                    grep -v "DEPRECATED" | \
+                    awk 'NR==2 {print $2}')
     
     if [[ -n "$latest_version" && "$latest_version" != "CHART VERSION" ]]; then
-        echo "$latest_version"
+        printf '%s\n' "$latest_version"
     else
         log_error "❌ No se pudo obtener la versión de $repo_name/$chart_name"
         return 1
     fi
 }
 
+# Actualizar versión en archivo de aplicación ArgoCD
+# Parámetros: app_file new_version
+# Retorna: 0 en éxito, 1 en error
 update_argocd_application() {
     local app_file="$1"
     local new_version="$2"
     local app_name
-    app_name=$(basename "$app_file" .yaml)
     
+    # Validar parámetros
+    if [[ -z "$app_file" || -z "$new_version" ]]; then
+        log_error "❌ Parámetros requeridos: app_file new_version"
+        return 1
+    fi
+    
+    if [[ ! -f "$app_file" ]]; then
+        log_error "❌ Archivo no encontrado: $app_file"
+        return 1
+    fi
+    
+    app_name=$(basename "$app_file" .yaml)
     log_info "🔧 Actualizando $app_name a versión $new_version"
     
     # Usar yq para actualizar la versión si existe
     if command -v yq >/dev/null 2>&1; then
-        yq eval ".spec.source.targetRevision = \"$new_version\"" -i "$app_file"
-        log_success "✅ $app_name actualizado a $new_version"
+        if yq eval ".spec.source.targetRevision = \"$new_version\"" -i "$app_file"; then
+            log_success "✅ $app_name actualizado a $new_version"
+        else
+            log_error "❌ Error actualizando $app_name con yq"
+            return 1
+        fi
     else
         # Fallback con sed si yq no está disponible
-        sed -i "s/targetRevision: .*/targetRevision: $new_version/" "$app_file"
-        log_success "✅ $app_name actualizado a $new_version (usando sed)"
+        if sed -i "s/targetRevision: .*/targetRevision: $new_version/" "$app_file"; then
+            log_success "✅ $app_name actualizado a $new_version (usando sed)"
+        else
+            log_error "❌ Error actualizando $app_name con sed"
+            return 1
+        fi
     fi
 }
 

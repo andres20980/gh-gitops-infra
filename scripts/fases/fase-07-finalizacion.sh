@@ -1,7 +1,33 @@
 #!/bin/bash
 
 # ============================================================================
-# FASE 7: MOSTRAR INFORMACIÓN FINAL
+# FASE 7: FINALIZACIÓN Y VERIFICACIÓN
+# ============================================================================
+# Verifica el estado final y proporciona información de acceso
+# Script autocontenido - puede ejecutarse independientemente
+# ============================================================================
+
+set -euo pipefail
+
+# ============================================================================
+# AUTOCONTENCIÓN - Carga automática de dependencias
+# ============================================================================
+
+# Detectar directorio del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Cargar autocontención
+if [[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]]; then
+    # shellcheck source=../comun/autocontener.sh
+    source "$SCRIPT_DIR/../comun/autocontener.sh"
+else
+    echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
+    echo "   Asegúrate de ejecutar desde la estructura correcta del proyecto" >&2
+    exit 1
+fi
+
+# ============================================================================
+# FUNCIONES DE LA FASE X
 # ============================================================================
 
 # Mostrar accesos al sistema
@@ -84,3 +110,39 @@ mostrar_resumen_final() {
     
     mostrar_accesos_sistema
 }
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL DE LA FASE 7
+# ============================================================================
+
+fase_07_finalizacion() {
+    log_info "🎯 FASE 7: Finalización y Verificación"
+    log_info "════════════════════════════════════════"
+    
+    # Verificar estado final del sistema
+    log_info "🔍 Verificando estado final del sistema..."
+    
+    # Verificar clusters activos
+    log_info "📋 Clusters activos:"
+    minikube profile list 2>/dev/null || log_warning "No se pudo listar perfiles"
+    
+    # Verificar ArgoCD y aplicaciones
+    if kubectl get namespace argocd >/dev/null 2>&1; then
+        log_info "📋 Aplicaciones en ArgoCD:"
+        kubectl get applications -n argocd 2>/dev/null | head -10 || log_warning "No se pudo listar aplicaciones"
+    fi
+    
+    # Mostrar resumen final y accesos
+    mostrar_resumen_final
+    
+    log_info "✅ Fase 7 completada: Sistema verificado y finalizado"
+}
+
+# ============================================================================
+# EJECUCIÓN DIRECTA
+# ============================================================================
+
+# Solo ejecutar si se llama directamente (no sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    fase_07_finalizacion "$@"
+fi

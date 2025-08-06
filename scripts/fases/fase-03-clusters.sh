@@ -3,6 +3,61 @@
 # ============================================================================
 # FASE 3: CONFIGURACIÓN DOCKER Y CLUSTERS
 # ============================================================================
+# Configura Docker automáticamente y crea el cluster gitops-dev
+# Script autocontenido - puede ejecutarse independientemente
+# ============================================================================
+
+set -euo pipefail
+
+# ============================================================================
+# AUTOCONTENCIÓN - Carga automática de dependencias
+# ============================================================================
+
+# Detectar directorio del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Cargar autocontención
+if [[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]]; then
+    # shellcheck source=../comun/autocontener.sh
+    source "$SCRIPT_DIR/../comun/autocontener.sh"
+else
+    echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
+    echo "   Asegúrate de ejecutar desde la estructura correcta del proyecto" >&2
+    exit 1
+fi
+
+# ============================================================================
+# FUNCIONES DE LA FASE 3
+# ============================================================================
+
+# Verificar que Docker está disponible y funcionando
+verificar_docker_disponible() {
+    log_info "🐳 Verificando Docker..."
+    
+    # Verificar si Docker está instalado
+    if ! command -v docker >/dev/null 2>&1; then
+        log_error "❌ Docker no está instalado"
+        log_info "💡 Ejecuta primero la Fase 2 (dependencias)"
+        return 1
+    fi
+    
+    # En modo dry-run, simplificar verificación
+    if es_dry_run; then
+        log_info "[DRY-RUN] Verificaría Docker daemon y lo configuraría si es necesario"
+        log_success "✅ Docker disponible (modo dry-run)"
+        return 0
+    fi
+    
+    # Verificar si Docker daemon está corriendo o configurarlo
+    if ! docker info >/dev/null 2>&1; then
+        log_info "🔧 Docker daemon no está activo, configurando automáticamente..."
+        configurar_docker_automatico
+    else
+        log_success "✅ Docker daemon disponible"
+    fi
+    
+    return 0
+}
 
 # Detectar y configurar Docker automáticamente
 configurar_docker_automatico() {
@@ -115,16 +170,19 @@ crear_cluster_gitops_dev() {
         minikube delete --profile="$CLUSTER_DEV_NAME"
     fi
     
-    # Crear cluster con capacidad completa
-    log_info "🏗️ Creando cluster $CLUSTER_DEV_NAME..."
+    # Crear cluster con capacidad completa para ecosistema GitOps
+    log_info "🏗️ Creando cluster $CLUSTER_DEV_NAME con capacidad para ecosistema GitOps completo..."
+    log_info "   📊 Recursos asignados: ${CLUSTER_DEV_CPUS} CPUs, ${CLUSTER_DEV_MEMORY}MB RAM, ${CLUSTER_DEV_DISK} disk"
     
     # Configurar argumentos según el usuario
     local minikube_args=(
         "--profile=$CLUSTER_DEV_NAME"
-        "--cpus=$CLUSTER_DEV_CPUS"
-        "--memory=$CLUSTER_DEV_MEMORY"
-        "--disk-size=$CLUSTER_DEV_DISK"
+        "--cpus=$CLUSTER_DEV_CPUS"          # 4 CPUs para ArgoCD + herramientas
+        "--memory=$CLUSTER_DEV_MEMORY"      # 8GB para ecosistema completo  
+        "--disk-size=$CLUSTER_DEV_DISK"     # 40GB para imágenes y storage
         "--kubernetes-version=stable"
+        "--feature-gates=EphemeralContainers=true"
+        "--extra-config=apiserver.enable-admission-plugins=NamespaceLifecycle,ResourceQuota"
     )
     
     # Detectar si se ejecuta como root y ajustar driver
@@ -155,7 +213,12 @@ crear_cluster_gitops_dev() {
     log_info "🔍 Verificando que el cluster está listo..."
     kubectl wait --for=condition=ready nodes --all --timeout=300s
     
-    log_success "✅ Cluster $CLUSTER_DEV_NAME creado y configurado correctamente"
+    # Mostrar información del cluster
+    log_info "📋 Información del cluster DEV:"
+    kubectl get nodes -o wide
+    
+    log_success "✅ Cluster $CLUSTER_DEV_NAME creado y listo para ecosistema GitOps"
+    log_info "🎯 Próximos pasos: ArgoCD → Herramientas GitOps → Apps Custom → Clusters PRE/PRO"
     return 0
 }
 
@@ -212,3 +275,47 @@ crear_clusters_promocion() {
     log_success "✅ Clusters de promoción creados y registrados"
     return 0
 }
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL DE LA FASE 3
+# ============================================================================
+
+fase_03_clusters() {
+    log_info "🏗️ FASE 3: Configuración de Clusters Kubernetes"
+    log_info "══════════════════════════════════════════════"
+    
+    # Verificar que no estamos ejecutando como root
+    if [[ "$EUID" -eq 0 ]]; then
+        log_error "❌ Esta fase no debe ejecutarse como root"
+        log_info "💡 Los clusters Kubernetes deben crearse con usuario normal"
+        return 1
+    fi
+    
+    # Verificar Docker
+    verificar_docker_disponible
+    
+    # Configurar cluster principal DEV
+    crear_cluster_gitops_dev
+    
+    # Configurar clusters adicionales si no es solo DEV
+    if ! solo_dev; then
+        crear_clusters_promocion
+    else
+        log_info "⏭️ Saltando clusters de promoción (--solo-dev)"
+    fi
+    
+    # Mostrar estado final
+    log_info "📋 Estado final de clusters:"
+    minikube profile list 2>/dev/null || log_warning "No se pudo listar perfiles"
+    
+    log_info "✅ Fase 3 completada: Clusters configurados"
+}
+
+# ============================================================================
+# EJECUCIÓN DIRECTA
+# ============================================================================
+
+# Solo ejecutar si se llama directamente (no sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    fase_03_clusters "$@"
+fi

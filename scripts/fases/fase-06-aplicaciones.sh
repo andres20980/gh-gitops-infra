@@ -1,8 +1,58 @@
 #!/bin/bash
 
 # ============================================================================
-# FASE 6: APLICACIONES CUSTOM
+# FASE 6: DESPLIEGUE DE APLICACIONES
 # ============================================================================
+# Despliega aplicaciones de prueba usando Application Sets
+# Script autocontenido - puede ejecutarse independientemente
+# ============================================================================
+
+set -euo pipefail
+
+# ============================================================================
+# AUTOCONTENCIÓN - Carga automática de dependencias
+# ============================================================================
+
+# Detectar directorio del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Cargar autocontención
+if [[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]]; then
+    # shellcheck source=../comun/autocontener.sh
+    source "$SCRIPT_DIR/../comun/autocontener.sh"
+else
+    echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
+    echo "   Asegúrate de ejecutar desde la estructura correcta del proyecto" >&2
+    exit 1
+fi
+
+# ============================================================================
+# FUNCIONES DE LA FASE X
+# ============================================================================
+
+# Configurar aplicaciones custom
+configurar_aplicaciones_custom() {
+    desplegar_aplicaciones_custom
+    generar_commit_aplicaciones_custom
+}
+
+# Desplegar ApplicationSets
+desplegar_application_sets() {
+    log_info "🚀 Desplegando ApplicationSets..."
+    
+    if es_dry_run; then
+        log_info "[DRY-RUN] Desplegaría ApplicationSets"
+        return 0
+    fi
+    
+    # Aplicar ApplicationSet para aplicaciones
+    if [[ -f "argo-apps/appset-aplicaciones-custom.yaml" ]]; then
+        kubectl apply -f argo-apps/appset-aplicaciones-custom.yaml
+        log_success "✅ ApplicationSets desplegados"
+    else
+        log_warning "⚠️ ApplicationSet no encontrado"
+    fi
+}
 
 # Desplegar aplicaciones custom
 desplegar_aplicaciones_custom() {
@@ -142,3 +192,51 @@ verificar_aplicaciones_custom_synced() {
     log_warning "⚠️ Timeout esperando aplicaciones custom (continuando...)"
     return 0
 }
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL DE LA FASE 6
+# ============================================================================
+
+fase_06_aplicaciones() {
+    log_info "🚀 FASE 6: Despliegue de Aplicaciones"
+    log_info "═══════════════════════════════════════"
+    
+    # Verificar que no estamos ejecutando como root
+    if [[ "$EUID" -eq 0 ]]; then
+        log_error "❌ Esta fase no debe ejecutarse como root"
+        log_info "💡 Las aplicaciones deben desplegarse con usuario normal"
+        return 1
+    fi
+    
+    # Verificar que ArgoCD está disponible
+    if ! kubectl get namespace argocd >/dev/null 2>&1; then
+        log_error "❌ ArgoCD no está instalado"
+        log_info "💡 Ejecuta primero las fases anteriores"
+        return 1
+    fi
+    
+    # Configurar y desplegar aplicaciones
+    log_info "📦 Configurando aplicaciones de ejemplo..."
+    configurar_aplicaciones_custom
+    
+    log_info "🚀 Desplegando ApplicationSets..."
+    desplegar_application_sets
+    
+    log_info "⏳ Verificando despliegue de aplicaciones..."
+    verificar_aplicaciones_custom_synced
+    
+    log_info "📋 Para verificar el estado de las aplicaciones:"
+    log_info "   kubectl get applications -n argocd"
+    log_info "   kubectl get pods --all-namespaces"
+    
+    log_info "✅ Fase 6 completada: Aplicaciones desplegadas"
+}
+
+# ============================================================================
+# EJECUCIÓN DIRECTA
+# ============================================================================
+
+# Solo ejecutar si se llama directamente (no sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    fase_06_aplicaciones "$@"
+fi

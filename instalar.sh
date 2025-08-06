@@ -4,97 +4,52 @@
 # INSTALADOR PRINCIPAL MODULAR - GitOps España Infrastructure (Versión 3.0.0)
 # ============================================================================
 # Instalador principal optimizado y modular para infraestructura GitOps
-# Orquestador inteligente con arquitectura por fases
+# Orquestador inteligente con arquitectura por fases autocontenidas
 # ============================================================================
 
 set -euo pipefail
 
 # ============================================================================
-# CONFIGURACIÓN GLOBAL
+# AUTOCONTENCIÓN - Carga automática de dependencias
 # ============================================================================
 
-# Metadatos del script
-readonly SCRIPT_VERSION="3.0.0"
-readonly SCRIPT_NAME="GitOps España Instalador Modular"
-readonly SCRIPT_DESCRIPTION="Instalador principal modular para infraestructura GitOps"
-
-# Directorios del proyecto
+# Detectar PROJECT_ROOT automáticamente
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly SCRIPTS_DIR="${PROJECT_ROOT}/scripts"
-readonly COMUN_DIR="${SCRIPTS_DIR}/comun"
-readonly FASES_DIR="${SCRIPTS_DIR}/fases"
+export PROJECT_ROOT
 
-# ============================================================================
-# CARGA DE SISTEMA BASE
-# ============================================================================
-
-# Verificar que existe la nueva estructura modular
-if [[ ! -d "$SCRIPTS_DIR" ]]; then
-    echo "❌ Error: No se encontró la estructura modular en $SCRIPTS_DIR"
-    exit 1
-fi
-
-# Cargar módulos comunes
-base_path="$COMUN_DIR/base.sh"
-if [[ -f "$base_path" ]]; then
-    # shellcheck source=scripts/comun/base.sh
-    source "$base_path"
+# Cargar autocontención
+if [[ -f "$PROJECT_ROOT/scripts/comun/autocontener.sh" ]]; then
+    # shellcheck source=scripts/comun/autocontener.sh
+    source "$PROJECT_ROOT/scripts/comun/autocontener.sh"
 else
-    echo "❌ Error: Módulo base no encontrado en $base_path" >&2
+    echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
+    echo "   Asegúrate de que la estructura del proyecto sea correcta" >&2
     exit 1
 fi
 
 # ============================================================================
-# CONFIGURACIÓN DE VARIABLES
+# FUNCIONES ESPECÍFICAS DEL INSTALADOR
 # ============================================================================
 
-# Control de flujo (PROCESO DESATENDIDO por defecto)
-export DRY_RUN="${DRY_RUN:-false}"
-export VERBOSE="${VERBOSE:-true}"    # VERBOSE SIEMPRE por defecto
-export INTERACTIVE="${INTERACTIVE:-false}"  # NO INTERACTIVO por defecto
-export DEBUG="${DEBUG:-false}"
-export SKIP_DEPS="${SKIP_DEPS:-false}"
-export SOLO_DEV="${SOLO_DEV:-false}"
-export FORCE="${FORCE:-false}"
-
-# Configuración del proceso GitOps (MÚLTIPLES CLUSTERS)
-export CLUSTER_DEV_NAME="${CLUSTER_DEV_NAME:-gitops-dev}"
-export CLUSTER_PRE_NAME="${CLUSTER_PRE_NAME:-gitops-pre}"  
-export CLUSTER_PRO_NAME="${CLUSTER_PRO_NAME:-gitops-pro}"
-export CLUSTER_PROVIDER="${CLUSTER_PROVIDER:-minikube}"
-
-# Capacidades de clusters
-export CLUSTER_DEV_CPUS="${CLUSTER_DEV_CPUS:-4}"
-export CLUSTER_DEV_MEMORY="${CLUSTER_DEV_MEMORY:-8192}"
-export CLUSTER_DEV_DISK="${CLUSTER_DEV_DISK:-40g}"
-
-export CLUSTER_PRE_CPUS="${CLUSTER_PRE_CPUS:-2}"
-export CLUSTER_PRE_MEMORY="${CLUSTER_PRE_MEMORY:-4096}"
-export CLUSTER_PRE_DISK="${CLUSTER_PRE_DISK:-20g}"
-
-export CLUSTER_PRO_CPUS="${CLUSTER_PRO_CPUS:-2}"
-export CLUSTER_PRO_MEMORY="${CLUSTER_PRO_MEMORY:-4096}"
-export CLUSTER_PRO_DISK="${CLUSTER_PRO_DISK:-20g}"
-
-# Configuración de componentes (TODO HABILITADO para entorno completo)
-export INSTALL_ARGOCD="${INSTALL_ARGOCD:-true}"
-export INSTALL_KARGO="${INSTALL_KARGO:-true}"
-export INSTALL_INGRESS_NGINX="${INSTALL_INGRESS_NGINX:-true}"
-export INSTALL_CERT_MANAGER="${INSTALL_CERT_MANAGER:-true}"
-export INSTALL_PROMETHEUS_STACK="${INSTALL_PROMETHEUS_STACK:-true}"
-export INSTALL_GRAFANA="${INSTALL_GRAFANA:-true}"
-export INSTALL_LOKI="${INSTALL_LOKI:-true}"
-export INSTALL_JAEGER="${INSTALL_JAEGER:-true}"
-export INSTALL_EXTERNAL_SECRETS="${INSTALL_EXTERNAL_SECRETS:-true}"
-export INSTALL_MINIO="${INSTALL_MINIO:-true}"
-export INSTALL_GITEA="${INSTALL_GITEA:-true}"
-export INSTALL_ARGO_WORKFLOWS="${INSTALL_ARGO_WORKFLOWS:-true}"
-export INSTALL_ARGO_EVENTS="${INSTALL_ARGO_EVENTS:-true}"
-export INSTALL_ARGO_ROLLOUTS="${INSTALL_ARGO_ROLLOUTS:-true}"
-
-# Timeouts y configuración avanzada
-export TIMEOUT_INSTALL="${TIMEOUT_INSTALL:-600}"
-export TIMEOUT_READY="${TIMEOUT_READY:-300}"
+# Cargar todos los módulos de fases
+cargar_modulos_fases() {
+    log_info "📂 Cargando módulos por fases..."
+    
+    for fase in "${FASES_DISPONIBLES[@]}"; do
+        local fase_path="$FASES_DIR/$fase"
+        
+        if [[ -f "$fase_path" ]]; then
+            # shellcheck source=/dev/null
+            source "$fase_path"
+            log_debug "✅ Módulo cargado: $fase"
+        else
+            log_error "❌ Módulo de fase no encontrado: $fase_path"
+            return 1
+        fi
+    done
+    
+    log_success "✅ Todos los módulos de fases cargados correctamente"
+}
 export TIMEOUT_DELETE="${TIMEOUT_DELETE:-120}"
 
 # ============================================================================

@@ -77,7 +77,11 @@ instalar_kubectl() {
     curl -LO "https://dl.k8s.io/release/$version/bin/linux/amd64/kubectl.sha256"
     
     # Verificar checksum
-    echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+    if ! printf '%s  kubectl\n' "$(cat kubectl.sha256)" | sha256sum --check --quiet; then
+        log_error "❌ Verificación de checksum falló para kubectl"
+        rm -f kubectl kubectl.sha256
+        return 1
+    fi
     
     # Instalar kubectl
     sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl

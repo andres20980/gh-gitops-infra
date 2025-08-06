@@ -54,10 +54,15 @@ validar_sistema_operativo() {
     if [[ "$distro" == "ubuntu" ]]; then
         local version
         version=$(obtener_version_sistema)
-        local version_number
-        version_number=$(echo "$version" | cut -d'.' -f1,2)
+        local version_major version_minor
+        version_major=$(printf '%s\n' "$version" | cut -d'.' -f1)
+        version_minor=$(printf '%s\n' "$version" | cut -d'.' -f2)
         
-        if (( $(echo "$version_number >= 20.04" | bc -l) )); then
+        # Comparación sin bc: 20.04 = 2004, comparamos como enteros
+        local version_int=$((version_major * 100 + version_minor))
+        local min_version_int=2004  # 20.04
+        
+        if [[ $version_int -ge $min_version_int ]]; then
             log_debug "Versión de Ubuntu verificada: $version >= 20.04"
         else
             log_error "Versión de Ubuntu no soportada: $version (mínimo 20.04)"

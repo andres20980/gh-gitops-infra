@@ -26,6 +26,16 @@ else
     exit 1
 fi
 
+# Cargar helper dinámico de GitOps
+if [[ -f "$SCRIPT_DIR/../comun/helpers/gitops-helper.sh" ]]; then
+    # shellcheck source=../comun/helpers/gitops-helper.sh
+    source "$SCRIPT_DIR/../comun/helpers/gitops-helper.sh"
+else
+    echo "❌ Error: No se pudo cargar el helper dinámico de GitOps" >&2
+    echo "   Asegúrate de que el sistema de helpers esté disponible" >&2
+    exit 1
+fi
+
 # ============================================================================
 # FUNCIONES DE LA FASE X
 # ============================================================================
@@ -46,26 +56,25 @@ configurar_git_ops() {
 
 # Instalar herramientas GitOps via ArgoCD
 instalar_herramientas_gitops() {
-    log_info "🚀 Instalando herramientas GitOps con configuraciones dev..."
+    log_info "🚀 Instalando herramientas GitOps con sistema dinámico v3.0.0..."
     
     if es_dry_run; then
-        log_info "[DRY-RUN] Simularía instalación de herramientas GitOps"
+        log_info "[DRY-RUN] Se ejecutaría optimización GitOps dinámica"
+        autodescubrir_herramientas_gitops
+        mostrar_resumen_herramientas
         return 0
     fi
     
-    # Versión simplificada temporal - evita problemas de dependencias
-    log_info "📋 Verificando que ArgoCD está disponible..."
-    if ! kubectl get namespace argocd >/dev/null 2>&1; then
-        log_error "❌ ArgoCD no está instalado. Ejecuta primero la fase 4."
+    # Ejecutar optimización GitOps completamente dinámica
+    log_info "🔍 Iniciando autodescubrimiento y optimización dinámica..."
+    
+    if ! ejecutar_optimizacion_gitops; then
+        log_error "❌ Falló la optimización GitOps dinámica"
         return 1
     fi
     
-    log_info "✅ ArgoCD disponible, continuando..."
-    
-    # Crear la aplicación de herramientas GitOps
-    crear_app_herramientas_gitops
-    
-    log_success "✅ Herramientas GitOps configuradas para despliegue via ArgoCD"
+    log_success "✅ Herramientas GitOps optimizadas dinámicamente"
+    return 0
 }
 
 # Crear aplicación de herramientas GitOps en ArgoCD

@@ -30,6 +30,77 @@ fi
 # FUNCIONES DE LA FASE X
 # ============================================================================
 
+# Verificar prerrequisitos críticos de la Fase 6
+verificar_prerrequisitos_fase6() {
+    log_info "🔍 VERIFICACIÓN CRÍTICA: Comprobando prerrequisitos para Fase 6..."
+    
+    # 1. Verificar que ArgoCD está healthy
+    if ! kubectl get namespace argocd >/dev/null 2>&1; then
+        log_error "❌ ArgoCD no está instalado"
+        return 1
+    fi
+    
+    if ! kubectl get deployment argocd-server -n argocd >/dev/null 2>&1; then
+        log_error "❌ ArgoCD server no está disponible"
+        return 1
+    fi
+    
+    # 2. Verificar que las herramientas GitOps están synced y healthy
+    log_info "🔍 Verificando que herramientas GitOps están ready..."
+    
+    if kubectl get application tools-gitops -n argocd >/dev/null 2>&1; then
+        local sync_status
+        sync_status=$(kubectl get application tools-gitops -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        local health_status
+        health_status=$(kubectl get application tools-gitops -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+        
+        if [[ "$sync_status" != "Synced" ]] || [[ "$health_status" != "Healthy" ]]; then
+            log_error "❌ PRERREQUISITO FALLA: App of Tools no está synced/healthy ($sync_status/$health_status)"
+            log_error "❌ NO ES SEGURO desplegar aplicaciones sin herramientas GitOps ready"
+            log_info "💡 Ejecuta primero: ./instalar.sh --fase 05"
+            log_info "💡 Verifica manualmente: kubectl get applications -n argocd"
+            return 1
+        fi
+        
+        log_success "✅ App of Tools está synced y healthy ($sync_status/$health_status)"
+    else
+        log_error "❌ PRERREQUISITO FALLA: App of Tools no encontrada"
+        log_error "❌ Las herramientas GitOps no están desplegadas"
+        log_info "💡 Ejecuta primero: ./instalar.sh --fase 05"
+        return 1
+    fi
+    
+    # 3. Verificar namespaces críticos de herramientas
+    local herramientas_namespaces=("cert-manager" "ingress-nginx" "monitoring")
+    local namespaces_ready=0
+    
+    for ns in "${herramientas_namespaces[@]}"; do
+        if kubectl get namespace "$ns" >/dev/null 2>&1; then
+            local pods_running
+            pods_running=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | grep -c " Running " || echo "0")
+            if [[ $pods_running -gt 0 ]]; then
+                ((namespaces_ready++))
+                log_success "✅ $ns: $pods_running pods running"
+            else
+                log_warning "⚠️ $ns: no hay pods running"
+            fi
+        else
+            log_warning "⚠️ $ns: namespace no existe"
+        fi
+    done
+    
+    if [[ $namespaces_ready -lt 2 ]]; then
+        log_error "❌ PRERREQUISITO FALLA: Muy pocas herramientas GitOps están ready ($namespaces_ready/${#herramientas_namespaces[@]})"
+        log_error "❌ NO ES SEGURO desplegar aplicaciones sin infraestructura básica"
+        log_info "💡 Espera a que las herramientas se desplieguen completamente"
+        return 1
+    fi
+    
+    log_success "✅ PRERREQUISITOS OK: $namespaces_ready/${#herramientas_namespaces[@]} herramientas críticas ready"
+    log_success "✅ Es seguro proceder con el despliegue de aplicaciones"
+    return 0
+}
+
 # Configurar aplicaciones custom
 configurar_aplicaciones_custom() {
     desplegar_aplicaciones_custom
@@ -208,10 +279,15 @@ fase_06_aplicaciones() {
         return 1
     fi
     
-    # Verificar que ArgoCD está disponible
-    if ! kubectl get namespace argocd >/dev/null 2>&1; then
-        log_error "❌ ArgoCD no está instalado"
-        log_info "💡 Ejecuta primero las fases anteriores"
+    # VERIFICACIÓN CRÍTICA: Comprobar prerrequisitos
+    if ! verificar_prerrequisitos_fase6; then
+        log_error "❌ FASE 6 ABORTADA: Los prerrequisitos no se cumplen"
+        log_error "❌ Las herramientas GitOps deben estar completamente ready antes de desplegar aplicaciones"
+        log_info "💡 Soluciones:"
+        log_info "   1. Ejecuta: ./instalar.sh --fase 05"
+        log_info "   2. Espera a que todas las herramientas estén synced/healthy"
+        log_info "   3. Verifica: kubectl get applications -n argocd"
+        log_info "   4. Luego ejecuta: ./instalar.sh --fase 06"
         return 1
     fi
     

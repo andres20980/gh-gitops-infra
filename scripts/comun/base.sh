@@ -287,6 +287,71 @@ ejecutar_con_retry() {
 # ============================================================================
 
 # Función de inicialización del módulo
+    # ============================================================================
+    # FUNCIONES DE GESTIÓN DE FASES
+    # ============================================================================
+    
+    # Validar dependencias de fase
+    validar_dependencia_fase() {
+        local fase="$1"
+        
+        # Cargar dependencias desde config.sh si no están disponibles
+        if [[ -z "${FASE_DEPENDENCIAS[$fase]:-}" ]]; then
+            if [[ -f "$PROJECT_ROOT/scripts/comun/config.sh" ]]; then
+                source "$PROJECT_ROOT/scripts/comun/config.sh"
+            fi
+        fi
+        
+        local dependencia="${FASE_DEPENDENCIAS[$fase]:-}"
+        
+        # Si no tiene dependencias, está OK
+        if [[ -z "$dependencia" ]]; then
+            return 0
+        fi
+        
+        # Verificar si la fase dependiente fue completada
+        local marca_completada="${LOGS_DIR:-logs}/.fase-${dependencia}-completada"
+        if [[ -f "$marca_completada" ]]; then
+            log_info "✅ Dependencia verificada: Fase $dependencia ya completada"
+            return 0
+        else
+            log_error "❌ ERROR: No puedes ejecutar la Fase $fase sin completar primero la Fase $dependencia"
+            log_info "💡 Solución: Ejecuta primero './instalar.sh fase-$dependencia'"
+            return 1
+        fi
+    }
+    
+    # Marcar fase como completada
+    marcar_fase_completada() {
+        local fase="$1"
+        local logs_dir="${LOGS_DIR:-logs}"
+        mkdir -p "$logs_dir" 2>/dev/null || true
+        local marca_completada="$logs_dir/.fase-${fase}-completada"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Fase $fase completada exitosamente" > "$marca_completada"
+        log_success "✅ Fase $fase marcada como completada"
+    }
+    
+    # Mostrar información de fase con estimación
+    mostrar_info_fase() {
+        local fase="$1"
+        
+        # Cargar información desde config.sh si no está disponible
+        if [[ -z "${FASE_NOMBRES[$fase]:-}" ]]; then
+            if [[ -f "$PROJECT_ROOT/scripts/comun/config.sh" ]]; then
+                source "$PROJECT_ROOT/scripts/comun/config.sh"
+            fi
+        fi
+        
+        local nombre="${FASE_NOMBRES[$fase]:-Desconocida}"
+        local tiempo="${FASE_TIEMPOS[$fase]:-?}"
+        local dependencia="${FASE_DEPENDENCIAS[$fase]:-}"
+        
+        log_info "📊 FASE $fase: $nombre (⏱️ ~${tiempo}min)"
+        if [[ -n "$dependencia" ]]; then
+            log_info "📋 Requiere: Fase $dependencia completada"
+        fi
+    }
+
 inicializar_modulo_base() {
     log_debug "Módulo base cargado - Funciones fundamentales disponibles"
 }

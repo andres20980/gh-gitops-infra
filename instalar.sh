@@ -445,47 +445,62 @@ ejecutar_fase_individual() {
     fi
     echo
     
+    # Validar dependencias de fase
+    if ! validar_dependencia_fase "$fase"; then
+        return 1
+    fi
+    
+    # Mostrar información de la fase
+    mostrar_info_fase "$fase"
+    echo
+    
     case "$fase" in
         "01")
-            log_section "🔐 FASE 1: Gestión Inteligente de Permisos"
+            iniciar_fase "01" "🔐 FASE 1: Gestión Inteligente de Permisos" "1-2min"
             gestionar_permisos_inteligente "dependencias"
-            log_success "✅ FASE 1 completada: Permisos configurados correctamente"
+            marcar_fase_completada "01"
+            finalizar_fase "Permisos configurados correctamente"
             ;;
         "02")
-            log_section "📦 FASE 2: Verificar/Actualizar Dependencias del Sistema"
+            iniciar_fase "02" "📦 FASE 2: Verificar/Actualizar Dependencias del Sistema" "2-3min"
             if [[ "$SKIP_DEPS" == "false" ]]; then
                 ejecutar_instalacion_dependencias
             else
                 verificar_dependencias_criticas
             fi
-            log_success "✅ FASE 2 completada: Dependencias procesadas"
+            marcar_fase_completada "02"
+            finalizar_fase "Dependencias procesadas"
             ;;
         "03")
             iniciar_fase "03" "🐳 FASE 3: Configurar Docker y Crear Cluster gitops-dev" "3-5min"
             configurar_docker_automatico
             crear_cluster_gitops_dev
+            marcar_fase_completada "03"
             finalizar_fase "Cluster $CLUSTER_DEV_NAME creado"
             ;;
         "04")
-            iniciar_fase "04" "🔄 FASE 4: Instalar ArgoCD" "2-3min"
-            instalar_argocd_maestro
-            verificar_argocd_healthy
+            iniciar_fase "04" "🔄 FASE 4: Instalar ArgoCD" "1-2min"
+            fase_04_argocd
+            marcar_fase_completada "04"
             finalizar_fase "ArgoCD instalado y configurado"
             ;;
         "05")
             iniciar_fase "05" "📊 FASE 5: Desplegar Herramientas GitOps" "5-7min"
             fase_05_herramientas
+            marcar_fase_completada "05"
             finalizar_fase "Herramientas GitOps desplegadas"
             ;;
         "06")
             iniciar_fase "06" "🚀 FASE 6: Desplegar Aplicaciones Custom" "3-4min"
             desplegar_aplicaciones_custom
+            marcar_fase_completada "06"
             finalizar_fase "Aplicaciones custom desplegadas"
             ;;
         "07")
             iniciar_fase "07" "🌐 FASE 7: Finalización y Accesos" "2-3min"
             crear_clusters_promocion
             mostrar_resumen_final
+            marcar_fase_completada "07"
             finalizar_fase "Proceso finalizado"
             ;;
         *)
@@ -670,14 +685,9 @@ ejecutar_proceso_completo() {
     # ========================================================================
     # FASE 4: INSTALAR ARGOCD (ÚLTIMA VERSIÓN)
     # ========================================================================
-    iniciar_fase "04" "🔄 FASE 4: Instalar ArgoCD (Controlará todos los clusters)" "2-3min"
-    if ! instalar_argocd_maestro; then
-        log_error "Error instalando ArgoCD maestro"
-        exit 1
-    fi
-    
-    if ! verificar_argocd_healthy; then
-        log_error "ArgoCD no está healthy"
+    iniciar_fase "04" "🔄 FASE 4: Instalar ArgoCD (Controlará todos los clusters)" "1-2min"
+    if ! fase_04_argocd; then
+        log_error "Error en Fase 4: ArgoCD"
         exit 1
     fi
     finalizar_fase "ArgoCD instalado y configurado"

@@ -121,6 +121,28 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
         ["07"]="Finalización y Accesos"
     )
     
+    # Estimaciones de tiempo por fase (en minutos)
+    readonly -A FASE_TIEMPOS=(
+        ["01"]="1-2"
+        ["02"]="2-3"
+        ["03"]="3-5"
+        ["04"]="1-2"        # Optimizada: antes 2-3, ahora 1-2
+        ["05"]="5-7"
+        ["06"]="3-4"
+        ["07"]="2-3"
+    )
+    
+    # Dependencias de fases (qué fase debe completarse antes)
+    readonly -A FASE_DEPENDENCIAS=(
+        ["01"]=""           # Sin dependencias
+        ["02"]="01"         # Requiere permisos
+        ["03"]="02"         # Requiere dependencias
+        ["04"]="03"         # Requiere clusters
+        ["05"]="04"         # Requiere ArgoCD
+        ["06"]="05"         # Requiere herramientas GitOps
+        ["07"]="06"         # Requiere aplicaciones
+    )
+    
     # ============================================================================
     # FUNCIONES DE CONFIGURACIÓN
     # ============================================================================
@@ -190,6 +212,53 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
 ├─ Solo DEV: $SOLO_DEV
 └─ Log file: $LOG_FILE
 EOF
+    }
+    
+    # Validar dependencias de fase
+    validar_dependencia_fase() {
+        local fase="$1"
+        local dependencia="${FASE_DEPENDENCIAS[$fase]:-}"
+        
+        # Si no tiene dependencias, está OK
+        if [[ -z "$dependencia" ]]; then
+            return 0
+        fi
+        
+        # Verificar si la fase dependiente fue completada
+        local marca_completada="$LOGS_DIR/.fase-${dependencia}-completada"
+        if [[ -f "$marca_completada" ]]; then
+            return 0
+        else
+            echo "❌ ERROR: No puedes ejecutar la Fase $fase sin completar primero la Fase $dependencia"
+            echo "💡 Solución: Ejecuta primero './instalar.sh fase-$dependencia'"
+            return 1
+        fi
+    }
+    
+    # Marcar fase como completada
+    marcar_fase_completada() {
+        local fase="$1"
+        local marca_completada="$LOGS_DIR/.fase-${fase}-completada"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Fase $fase completada exitosamente" > "$marca_completada"
+    }
+    
+    # Obtener estimación de tiempo de fase
+    obtener_estimacion_fase() {
+        local fase="$1"
+        echo "${FASE_TIEMPOS[$fase]:-?}"
+    }
+    
+    # Mostrar información de fase con estimación
+    mostrar_info_fase() {
+        local fase="$1"
+        local nombre="${FASE_NOMBRES[$fase]:-Desconocida}"
+        local tiempo="${FASE_TIEMPOS[$fase]:-?}"
+        local dependencia="${FASE_DEPENDENCIAS[$fase]:-}"
+        
+        echo "📊 FASE $fase: $nombre (⏱️ ~${tiempo}min)"
+        if [[ -n "$dependencia" ]]; then
+            echo "📋 Requiere: Fase $dependencia completada"
+        fi
     }
 
 fi

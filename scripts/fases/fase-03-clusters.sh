@@ -170,55 +170,27 @@ crear_cluster_gitops_dev() {
         minikube delete --profile="$CLUSTER_DEV_NAME"
     fi
     
-    # Crear cluster con capacidad completa para ecosistema GitOps
-    log_info "🏗️ Creando cluster $CLUSTER_DEV_NAME con capacidad para ecosistema GitOps completo..."
-    log_info "   📊 Recursos asignados: ${CLUSTER_DEV_CPUS} CPUs, ${CLUSTER_DEV_MEMORY}MB RAM, ${CLUSTER_DEV_DISK} disk"
+    # Usar el gestor de cluster optimizado para WSL
+    log_info "🔧 Utilizando gestor de cluster optimizado para WSL..."
     
-    # Configurar argumentos según el usuario
-    local minikube_args=(
-        "--profile=$CLUSTER_DEV_NAME"
-        "--cpus=$CLUSTER_DEV_CPUS"          # 4 CPUs para ArgoCD + herramientas
-        "--memory=$CLUSTER_DEV_MEMORY"      # 8GB para ecosistema completo  
-        "--disk-size=$CLUSTER_DEV_DISK"     # 40GB para imágenes y storage
-        "--kubernetes-version=stable"
-        "--feature-gates=EphemeralContainers=true"
-        "--extra-config=apiserver.enable-admission-plugins=NamespaceLifecycle,ResourceQuota"
-    )
-    
-    # Detectar si se ejecuta como root y ajustar driver
-    if [[ "$EUID" -eq 0 ]]; then
-        log_warning "⚠️ Ejecutándose como root, usando driver 'none'"
-        minikube_args+=("--driver=none" "--force")
+    # Cargar el gestor de cluster
+    local gestor_cluster="$SCRIPT_DIR/../cluster/gestor.sh"
+    if [[ -f "$gestor_cluster" ]]; then
+        log_info "📦 Cargando gestor de cluster..."
+        # shellcheck source=../cluster/gestor.sh
+        source "$gestor_cluster"
+        
+        # Llamar al gestor con configuración optimizada
+        if crear_cluster_minikube "$CLUSTER_DEV_NAME"; then
+            log_success "✅ Cluster $CLUSTER_DEV_NAME creado exitosamente"
+        else
+            log_error "❌ Error creando cluster $CLUSTER_DEV_NAME"
+            return 1
+        fi
     else
-        log_info "👤 Ejecutándose como usuario normal, usando driver 'docker'"
-        minikube_args+=("--driver=docker")
-    fi
-    
-    if ! minikube start "${minikube_args[@]}"; then
-        log_error "Error creando cluster $CLUSTER_DEV_NAME"
+        log_error "❌ Gestor de cluster no encontrado: $gestor_cluster"
         return 1
     fi
-    
-    # Habilitar addons esenciales
-    log_info "🔧 Habilitando addons esenciales..."
-    minikube addons enable metrics-server --profile="$CLUSTER_DEV_NAME"
-    minikube addons enable ingress --profile="$CLUSTER_DEV_NAME"
-    minikube addons enable storage-provisioner --profile="$CLUSTER_DEV_NAME"
-    
-    # Configurar contexto
-    log_info "⚙️ Configurando contexto kubectl..."
-    kubectl config use-context "$CLUSTER_DEV_NAME"
-    
-    # Verificar que el cluster está listo
-    log_info "🔍 Verificando que el cluster está listo..."
-    kubectl wait --for=condition=ready nodes --all --timeout=300s
-    
-    # Mostrar información del cluster
-    log_info "📋 Información del cluster DEV:"
-    kubectl get nodes -o wide
-    
-    log_success "✅ Cluster $CLUSTER_DEV_NAME creado y listo para ecosistema GitOps"
-    log_info "🎯 Próximos pasos: ArgoCD → Herramientas GitOps → Apps Custom → Clusters PRE/PRO"
     return 0
 }
 

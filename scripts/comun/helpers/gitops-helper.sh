@@ -46,8 +46,9 @@ extraer_info_chart_del_yaml() {
         echo "   ⚠️  No se encontró info de chart en $archivo_yaml, usando detección inteligente"
         detectar_chart_inteligente "$herramienta"
     else
-        # Extraer nombre del repositorio de la URL
-        local repo_name=$(echo "$repo_url" | sed 's|https://||' | sed 's|\.github\.io/.*||' | sed 's|.*github\.com/||' | sed 's|/.*||')
+        # Extraer nombre del repositorio de la URL - manejo seguro
+        local repo_name
+        repo_name=$(echo "$repo_url" | sed 's|https://||' | sed 's|\.github\.io/.*||' | sed 's|.*github\.com/||' | sed 's|/.*||' 2>/dev/null || echo "unknown")
         
         GITOPS_CHART_INFO["${herramienta}_repo"]="$repo_name"
         GITOPS_CHART_INFO["${herramienta}_chart"]="$chart_name"
@@ -288,6 +289,99 @@ ejecutar_optimizacion_gitops() {
     echo "✅ Optimización GitOps completada dinámicamente"
     echo "🔄 Sistema autodescubrible activo - nuevos YAMLs se detectarán automáticamente"
     echo "📊 Versiones actualizadas dinámicamente desde fuentes oficiales"
+    
+    # Paso 4: Commit y push de cambios antes de desplegar
+    hacer_commit_push_cambios
+    
+    # Paso 5: Aplicar App of Tools a ArgoCD
+    aplicar_app_of_tools
+}
+
+# Función para hacer commit y push de los cambios antes del despliegue
+hacer_commit_push_cambios() {
+    echo
+    echo "🔄 Realizando commit y push de cambios de versiones..."
+    
+    # Verificar si hay cambios para commitear
+    if git diff --quiet && git diff --cached --quiet; then
+        echo "ℹ️  No hay cambios para commitear"
+        return 0
+    fi
+    
+    # Mostrar archivos modificados
+    echo "📝 Archivos modificados:"
+    git status --porcelain | head -10
+    
+    # Agregar todos los cambios
+    echo "📦 Agregando cambios al staging..."
+    git add .
+    
+    # Crear commit con mensaje descriptivo
+    local fecha=$(date '+%Y-%m-%d %H:%M:%S')
+    local mensaje="feat: actualización automática versiones GitOps - $fecha"
+    
+    echo "💾 Creando commit: $mensaje"
+    if git commit -m "$mensaje"; then
+        echo "✅ Commit creado exitosamente"
+        
+        # Hacer push a la rama actual
+        local rama_actual=$(git branch --show-current)
+        echo "🚀 Haciendo push a rama: $rama_actual"
+        
+        if git push origin "$rama_actual"; then
+            echo "✅ Push completado exitosamente"
+            echo "🌐 Cambios sincronizados con el repositorio remoto"
+            
+            # Esperar un momento para que GitHub procese los cambios
+            echo "⏳ Esperando sincronización con GitHub (5 segundos)..."
+            sleep 5
+            
+            return 0
+        else
+            echo "❌ Error al hacer push"
+            echo "⚠️  Los cambios están commiteados localmente pero no sincronizados"
+            return 1
+        fi
+    else
+        echo "❌ Error al crear commit"
+        return 1
+    fi
+}
+
+# Función para aplicar la App of Tools a ArgoCD
+aplicar_app_of_tools() {
+    echo
+    echo "🚀 Aplicando App of Tools a ArgoCD..."
+    
+    local app_tools_file="argo-apps/app-of-tools-gitops.yaml"
+    
+    if [[ ! -f "$app_tools_file" ]]; then
+        echo "❌ Archivo $app_tools_file no encontrado"
+        return 1
+    fi
+    
+    echo "📋 Aplicando $app_tools_file..."
+    if kubectl apply -f "$app_tools_file"; then
+        echo "✅ App of Tools aplicada exitosamente"
+        
+        # Verificar que la aplicación se creó
+        echo "🔍 Verificando aplicación en ArgoCD..."
+        sleep 3
+        if kubectl get application app-of-tools-gitops -n argocd >/dev/null 2>&1; then
+            echo "✅ Aplicación app-of-tools-gitops creada en ArgoCD"
+            
+            # Mostrar estado inicial
+            echo "📊 Estado inicial de la aplicación:"
+            kubectl get application app-of-tools-gitops -n argocd -o custom-columns="NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status" 2>/dev/null || echo "   (Estado aún no disponible)"
+        else
+            echo "⚠️ Aplicación creada pero aún no visible en ArgoCD"
+        fi
+    else
+        echo "❌ Error al aplicar App of Tools"
+        return 1
+    fi
+    
+    return 0
 }
 
 # Función para aplicar optimizaciones específicas de desarrollo
@@ -298,6 +392,32 @@ aplicar_optimizaciones_desarrollo() {
     
     echo "   ⚙️  Aplicando optimizaciones de desarrollo..."
     echo "   📦 Versión objetivo: $version"
+    
+    # Actualizar la versión en el archivo YAML si es diferente de "latest"
+    if [[ "$version" != "latest" && -f "$archivo_yaml" ]]; then
+        echo "   🔄 Actualizando versión en $archivo_yaml..."
+        
+        # Crear backup del archivo original
+        cp "$archivo_yaml" "${archivo_yaml}.backup"
+        
+        # Actualizar targetRevision si existe
+        if grep -q "targetRevision:" "$archivo_yaml"; then
+            sed -i "s/targetRevision:.*/targetRevision: \"$version\"/" "$archivo_yaml"
+            echo "   ✅ targetRevision actualizado a: $version"
+        else
+            echo "   ℹ️  No se encontró targetRevision en el archivo"
+        fi
+        
+        # Verificar si el cambio se aplicó
+        local version_actualizada=$(grep "targetRevision:" "$archivo_yaml" | sed 's/.*targetRevision:\s*//' | tr -d '"' | tr -d "'")
+        if [[ "$version_actualizada" == "$version" ]]; then
+            echo "   ✅ Versión verificada en archivo: $version_actualizada"
+            rm -f "${archivo_yaml}.backup"  # Eliminar backup si todo salió bien
+        else
+            echo "   ⚠️  La actualización no se reflejó correctamente"
+            mv "${archivo_yaml}.backup" "$archivo_yaml"  # Restaurar backup
+        fi
+    fi
     
     # Crear archivo temporal con valores optimizados
     local valores_temp="/tmp/${herramienta}-dev-values.yaml"

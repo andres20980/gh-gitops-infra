@@ -51,7 +51,7 @@ log_message() {
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
-    printf '%s[%s] %s [%s] %s%s\n' "${color}" "${timestamp}" "${symbol}" "${level}" "${message}" "${COLOR_RESET}"
+    echo -e "${color}[${timestamp}] ${symbol} [${level}] ${message}${COLOR_RESET}"
 }
 
 # Funciones específicas de logging
@@ -66,14 +66,60 @@ log_debug() {
 }
 log_running() { log_message "INFO" "$SYMBOL_RUNNING" "$COLOR_PURPLE" "$1"; }
 
-# Función para secciones principales
+# Función para secciones principales con estimación de tiempo
 log_section() {
     local title="$1"
+    local estimated_time="${2:-}"
     echo
     echo "================================================================================"
-    printf '%s→ %s%s\n' "${COLOR_CYAN}" "${title}" "${COLOR_RESET}"
+    if [[ -n "$estimated_time" ]]; then
+        echo -e "${COLOR_CYAN}→ ${title} (⏱️ ~${estimated_time})${COLOR_RESET}"
+    else
+        echo -e "${COLOR_CYAN}→ ${title}${COLOR_RESET}"
+    fi
     echo "================================================================================"
     echo
+}
+
+# Variables para seguimiento de tiempo
+FASE_START_TIME=""
+FASE_NUMBER=""
+
+# Función para iniciar medición de tiempo de fase
+iniciar_fase() {
+    local fase_num="$1"
+    local title="$2"
+    local estimated_time="$3"
+    
+    FASE_START_TIME=$(date +%s)
+    FASE_NUMBER="$fase_num"
+    
+    log_section "$title" "$estimated_time"
+}
+
+# Función para finalizar medición de tiempo de fase
+finalizar_fase() {
+    local message="$1"
+    
+    if [[ -n "$FASE_START_TIME" ]]; then
+        local end_time
+        end_time=$(date +%s)
+        local duration=$((end_time - FASE_START_TIME))
+        local minutes=$((duration / 60))
+        local seconds=$((duration % 60))
+        
+        if [[ $minutes -gt 0 ]]; then
+            log_success "✅ FASE $FASE_NUMBER completada: $message (⏱️ ${minutes}m ${seconds}s)"
+        else
+            log_success "✅ FASE $FASE_NUMBER completada: $message (⏱️ ${seconds}s)"
+        fi
+    else
+        log_success "✅ FASE $FASE_NUMBER completada: $message"
+    fi
+    
+    # Reset variables
+    FASE_START_TIME=""
+    FASE_NUMBER=""
 }
 
 # ============================================================================

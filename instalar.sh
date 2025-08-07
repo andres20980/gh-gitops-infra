@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================================
-# INSTALADOR PRINCIPAL MODULAR - GitOps España Infrastructure (Versión 3.0.0)
+# INSTALADOR PRINCIPAL MODULAR - GitOps en Español Infrastructure (Versión 3.0.0)
 # ============================================================================
 # Instalador principal optimizado y modular para infraestructura GitOps
 # Orquestador inteligente con arquitectura por fases autocontenidas
@@ -174,7 +174,7 @@ configurar_logging_instalador() {
 # Mostrar ayuda completa
 mostrar_ayuda() {
     cat << 'EOF'
-GitOps España Infrastructure - Instalador Principal Modular v3.0.0
+GitOps en Español Infrastructure - Instalador Principal Modular v3.0.0
 
 SINTAXIS:
   ./instalar.sh [FASE] [OPCIONES]
@@ -244,7 +244,7 @@ EOF
 # Mostrar banner inicial mejorado
 mostrar_banner_inicial() {
     clear
-    log_section "🚀 GitOps España - Instalador Modular v${SCRIPT_VERSION}"
+    log_section "🚀 GitOps en Español - Instalador Modular v${GITOPS_VERSION}"
     
     # Información adicional del sistema
     log_info "Sistema: $(uname -s) $(uname -m)"
@@ -372,7 +372,7 @@ procesar_argumentos() {
                 exit 0
                 ;;
             --version)
-                echo "$SCRIPT_NAME v$SCRIPT_VERSION"
+                echo "$SCRIPT_NAME v$GITOPS_VERSION"
                 exit 0
                 ;;
             
@@ -461,32 +461,32 @@ ejecutar_fase_individual() {
             log_success "✅ FASE 2 completada: Dependencias procesadas"
             ;;
         "03")
-            log_section "🐳 FASE 3: Configurar Docker y Crear Cluster gitops-dev"
+            iniciar_fase "03" "🐳 FASE 3: Configurar Docker y Crear Cluster gitops-dev" "3-5min"
             configurar_docker_automatico
             crear_cluster_gitops_dev
-            log_success "✅ FASE 3 completada: Cluster $CLUSTER_DEV_NAME creado"
+            finalizar_fase "Cluster $CLUSTER_DEV_NAME creado"
             ;;
         "04")
-            log_section "🔄 FASE 4: Instalar ArgoCD"
+            iniciar_fase "04" "🔄 FASE 4: Instalar ArgoCD" "2-3min"
             instalar_argocd_maestro
             verificar_argocd_healthy
-            log_success "✅ FASE 4 completada: ArgoCD instalado y configurado"
+            finalizar_fase "ArgoCD instalado y configurado"
             ;;
         "05")
-            log_section "📊 FASE 5: Desplegar Herramientas GitOps"
-            actualizar_y_desplegar_herramientas
-            log_success "✅ FASE 5 completada: Herramientas GitOps desplegadas"
+            iniciar_fase "05" "📊 FASE 5: Desplegar Herramientas GitOps" "5-7min"
+            fase_05_herramientas
+            finalizar_fase "Herramientas GitOps desplegadas"
             ;;
         "06")
-            log_section "🚀 FASE 6: Desplegar Aplicaciones Custom"
+            iniciar_fase "06" "🚀 FASE 6: Desplegar Aplicaciones Custom" "3-4min"
             desplegar_aplicaciones_custom
-            log_success "✅ FASE 6 completada: Aplicaciones custom desplegadas"
+            finalizar_fase "Aplicaciones custom desplegadas"
             ;;
         "07")
-            log_section "🌐 FASE 7: Finalización y Accesos"
+            iniciar_fase "07" "🌐 FASE 7: Finalización y Accesos" "2-3min"
             crear_clusters_promocion
             mostrar_resumen_final
-            log_success "✅ FASE 7 completada: Proceso finalizado"
+            finalizar_fase "Proceso finalizado"
             ;;
         *)
             log_error "❌ Fase no reconocida: $fase"
@@ -530,10 +530,64 @@ ejecutar_rango_fases() {
     log_success "🎉 Rango de fases $inicio-$fin completado exitosamente"
 }
 
+# Mostrar resumen de accesos a herramientas GitOps
+mostrar_resumen_accesos_herramientas() {
+    log_section "🌐 RESUMEN DE ACCESOS A HERRAMIENTAS GITOPS"
+    
+    echo "🎛️ TODAS LAS HERRAMIENTAS GITOPS ESTÁN LISTAS Y ACCESIBLES:"
+    echo "================================================================================"
+    echo
+    echo "🔧 INFRAESTRUCTURA BÁSICA:"
+    echo "  • ArgoCD (GitOps Controller)    : http://localhost:8080"
+    echo "    📝 Usuario: admin | Password: Ver en instalación ArgoCD"
+    echo "  • Cert-Manager (TLS Automático) : Sin UI (funciona automáticamente)"
+    echo "  • Ingress-NGINX (Load Balancer) : Sin UI específica"
+    echo
+    echo "📊 OBSERVABILIDAD Y MONITOREO:"
+    echo "  • Grafana (Dashboards)          : http://localhost:8081"
+    echo "    📝 Usuario: admin | Password: prom-operator"
+    echo "  • Prometheus (Métricas)         : http://localhost:8082"
+    echo "  • AlertManager (Alertas)        : http://localhost:8083"
+    echo "  • Jaeger (Distributed Tracing)  : http://localhost:8084"
+    echo "  • Loki (Log Aggregation)        : http://localhost:8086"
+    echo
+    echo "🚀 HERRAMIENTAS GITOPS AVANZADAS:"
+    echo "  • Argo Workflows (CI/CD)        : http://localhost:8089"
+    echo "  • Argo Events (Event-driven)    : http://localhost:8090"
+    echo "  • Argo Rollouts (Deploy Avanz.) : http://localhost:8091"
+    echo "  • Kargo (Environment Promotion) : http://localhost:8085"
+    echo
+    echo "📦 ALMACENAMIENTO Y DESARROLLO:"
+    echo "  • MinIO (S3 Compatible Storage) : http://localhost:8087"
+    echo "    📝 Usuario: minioadmin | Password: minioadmin"
+    echo "  • Gitea (Git Server Local)      : http://localhost:8088"
+    echo "    📝 Usuario: gitea | Password: gitea"
+    echo
+    echo "================================================================================"
+    echo "💡 COMANDOS ÚTILES:"
+    echo "  • Ver estado accesos : ./scripts/accesos-herramientas.sh status"
+    echo "  • Iniciar accesos    : ./scripts/accesos-herramientas.sh start"
+    echo "  • Parar accesos      : ./scripts/accesos-herramientas.sh stop"
+    echo "  • Listar herramientas: ./scripts/accesos-herramientas.sh list"
+    echo "================================================================================"
+    echo
+    
+    if [[ "$PROCESO_DESATENDIDO" != "true" ]]; then
+        log_info "⏸️ PAUSA ANTES DE CONTINUAR CON APLICACIONES"
+        log_info "Puedes revisar las herramientas antes de desplegar aplicaciones."
+        log_info "Presiona ENTER para continuar con la Fase 6 o Ctrl+C para pausar."
+        read -r
+    else
+        log_info "⏭️ Continuando automáticamente con la Fase 6 en 10 segundos..."
+        log_info "💡 Puedes acceder a las herramientas en cualquier momento usando los enlaces de arriba"
+        sleep 10
+    fi
+}
+
 # Ejecutar proceso completo (modo original)
 ejecutar_proceso_completo() {
     log_section "⚙️ Configuración del Proceso GitOps Absoluto Modular"
-    log_info "Versión: $SCRIPT_VERSION (Arquitectura Modular)"
+    log_info "Versión: $GITOPS_VERSION (Arquitectura Modular)"
     log_info "Modo: PROCESO DESATENDIDO (Entorno GitOps Absoluto)"
     log_info "Clusters a crear:"
     log_info "  • $CLUSTER_DEV_NAME: ${CLUSTER_DEV_CPUS} CPUs, ${CLUSTER_DEV_MEMORY}MB RAM, ${CLUSTER_DEV_DISK} disk"
@@ -616,7 +670,7 @@ ejecutar_proceso_completo() {
     # ========================================================================
     # FASE 4: INSTALAR ARGOCD (ÚLTIMA VERSIÓN)
     # ========================================================================
-    log_section "🔄 FASE 4: Instalar ArgoCD (Controlará todos los clusters)"
+    iniciar_fase "04" "🔄 FASE 4: Instalar ArgoCD (Controlará todos los clusters)" "2-3min"
     if ! instalar_argocd_maestro; then
         log_error "Error instalando ArgoCD maestro"
         exit 1
@@ -626,27 +680,34 @@ ejecutar_proceso_completo() {
         log_error "ArgoCD no está healthy"
         exit 1
     fi
-    log_success "✅ FASE 4 completada: ArgoCD instalado y configurado"
+    finalizar_fase "ArgoCD instalado y configurado"
     
     # ========================================================================
     # FASE 5: OPTIMIZAR Y DESPLEGAR HERRAMIENTAS GITOPS
     # ========================================================================
-    log_section "📊 FASE 5: Optimizar Configuraciones y Desplegar Herramientas GitOps"
-    if ! actualizar_y_desplegar_herramientas; then
+    iniciar_fase "05" "📊 FASE 5: Optimizar Configuraciones y Desplegar Herramientas GitOps" "5-7min"
+    if ! instalar_herramientas_gitops; then
         log_error "Error desplegando herramientas GitOps"
         exit 1
     fi
-    log_success "✅ FASE 5 completada: Herramientas optimizadas y desplegadas"
+    finalizar_fase "Herramientas optimizadas y desplegadas"
+    
+    # ========================================================================
+    # PAUSA INFORMATIVA: ACCESOS A HERRAMIENTAS GITOPS
+    # ========================================================================
+    if [[ "$SKIP_INTERACTIVE" != "true" ]]; then
+        mostrar_resumen_accesos_herramientas
+    fi
     
     # ========================================================================
     # FASE 6: DESPLEGAR APLICACIONES CUSTOM
     # ========================================================================
-    log_section "🚀 FASE 6: Desplegar Aplicaciones Custom"
+    iniciar_fase "06" "🚀 FASE 6: Desplegar Aplicaciones Custom" "3-4min"
     if ! desplegar_aplicaciones_custom; then
         log_error "Error desplegando aplicaciones custom"
         exit 1
     fi
-    log_success "✅ FASE 6 completada: Aplicaciones custom desplegadas"
+    finalizar_fase "Aplicaciones custom desplegadas"
     
     # ========================================================================
     # FASE 7: CREAR CLUSTERS DE PROMOCIÓN Y MOSTRAR INFORMACIÓN FINAL

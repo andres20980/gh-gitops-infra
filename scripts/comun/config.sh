@@ -17,7 +17,7 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
     
     # Metadatos del proyecto
     readonly GITOPS_VERSION="3.0.0"
-    readonly GITOPS_NAME="GitOps España Infrastructure"
+    readonly GITOPS_NAME="GitOps en Español Infrastructure"
     readonly GITOPS_DESCRIPTION="Instalador modular para infraestructura GitOps"
     
     # Directorios del proyecto (se configuran automáticamente)
@@ -40,26 +40,29 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
     # CONFIGURACIÓN DE CLUSTERS
     # ============================================================================
     
-    # Cluster de desarrollo (capacidad completa)
+    # Cluster de desarrollo (capacidad optimizada)
     readonly CLUSTER_DEV_NAME="${CLUSTER_DEV_NAME:-gitops-dev}"
     readonly CLUSTER_DEV_CPUS="${CLUSTER_DEV_CPUS:-4}"
-    readonly CLUSTER_DEV_MEMORY="${CLUSTER_DEV_MEMORY:-8192}"
+    readonly CLUSTER_DEV_MEMORY="${CLUSTER_DEV_MEMORY:-4096}"
     readonly CLUSTER_DEV_DISK="${CLUSTER_DEV_DISK:-40g}"
     
     # Cluster de preproducción (capacidad media)
     readonly CLUSTER_PRE_NAME="${CLUSTER_PRE_NAME:-gitops-pre}"
     readonly CLUSTER_PRE_CPUS="${CLUSTER_PRE_CPUS:-2}"
-    readonly CLUSTER_PRE_MEMORY="${CLUSTER_PRE_MEMORY:-4096}"
+    readonly CLUSTER_PRE_MEMORY="${CLUSTER_PRE_MEMORY:-2048}"
     readonly CLUSTER_PRE_DISK="${CLUSTER_PRE_DISK:-20g}"
     
     # Cluster de producción (capacidad media)
     readonly CLUSTER_PRO_NAME="${CLUSTER_PRO_NAME:-gitops-pro}"
     readonly CLUSTER_PRO_CPUS="${CLUSTER_PRO_CPUS:-2}"
-    readonly CLUSTER_PRO_MEMORY="${CLUSTER_PRO_MEMORY:-4096}"
+    readonly CLUSTER_PRO_MEMORY="${CLUSTER_PRO_MEMORY:-2048}"
     readonly CLUSTER_PRO_DISK="${CLUSTER_PRO_DISK:-20g}"
     
     # Proveedor de clusters
     readonly CLUSTER_PROVIDER="${CLUSTER_PROVIDER:-minikube}"
+    
+    # Configuración específica para WSL/Linux
+    readonly MINIKUBE_EXTRA_ARGS="${MINIKUBE_EXTRA_ARGS:---extra-config=kubelet.cgroup-driver=systemd --extra-config=apiserver.service-node-port-range=30000-32767}"
     
     # ============================================================================
     # CONFIGURACIÓN DE ARGOCD
@@ -175,7 +178,7 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
     # Obtener información de configuración
     obtener_info_configuracion() {
         cat << EOF
-📋 Configuración GitOps España v${GITOPS_VERSION}
+📋 Configuración GitOps en Español v${GITOPS_VERSION}
 ├─ Proyecto: $PROJECT_ROOT
 ├─ Scripts: $SCRIPTS_DIR
 ├─ Fases: ${#FASES_DISPONIBLES[@]} módulos

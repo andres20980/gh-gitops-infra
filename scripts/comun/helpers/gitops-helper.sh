@@ -295,6 +295,135 @@ ejecutar_optimizacion_gitops() {
     
     # Paso 5: Aplicar App of Tools a ArgoCD
     aplicar_app_of_tools
+    
+    # Paso 6: Esperar a que todas las aplicaciones estén Synced y Healthy
+    echo
+    echo "⏳ Esperando a que todas las herramientas GitOps estén Synced y Healthy..."
+    esperar_aplicaciones_completas
+}
+
+# Función para esperar a que todas las aplicaciones estén Synced y Healthy
+esperar_aplicaciones_completas() {
+    local max_intentos=60  # 10 minutos máximo (60 intentos x 10 segundos)
+    local contador=1
+    local aplicaciones_esperadas=(
+        "argo-events" "argo-rollouts" "argo-workflows" "cert-manager"
+        "external-secrets" "gitea" "grafana" "ingress-nginx" "jaeger"
+        "kargo" "loki" "minio" "prometheus-stack"
+    )
+    
+    echo "🎯 Verificando estado de ${#aplicaciones_esperadas[@]} herramientas GitOps..."
+    
+    while [[ $contador -le $max_intentos ]]; do
+        echo "[$contador/$max_intentos] 🔍 Verificando estado de aplicaciones..."
+        
+        local todas_ok=true
+        local aplicaciones_problematicas=()
+        
+        # Verificar cada aplicación esperada
+        for app in "${aplicaciones_esperadas[@]}"; do
+            if ! kubectl get application "$app" -n argocd >/dev/null 2>&1; then
+                todas_ok=false
+                aplicaciones_problematicas+=("$app:NO_EXISTE")
+                continue
+            fi
+            
+            local sync_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            local health_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+            
+            if [[ "$sync_status" != "Synced" ]] || [[ "$health_status" != "Healthy" ]]; then
+                todas_ok=false
+                aplicaciones_problematicas+=("$app:$sync_status/$health_status")
+            fi
+        done
+        
+        if [[ "$todas_ok" == "true" ]]; then
+            echo
+            echo "✅ ¡Todas las herramientas GitOps están Synced y Healthy!"
+            mostrar_estado_final_aplicaciones
+            return 0
+        fi
+        
+        # Mostrar aplicaciones problemáticas (solo primeras 5 para no saturar log)
+        if [[ ${#aplicaciones_problematicas[@]} -gt 0 ]]; then
+            echo "   ⚠️  Aplicaciones pendientes: ${aplicaciones_problematicas[@]:0:5}"
+            if [[ ${#aplicaciones_problematicas[@]} -gt 5 ]]; then
+                echo "      ... y $((${#aplicaciones_problematicas[@]} - 5)) más"
+            fi
+        fi
+        
+        # Intentar sincronización automática cada 5 intentos
+        if [[ $((contador % 5)) -eq 0 ]]; then
+            echo "   🔄 Forzando sincronización automática..."
+            forzar_sincronizacion_aplicaciones
+        fi
+        
+        echo "   ⏱️  Esperando 10 segundos antes del siguiente chequeo..."
+        sleep 10
+        ((contador++))
+    done
+    
+    echo
+    echo "❌ ¡TIMEOUT! Algunas aplicaciones no llegaron a estar Synced y Healthy"
+    echo "📊 Estado final de aplicaciones:"
+    mostrar_estado_final_aplicaciones
+    return 1
+}
+
+# Función para forzar sincronización de aplicaciones OutOfSync
+forzar_sincronizacion_aplicaciones() {
+    local aplicaciones_out_of_sync
+    aplicaciones_out_of_sync=$(kubectl get applications -n argocd -o jsonpath='{range .items[*]}{.metadata.name}:{.status.sync.status}{"\n"}{end}' 2>/dev/null | grep -v ":Synced" | cut -d: -f1)
+    
+    if [[ -n "$aplicaciones_out_of_sync" ]]; then
+        echo "   🔧 Sincronizando aplicaciones OutOfSync..."
+        while read -r app; do
+            if [[ -n "$app" ]]; then
+                echo "      🔄 Sincronizando: $app"
+                kubectl patch application "$app" -n argocd --type merge -p '{"operation":{"sync":{}}}' >/dev/null 2>&1 || true
+            fi
+        done <<< "$aplicaciones_out_of_sync"
+    fi
+}
+
+# Función para mostrar estado final detallado de aplicaciones
+mostrar_estado_final_aplicaciones() {
+    echo
+    echo "📊 Estado final de herramientas GitOps:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if kubectl get applications -n argocd >/dev/null 2>&1; then
+        kubectl get applications -n argocd -o custom-columns="HERRAMIENTA:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,VERSION:.spec.source.targetRevision" 2>/dev/null || echo "Error obteniendo estado de aplicaciones"
+    else
+        echo "❌ No se pudo obtener el estado de las aplicaciones"
+    fi
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Verificar configuración multi-cluster
+    verificar_configuracion_multicluster
+}
+
+# Función para verificar que ArgoCD esté configurado para manejar múltiples clusters
+verificar_configuracion_multicluster() {
+    echo
+    echo "🌐 Verificando configuración multi-cluster de ArgoCD..."
+    
+    local clusters_configurados
+    clusters_configurados=$(kubectl get secrets -n argocd -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null | wc -l)
+    
+    echo "   📊 Clusters configurados en ArgoCD: $clusters_configurados"
+    
+    if [[ $clusters_configurados -eq 0 ]]; then
+        echo "   ℹ️  Solo cluster local configurado (normal para entorno dev)"
+        echo "   💡 Para multi-cluster, ejecutar configuración adicional en fases posteriores"
+    else
+        echo "   ✅ Configuración multi-cluster detectada"
+        echo "   🔍 Clusters externos configurados:"
+        kubectl get secrets -n argocd -l argocd.argoproj.io/secret-type=cluster -o custom-columns="CLUSTER:.metadata.labels.argocd\.argoproj\.io/secret-type,SERVER:.data.server" 2>/dev/null | base64 -d 2>/dev/null || echo "   (Detalles no disponibles)"
+    fi
+    
+    return 0
 }
 
 # Función para hacer commit y push de los cambios antes del despliegue

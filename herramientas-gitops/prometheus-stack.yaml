@@ -12,6 +12,8 @@ spec:
     chart: kube-prometheus-stack
     targetRevision: "75.18.1"
     helm:
+      valueFiles:
+        - values-dev/prometheus-stack-dev-values.yaml
       values: |
         # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         

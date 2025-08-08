@@ -1,0 +1,27 @@
+# Configuración optimizada para desarrollo - Gitea
+gitea:
+  admin:
+    username: admin
+    password: admin123
+    email: admin@local.dev
+  config:
+    database:
+      DB_TYPE: sqlite3
+    session:
+      PROVIDER: memory
+    cache:
+      ENABLED: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
+persistence:
+  enabled: true
+  size: 2Gi
+postgresql:
+  enabled: false
+mysql:
+  enabled: false

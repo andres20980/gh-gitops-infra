@@ -12,6 +12,8 @@ spec:
     chart: ingress-nginx
     targetRevision: "v1.13.0"
     helm:
+      valueFiles:
+        - values-dev/ingress-nginx-dev-values.yaml
       values: |
         # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         

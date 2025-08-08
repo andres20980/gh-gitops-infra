@@ -1,9 +1,6 @@
 # Configuración optimizada para desarrollo - Grafana
-# Recursos mínimos, credenciales simples, persistencia básica
-
 adminUser: admin
 adminPassword: admin123
-
 resources:
   requests:
     cpu: 100m
@@ -11,57 +8,10 @@ resources:
   limits:
     cpu: 200m
     memory: 256Mi
-
 persistence:
   enabled: true
   size: 1Gi
-  accessModes:
-    - ReadWriteOnce
-
 testFramework:
   enabled: false
-
 serviceMonitor:
   enabled: false
-
-# Configuración para desarrollo sin autenticación compleja
-grafana.ini:
-  security:
-    allow_embedding: true
-  auth:
-    disable_login_form: false
-  auth.anonymous:
-    enabled: true
-    org_role: Viewer
-  users:
-    allow_sign_up: false
-    auto_assign_org: true
-    auto_assign_org_role: Viewer
-
-# Configuración de red simple
-service:
-  type: ClusterIP
-  port: 3000
-
-# Dashboards predeterminados para desarrollo
-dashboardProviders:
-  dashboardproviders.yaml:
-    apiVersion: 1
-    providers:
-    - name: 'default'
-      orgId: 1
-      folder: ''
-      type: file
-      disableDeletion: false
-      editable: true
-      options:
-        path: /var/lib/grafana/dashboards/default
-
-# Configuración simplificada para entorno dev
-sidecar:
-  dashboards:
-    enabled: true
-    searchNamespace: ALL
-  datasources:
-    enabled: true
-    searchNamespace: ALL

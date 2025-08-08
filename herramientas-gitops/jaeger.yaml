@@ -12,6 +12,8 @@ spec:
     chart: jaeger
     targetRevision: "3.4.1"
     helm:
+      valueFiles:
+        - values-dev/jaeger-dev-values.yaml
       values: |
         # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         

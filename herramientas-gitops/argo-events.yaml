@@ -12,6 +12,8 @@ spec:
     chart: argo-events
     targetRevision: 2.4.16
     helm:
+      valueFiles:
+        - values-dev/argo-events-dev-values.yaml
       values: |
         # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         

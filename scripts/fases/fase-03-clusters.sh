@@ -26,6 +26,12 @@ else
     exit 1
 fi
 
+# Cargar helper de clusters optimizado
+if [[ -f "$SCRIPT_DIR/../comun/helpers/cluster-helper.sh" ]]; then
+    # shellcheck source=../comun/helpers/cluster-helper.sh
+    source "$SCRIPT_DIR/../comun/helpers/cluster-helper.sh"
+fi
+
 # ============================================================================
 # FUNCIONES DE LA FASE 3
 # ============================================================================
@@ -249,12 +255,12 @@ crear_clusters_promocion() {
 }
 
 # ============================================================================
-# FUNCIÓN PRINCIPAL DE LA FASE 3
+# FUNCIÓN PRINCIPAL DE LA FASE 3 - OPTIMIZADA
 # ============================================================================
 
 fase_03_clusters() {
-    log_info "🏗️ FASE 3: Configuración de Clusters Kubernetes"
-    log_info "══════════════════════════════════════════════"
+    log_info "🏗️ FASE 3: Configuración Optimizada de Clusters Kubernetes"
+    log_info "═══════════════════════════════════════════════════════════"
     
     # Verificar que no estamos ejecutando como root
     if [[ "$EUID" -eq 0 ]]; then
@@ -263,24 +269,40 @@ fase_03_clusters() {
         return 1
     fi
     
-    # Verificar Docker
-    verificar_docker_disponible
-    
-    # Configurar cluster principal DEV
-    crear_cluster_gitops_dev
-    
-    # Configurar clusters adicionales si no es solo DEV
-    if ! solo_dev; then
-        crear_clusters_promocion
-    else
-        log_info "⏭️ Saltando clusters de promoción (--solo-dev)"
+    # Verificar Docker solo una vez
+    if ! verificar_docker_disponible; then
+        log_error "❌ Docker no está disponible"
+        return 1
     fi
     
-    # Mostrar estado final
-    log_info "📋 Estado final de clusters:"
-    minikube profile list 2>/dev/null || log_warning "No se pudo listar perfiles"
+    # En modo dry-run, mostrar lo que se haría
+    if es_dry_run; then
+        log_info "[DRY-RUN] Crearía entorno GitOps optimizado:"
+        log_info "   • Pre-descarga de imágenes K8s para reutilización"
+        log_info "   • Cluster gitops-dev: 4 CPUs, 4096MB, 40g"
+        if ! solo_dev; then
+            log_info "   • Cluster gitops-pre: 2 CPUs, 2048MB, 20g"
+            log_info "   • Cluster gitops-pro: 2 CPUs, 2048MB, 20g"
+        fi
+        log_info "   • Configuración de addons en paralelo"
+        log_success "✅ Dry-run completado"
+        return 0
+    fi
     
-    log_info "✅ Fase 3 completada: Clusters configurados"
+    # Crear entorno GitOps completo con optimización
+    log_info "� Iniciando creación optimizada de clusters..."
+    
+    if ! crear_entorno_gitops_completo "$(solo_dev && echo "true" || echo "false")"; then
+        log_error "❌ Error en la creación optimizada de clusters"
+        return 1
+    fi
+    
+    # Mostrar estado final optimizado
+    mostrar_estado_clusters
+    
+    log_success "✅ Fase 3 completada: Entorno GitOps optimizado y funcional"
+    log_info "💾 Cache de imágenes disponible para futuras recreaciones"
+    log_info "⚡ Próximas creaciones de clusters serán significativamente más rápidas"
 }
 
 # ============================================================================

@@ -153,3 +153,51 @@ verificar_contexto_correcto() {
     
     return 0
 }
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL: GESTIÓN INTELIGENTE DE PERMISOS
+# ============================================================================
+
+# Gestiona permisos de forma inteligente según la fase
+gestionar_permisos_inteligente() {
+    local fase="${1:-clusters}"
+    local requerimiento="$(analizar_requerimientos_fase "$fase")"
+    
+    # Optimización: verificar contexto actual primero (evita logs redundantes)
+    if verificar_contexto_correcto "$fase"; then
+        # Solo log en modo verbose para evitar spam
+        [[ "${VERBOSE:-false}" == "true" ]] && echo "✅ Contexto correcto para fase: $fase"
+        return 0
+    fi
+    
+    echo "🔍 Analizando requerimientos de permisos para fase: $fase"
+    echo "   📋 Requerimiento detectado: $requerimiento"
+    echo "   ⚠️  Contexto incorrecto - se requiere: $requerimiento"
+    
+    case "$requerimiento" in
+        "root")
+            if verificar_sudo; then
+                echo "   🔄 Escalando con sudo automáticamente..."
+                gestionar_permisos_automatico "$fase"
+                return $?
+            else
+                echo "   ❌ Se requiere acceso root para esta fase"
+                return 1
+            fi
+            ;;
+        "user")
+            if [[ "$EUID" -eq 0 ]]; then
+                echo "   🔄 Desescalando a usuario normal automáticamente..."
+                gestionar_permisos_automatico "$fase"
+                return $?
+            else
+                echo "   ✅ Continuando con permisos de usuario"
+                return 0
+            fi
+            ;;
+        *)
+            echo "   ❓ Requerimiento desconocido: $requerimiento"
+            return 1
+            ;;
+    esac
+}

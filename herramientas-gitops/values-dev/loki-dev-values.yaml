@@ -1,0 +1,26 @@
+# Configuración optimizada para desarrollo - Loki
+deploymentMode: SingleBinary
+loki:
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  auth_enabled: false
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+  persistence:
+    size: 2Gi
+test:
+  enabled: false
+monitoring:
+  selfMonitoring:
+    enabled: false
+  serviceMonitor:
+    enabled: false

@@ -548,13 +548,18 @@ aplicar_optimizaciones_desarrollo() {
         fi
     fi
     
-    # Crear archivo temporal con valores optimizados
-    local valores_temp="/tmp/${herramienta}-dev-values.yaml"
+    # Crear directorio para valores de desarrollo si no existe
+    local dir_values_dev="herramientas-gitops/values-dev"
+    mkdir -p "$dir_values_dev"
+    
+    # Archivo de valores de desarrollo en el repositorio
+    local valores_dev_file="$dir_values_dev/${herramienta}-dev-values.yaml"
     
     # Configuraciones optimizadas basadas en el tipo de herramienta
     case "$herramienta" in
         *"ingress"*|*"nginx"*)
-            cat > "$valores_temp" << EOF
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Ingress NGINX
 controller:
   replicaCount: 1
   resources:
@@ -564,10 +569,15 @@ controller:
     limits:
       cpu: 200m
       memory: 256Mi
+  service:
+    type: NodePort
+  admissionWebhooks:
+    enabled: false
 EOF
             ;;
         *"prometheus"*|*"kube-prometheus-stack"*)
-            cat > "$valores_temp" << EOF
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Prometheus Stack
 prometheus:
   prometheusSpec:
     resources:
@@ -578,6 +588,12 @@ prometheus:
         cpu: 500m
         memory: 1Gi
     retention: 7d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 2Gi
 grafana:
   resources:
     requests:
@@ -588,10 +604,25 @@ grafana:
       memory: 256Mi
   persistence:
     enabled: false
+  testFramework:
+    enabled: false
+  adminPassword: admin123
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
 EOF
             ;;
         *"grafana"*)
-            cat > "$valores_temp" << EOF
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Grafana
+adminUser: admin
+adminPassword: admin123
 resources:
   requests:
     cpu: 100m
@@ -600,14 +631,235 @@ resources:
     cpu: 200m
     memory: 256Mi
 persistence:
-  enabled: false
+  enabled: true
+  size: 1Gi
 testFramework:
   enabled: false
+serviceMonitor:
+  enabled: false
+EOF
+            ;;
+        *"loki"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Loki
+deploymentMode: SingleBinary
+loki:
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  auth_enabled: false
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+  persistence:
+    size: 2Gi
+test:
+  enabled: false
+monitoring:
+  selfMonitoring:
+    enabled: false
+  serviceMonitor:
+    enabled: false
+EOF
+            ;;
+        *"jaeger"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Jaeger
+provisionDataStore:
+  cassandra: false
+  elasticsearch: false
+allInOne:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+storage:
+  type: memory
+agent:
+  enabled: false
+collector:
+  enabled: false
+query:
+  enabled: false
+EOF
+            ;;
+        *"minio"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - MinIO
+mode: standalone
+rootUser: admin
+rootPassword: admin123
+replicas: 1
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
+persistence:
+  enabled: true
+  size: 2Gi
+service:
+  type: ClusterIP
+consoleService:
+  type: ClusterIP
+EOF
+            ;;
+        *"gitea"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Gitea
+gitea:
+  admin:
+    username: admin
+    password: admin123
+    email: admin@local.dev
+  config:
+    database:
+      DB_TYPE: sqlite3
+    session:
+      PROVIDER: memory
+    cache:
+      ENABLED: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi
+persistence:
+  enabled: true
+  size: 2Gi
+postgresql:
+  enabled: false
+mysql:
+  enabled: false
+EOF
+            ;;
+        *"cert-manager"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Cert-Manager
+installCRDs: true
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+webhook:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+cainjector:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+EOF
+            ;;
+        *"external-secrets"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - External Secrets
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+replicaCount: 1
+webhook:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+certController:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+EOF
+            ;;
+        *"argo"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Argo (Events/Workflows/Rollouts)
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+server:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+EOF
+            ;;
+        *"kargo"*)
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - Kargo
+api:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+webhooksServer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
 EOF
             ;;
         *)
             # Configuración genérica optimizada para desarrollo
-            cat > "$valores_temp" << EOF
+            cat > "$valores_dev_file" << EOF
+# Configuración optimizada para desarrollo - $herramienta
 resources:
   requests:
     cpu: 100m
@@ -620,10 +872,49 @@ EOF
             ;;
     esac
     
-    echo "   💾 Configuración optimizada guardada en $valores_temp"
+    echo "   💾 Configuración optimizada guardada en $valores_dev_file"
     echo "   🎯 Recursos mínimos aplicados para entorno de desarrollo"
     
+    # Actualizar el YAML principal para referenciar los valores de desarrollo
+    actualizar_referencia_valores_dev "$archivo_yaml" "$valores_dev_file" "$herramienta"
+    
     return 0
+}
+
+# Función para actualizar la referencia a valores de desarrollo en el YAML principal
+actualizar_referencia_valores_dev() {
+    local archivo_yaml="$1"
+    local valores_dev_file="$2"
+    local herramienta="$3"
+    
+    echo "   🔧 Actualizando referencia a valores de desarrollo..."
+    
+    # Crear backup
+    cp "$archivo_yaml" "${archivo_yaml}.backup"
+    
+    # Buscar si ya existe una sección helm.valueFiles o helm.values
+    if grep -q "helm:" "$archivo_yaml"; then
+        # Ya existe sección helm, agregar/actualizar valueFiles
+        if grep -q "valueFiles:" "$archivo_yaml"; then
+            echo "   ⚠️  valueFiles ya existe, verificando contenido..."
+        else
+            # Agregar valueFiles después de la sección helm
+            sed -i '/helm:/a\      valueFiles:\n        - values-dev/'$herramienta'-dev-values.yaml' "$archivo_yaml"
+            echo "   ✅ Agregada referencia a valores de desarrollo"
+        fi
+    else
+        echo "   ℹ️  No se encontró sección helm en $archivo_yaml"
+        echo "   💡 Para aplicar valores de desarrollo, agregue sección helm manualmente"
+    fi
+    
+    # Verificar cambios
+    if grep -q "values-dev/${herramienta}-dev-values.yaml" "$archivo_yaml"; then
+        echo "   ✅ Referencia a valores de desarrollo confirmada"
+        rm -f "${archivo_yaml}.backup"
+    else
+        echo "   ⚠️  No se pudo agregar la referencia automáticamente"
+        mv "${archivo_yaml}.backup" "$archivo_yaml"
+    fi
 }
 
 # Función para mostrar resumen de herramientas descubiertas

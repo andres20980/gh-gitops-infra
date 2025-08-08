@@ -7,7 +7,7 @@
 # Principios: DRY - Delegación total a gitops-helper.sh
 # ============================================================================
 
-set -euo pipefail
+set -eo pipefail  # Removemos la 'u' para evitar errores de variables no declaradas en contexto dinámico
 
 # ============================================================================
 # AUTOCONTENCIÓN Y DEPENDENCIAS
@@ -24,12 +24,12 @@ else
     exit 1
 fi
 
-# Cargar helper especializado de GitOps
-if [[ -f "$SCRIPT_DIR/../comun/helpers/gitops-helper.sh" ]]; then
-    # shellcheck source=../comun/helpers/gitops-helper.sh
-    source "$SCRIPT_DIR/../comun/helpers/gitops-helper.sh"
+# Cargar helper especializado de GitOps MODULAR
+if [[ -f "$SCRIPT_DIR/../comun/helpers/gitops-helper-modular.sh" ]]; then
+    # shellcheck source=../comun/helpers/gitops-helper-modular.sh
+    source "$SCRIPT_DIR/../comun/helpers/gitops-helper-modular.sh"
 else
-    log_error "❌ GitOps helper no encontrado: gitops-helper.sh"
+    log_error "❌ GitOps helper modular no encontrado: gitops-helper-modular.sh"
     exit 1
 fi
 

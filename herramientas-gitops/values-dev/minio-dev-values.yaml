@@ -1,19 +1,9 @@
-# Configuración optimizada para desarrollo - MinIO
-mode: standalone
-rootUser: admin
-rootPassword: admin123
-replicas: 1
+# Configuración optimizada para desarrollo - minio
 resources:
   requests:
     cpu: 100m
-    memory: 256Mi
+    memory: 128Mi
   limits:
     cpu: 200m
-    memory: 512Mi
-persistence:
-  enabled: true
-  size: 2Gi
-service:
-  type: ClusterIP
-consoleService:
-  type: ClusterIP
+    memory: 256Mi
+replicaCount: 1

@@ -45,9 +45,38 @@ mostrar_ayuda() {
 
 # Función principal (solo orquestación)
 main() {
-    # Procesar argumentos
-    local comando="${1:-completo}"
-    shift || true
+    # Extraer comando (primer argumento que no sea una opción)
+    local comando=""
+    local args=()
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --*)
+                # Es una opción, añadir a args
+                if [[ "$1" == "--log-file" || "$1" == "--timeout" || "$1" == "--log-level" ]]; then
+                    args+=("$1" "$2")
+                    shift 2
+                else
+                    args+=("$1")
+                    shift
+                fi
+                ;;
+            *)
+                # Es el comando si aún no lo hemos encontrado
+                if [[ -z "$comando" ]]; then
+                    comando="$1"
+                    shift
+                else
+                    # Resto de argumentos
+                    args+=("$1")
+                    shift
+                fi
+                ;;
+        esac
+    done
+    
+    # Si no hay comando, usar "completo" por defecto
+    [[ -z "$comando" ]] && comando="completo"
     
     case "$comando" in
         --ayuda|--help|-h)
@@ -61,10 +90,18 @@ main() {
         fase-*)
             # Extraer número de fase
             local fase_num="${comando#fase-}"
-            ejecutar_fase_individual "$fase_num" "$@"
+            if [[ ${#args[@]} -gt 0 ]]; then
+                ejecutar_fase_individual "$fase_num" "${args[@]}"
+            else
+                ejecutar_fase_individual "$fase_num"
+            fi
             ;;
         completo|"")
-            ejecutar_proceso_completo "$@"
+            if [[ ${#args[@]} -gt 0 ]]; then
+                ejecutar_proceso_completo "${args[@]}"
+            else
+                ejecutar_proceso_completo
+            fi
             ;;
         *)
             log_error "Comando desconocido: $comando"

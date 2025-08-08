@@ -14,34 +14,36 @@ set -euo pipefail
 # ============================================================================
 
 # Lista de fases disponibles
-readonly FASES_DISPONIBLES=(
-    "fase-01-permisos.sh"
-    "fase-02-dependencias.sh"
-    "fase-03-clusters.sh"
-    "fase-04-argocd.sh"
-    "fase-05-herramientas.sh"
-    "fase-06-aplicaciones.sh"
-    "fase-07-finalizacion.sh"
-)
+if [[ -z "${FASES_DISPONIBLES:-}" ]]; then
+    readonly FASES_DISPONIBLES=(
+        "fase-01-permisos.sh"
+        "fase-02-dependencias.sh"
+        "fase-03-clusters.sh"
+        "fase-04-argocd.sh"
+        "fase-05-herramientas.sh"
+        "fase-06-aplicaciones.sh"
+        "fase-07-finalizacion.sh"
+    )
+fi
 
 # Cargar todos los módulos de fases
 cargar_modulos_fases() {
     log_info "📂 Cargando módulos por fases..."
     
-    for fase in "${FASES_DISPONIBLES[@]}"; do
-        local fase_path="$FASES_DIR/$fase"
+    for fase_file in "${FASES_DISPONIBLES[@]}"; do
+        local fase_path="$PROJECT_ROOT/scripts/fases/$fase_file"
         
         if [[ -f "$fase_path" ]]; then
-            # shellcheck source=/dev/null
             source "$fase_path"
-            log_debug "✅ Módulo cargado: $fase"
+            log_debug "✅ Módulo cargado: $fase_file"
         else
-            log_error "❌ Módulo de fase no encontrado: $fase_path"
+            log_error "❌ Módulo no encontrado: $fase_path"
             return 1
         fi
     done
     
     log_success "✅ Todos los módulos de fases cargados correctamente"
+    return 0
 }
 
 # Configurar modo de instalación
@@ -143,7 +145,8 @@ ejecutar_fase_individual_impl() {
     # Mostrar banner
     mostrar_banner_inicial
     
-    log_section "🎯 EJECUCIÓN FASE INDIVIDUAL: $fase"
+    log_debug "Fase recibida: '$fase'"
+    log_section "🎯 EJECUCIÓN FASE INDIVIDUAL: fase-$fase"
     
     # Mapear número de fase a función
     case "$fase" in
@@ -169,7 +172,7 @@ ejecutar_fase_individual_impl() {
             fase_07_finalizacion
             ;;
         *)
-            log_error "❌ Fase no reconocida: $fase"
+            log_error "❌ Fase no reconocida: fase-$fase"
             return 1
             ;;
     esac

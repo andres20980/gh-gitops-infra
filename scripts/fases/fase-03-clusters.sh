@@ -292,7 +292,7 @@ fase_03_clusters() {
     # Crear entorno GitOps completo con optimización
     log_info "� Iniciando creación optimizada de clusters..."
     
-    if ! crear_entorno_gitops_completo "$(solo_dev && echo "true" || echo "false")"; then
+    if ! crear_entorno_gitops_completo "${SOLO_DEV:-false}"; then
         log_error "❌ Error en la creación optimizada de clusters"
         return 1
     fi

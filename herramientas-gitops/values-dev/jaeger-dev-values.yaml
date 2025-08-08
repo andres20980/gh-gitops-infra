@@ -1,21 +1,9 @@
-# Configuración optimizada para desarrollo - Jaeger
-provisionDataStore:
-  cassandra: false
-  elasticsearch: false
-allInOne:
-  enabled: true
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 200m
-      memory: 512Mi
-storage:
-  type: memory
-agent:
-  enabled: false
-collector:
-  enabled: false
-query:
-  enabled: false
+# Configuración optimizada para desarrollo - jaeger
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+replicaCount: 1

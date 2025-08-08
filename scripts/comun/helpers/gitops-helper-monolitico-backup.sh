@@ -2,9 +2,18 @@
 # GitOps Helper - Sistema de optimización dinámico v3.0.0
 # Autodescubrimiento y búsqueda de versiones en tiempo real
 
-# Variables globales dinámicas
-declare -a GITOPS_TOOLS_DISCOVERED=()
-declare -A GITOPS_CHART_INFO=()
+#!/bin/bash
+# ============================================================================
+# GITOPS HELPER - Sistema dinámico de gestión de herramientas GitOps
+# ============================================================================
+
+# Desactivar set -u para evitar errores con variables dinámicas
+set +u
+
+# Arrays globales para el sistema dinámico
+GITOPS_TOOLS_DISCOVERED=()
+declare -a GITOPS_TOOLS_DISCOVERED
+declare -A GITOPS_CHART_INFO
 
 # Función para autodescubrir herramientas GitOps en tiempo real
 autodescubrir_herramientas_gitops() {
@@ -14,7 +23,10 @@ autodescubrir_herramientas_gitops() {
     
     # Limpiar arrays dinámicos
     GITOPS_TOOLS_DISCOVERED=()
-    GITOPS_CHART_INFO=()
+    # Limpiar array asociativo correctamente
+    for key in "${!GITOPS_CHART_INFO[@]}"; do
+        unset GITOPS_CHART_INFO["$key"]
+    done
     
     # Escanear todos los archivos YAML en herramientas-gitops
     for archivo_yaml in "$directorio_herramientas"/*.yaml; do
@@ -37,9 +49,13 @@ extraer_info_chart_del_yaml() {
     local archivo_yaml="$1"
     local herramienta="$2"
     
+    echo "   🔍 DEBUG: Procesando herramienta='$herramienta' archivo='$archivo_yaml'"
+    
     # Buscar información del repositorio Helm en el YAML
     local repo_url=$(grep -E '^\s*repoURL:' "$archivo_yaml" | head -1 | sed 's/.*repoURL:\s*//' | tr -d '"' | tr -d "'")
     local chart_name=$(grep -E '^\s*chart:' "$archivo_yaml" | head -1 | sed 's/.*chart:\s*//' | tr -d '"' | tr -d "'")
+    
+    echo "   🔍 DEBUG: repo_url='$repo_url' chart_name='$chart_name'"
     
     # Si no hay información del chart, intentar deducirla
     if [[ -z "$repo_url" || -z "$chart_name" ]]; then
@@ -50,9 +66,16 @@ extraer_info_chart_del_yaml() {
         local repo_name
         repo_name=$(echo "$repo_url" | sed 's|https://||' | sed 's|\.github\.io/.*||' | sed 's|.*github\.com/||' | sed 's|/.*||' 2>/dev/null || echo "unknown")
         
-        GITOPS_CHART_INFO["${herramienta}_repo"]="$repo_name"
-        GITOPS_CHART_INFO["${herramienta}_chart"]="$chart_name"
-        GITOPS_CHART_INFO["${herramienta}_repo_url"]="$repo_url"
+        echo "   🔍 DEBUG: repo_name='$repo_name' antes de asignar al array"
+        
+        # Usar variables auxiliares para evitar problemas de expansión con guiones
+        local key_repo="${herramienta}_repo"
+        local key_chart="${herramienta}_chart"
+        local key_repo_url="${herramienta}_repo_url"
+        
+        GITOPS_CHART_INFO["$key_repo"]="$repo_name"
+        GITOPS_CHART_INFO["$key_chart"]="$chart_name"
+        GITOPS_CHART_INFO["$key_repo_url"]="$repo_url"
         
         echo "   📋 Chart detectado: $repo_name/$chart_name"
     fi
@@ -62,75 +85,81 @@ extraer_info_chart_del_yaml() {
 detectar_chart_inteligente() {
     local herramienta="$1"
     
+    # Variables auxiliares para evitar problemas de expansión con guiones
+    local key_repo="${herramienta}_repo"
+    local key_chart="${herramienta}_chart"
+    
     # Base de conocimiento inteligente para detección automática
     case "$herramienta" in
         *"ingress"*|*"nginx"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="ingress-nginx"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="ingress-nginx"
+            GITOPS_CHART_INFO["$key_repo"]="ingress-nginx"
+            GITOPS_CHART_INFO["$key_chart"]="ingress-nginx"
             ;;
         *"external"*|*"secret"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="external-secrets"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="external-secrets"
+            GITOPS_CHART_INFO["$key_repo"]="external-secrets"
+            GITOPS_CHART_INFO["$key_chart"]="external-secrets"
             ;;
         *"cert"*|*"manager"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="jetstack"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="cert-manager"
+            GITOPS_CHART_INFO["$key_repo"]="jetstack"
+            GITOPS_CHART_INFO["$key_chart"]="cert-manager"
             ;;
         *"argo"*"event"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="argo"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="argo-events"
+            GITOPS_CHART_INFO["$key_repo"]="argo"
+            GITOPS_CHART_INFO["$key_chart"]="argo-events"
             ;;
         *"argo"*"workflow"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="argo"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="argo-workflows"
+            GITOPS_CHART_INFO["$key_repo"]="argo"
+            GITOPS_CHART_INFO["$key_chart"]="argo-workflows"
             ;;
         *"argo"*"rollout"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="argo"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="argo-rollouts"
+            GITOPS_CHART_INFO["$key_repo"]="argo"
+            GITOPS_CHART_INFO["$key_chart"]="argo-rollouts"
             ;;
         *"prometheus"*|*"kube-prometheus-stack"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="prometheus-community"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="kube-prometheus-stack"
+            GITOPS_CHART_INFO["$key_repo"]="prometheus-community"
+            GITOPS_CHART_INFO["$key_chart"]="kube-prometheus-stack"
             ;;
         *"grafana"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="grafana"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="grafana"
+            GITOPS_CHART_INFO["$key_repo"]="grafana"
+            GITOPS_CHART_INFO["$key_chart"]="grafana"
             ;;
         *"loki"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="grafana"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="loki"
+            GITOPS_CHART_INFO["$key_repo"]="grafana"
+            GITOPS_CHART_INFO["$key_chart"]="loki"
             ;;
         *"jaeger"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="jaegertracing"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="jaeger"
+            GITOPS_CHART_INFO["$key_repo"]="jaegertracing"
+            GITOPS_CHART_INFO["$key_chart"]="jaeger"
             ;;
         *"minio"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="minio"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="minio"
+            GITOPS_CHART_INFO["$key_repo"]="minio"
+            GITOPS_CHART_INFO["$key_chart"]="minio"
             ;;
         *"gitea"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="gitea-charts"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="gitea"
+            GITOPS_CHART_INFO["$key_repo"]="gitea-charts"
+            GITOPS_CHART_INFO["$key_chart"]="gitea"
             ;;
         *"kargo"*)
-            GITOPS_CHART_INFO["${herramienta}_repo"]="kargo"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="kargo"
+            GITOPS_CHART_INFO["$key_repo"]="kargo"
+            GITOPS_CHART_INFO["$key_chart"]="kargo"
             ;;
         *)
             # Detección genérica: usar el nombre de la herramienta
-            GITOPS_CHART_INFO["${herramienta}_repo"]="$herramienta"
-            GITOPS_CHART_INFO["${herramienta}_chart"]="$herramienta"
+            GITOPS_CHART_INFO["$key_repo"]="$herramienta"
+            GITOPS_CHART_INFO["$key_chart"]="$herramienta"
             ;;
     esac
     
-    echo "   🧠 Detección inteligente: ${GITOPS_CHART_INFO[${herramienta}_repo]}/${GITOPS_CHART_INFO[${herramienta}_chart]}"
+    echo "   🧠 Detección inteligente: ${GITOPS_CHART_INFO[$key_repo]:-unknown}/${GITOPS_CHART_INFO[$key_chart]:-unknown}"
 }
 
 # Función para buscar la última versión de un chart en tiempo real
 buscar_ultima_version_chart() {
     local herramienta="$1"
-    local repo="${GITOPS_CHART_INFO[${herramienta}_repo]}"
-    local chart="${GITOPS_CHART_INFO[${herramienta}_chart]}"
+    local key_repo="${herramienta}_repo"
+    local key_chart="${herramienta}_chart"
+    local repo="${GITOPS_CHART_INFO[$key_repo]:-}"
+    local chart="${GITOPS_CHART_INFO[$key_chart]:-}"
     
     if [[ -z "$repo" || -z "$chart" ]]; then
         echo "latest"
@@ -313,12 +342,15 @@ esperar_aplicaciones_completas() {
     )
     
     echo "🎯 Verificando estado de ${#aplicaciones_esperadas[@]} herramientas GitOps..."
+    echo "⚠️  MODO ACTIVO: Diagnosticando y corrigiendo problemas automáticamente"
     
     while [[ $contador -le $max_intentos ]]; do
         echo "[$contador/$max_intentos] 🔍 Verificando estado de aplicaciones..."
         
         local todas_ok=true
         local aplicaciones_problematicas=()
+        local aplicaciones_out_of_sync=()
+        local aplicaciones_unhealthy=()
         
         # Verificar cada aplicación esperada
         for app in "${aplicaciones_esperadas[@]}"; do
@@ -331,8 +363,13 @@ esperar_aplicaciones_completas() {
             local sync_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
             local health_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
             
-            if [[ "$sync_status" != "Synced" ]] || [[ "$health_status" != "Healthy" ]]; then
+            if [[ "$sync_status" != "Synced" ]]; then
                 todas_ok=false
+                aplicaciones_out_of_sync+=("$app")
+                aplicaciones_problematicas+=("$app:$sync_status/$health_status")
+            elif [[ "$health_status" != "Healthy" ]]; then
+                todas_ok=false
+                aplicaciones_unhealthy+=("$app")
                 aplicaciones_problematicas+=("$app:$sync_status/$health_status")
             fi
         done
@@ -352,10 +389,33 @@ esperar_aplicaciones_completas() {
             fi
         fi
         
-        # Intentar sincronización automática cada 5 intentos
-        if [[ $((contador % 5)) -eq 0 ]]; then
-            echo "   🔄 Forzando sincronización automática..."
-            forzar_sincronizacion_aplicaciones
+        # CORRECCIONES ACTIVAS cada 3 intentos
+        if [[ $((contador % 3)) -eq 0 ]]; then
+            echo "   🔧 Aplicando correcciones activas..."
+            
+            # Forzar sincronización de aplicaciones OutOfSync
+            if [[ ${#aplicaciones_out_of_sync[@]} -gt 0 ]]; then
+                echo "   🔄 Forzando sincronización de aplicaciones OutOfSync..."
+                for app in "${aplicaciones_out_of_sync[@]}"; do
+                    echo "      🔄 Sincronizando: $app"
+                    kubectl patch application "$app" -n argocd --type merge -p '{"operation":{"sync":{"syncStrategy":{"apply":{"force":true}}}}}' >/dev/null 2>&1 || true
+                done
+            fi
+            
+            # Diagnosticar aplicaciones Unhealthy
+            if [[ ${#aplicaciones_unhealthy[@]} -gt 0 ]]; then
+                echo "   🩺 Diagnosticando aplicaciones Unhealthy..."
+                diagnosticar_aplicaciones_unhealthy "${aplicaciones_unhealthy[@]}"
+            fi
+            
+            # Verificar App of Tools principal
+            verificar_app_of_tools
+        fi
+        
+        # CORRECCIÓN PROFUNDA cada 10 intentos
+        if [[ $((contador % 10)) -eq 0 ]]; then
+            echo "   🚨 Aplicando corrección profunda..."
+            correccion_profunda_aplicaciones
         fi
         
         echo "   ⏱️  Esperando 10 segundos antes del siguiente chequeo..."
@@ -367,38 +427,209 @@ esperar_aplicaciones_completas() {
     echo "❌ ¡TIMEOUT! Algunas aplicaciones no llegaron a estar Synced y Healthy"
     echo "📊 Estado final de aplicaciones:"
     mostrar_estado_final_aplicaciones
+    echo "🔧 Intentando última corrección de emergencia..."
+    correccion_emergencia_final
     return 1
 }
 
-# Función para forzar sincronización de aplicaciones OutOfSync
-forzar_sincronizacion_aplicaciones() {
-    local aplicaciones_out_of_sync
-    aplicaciones_out_of_sync=$(kubectl get applications -n argocd -o jsonpath='{range .items[*]}{.metadata.name}:{.status.sync.status}{"\n"}{end}' 2>/dev/null | grep -v ":Synced" | cut -d: -f1)
+# Función para diagnosticar aplicaciones Unhealthy
+diagnosticar_aplicaciones_unhealthy() {
+    local aplicaciones_unhealthy=("$@")
     
-    if [[ -n "$aplicaciones_out_of_sync" ]]; then
-        echo "   🔧 Sincronizando aplicaciones OutOfSync..."
-        while read -r app; do
-            if [[ -n "$app" ]]; then
-                echo "      🔄 Sincronizando: $app"
-                kubectl patch application "$app" -n argocd --type merge -p '{"operation":{"sync":{}}}' >/dev/null 2>&1 || true
+    for app in "${aplicaciones_unhealthy[@]}"; do
+        echo "      🩺 Diagnosticando: $app"
+        
+        # Obtener información del estado
+        local mensaje_health=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.message}' 2>/dev/null || echo "")
+        local conditions=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.conditions[*].message}' 2>/dev/null || echo "")
+        
+        echo "         Estado: $mensaje_health"
+        if [[ -n "$conditions" ]]; then
+            echo "         Condiciones: $conditions"
+        fi
+        
+        # Verificar namespace de destino
+        local target_namespace=$(kubectl get application "$app" -n argocd -o jsonpath='{.spec.destination.namespace}' 2>/dev/null || echo "")
+        if [[ -n "$target_namespace" ]]; then
+            if ! kubectl get namespace "$target_namespace" >/dev/null 2>&1; then
+                echo "         🔧 Creando namespace faltante: $target_namespace"
+                kubectl create namespace "$target_namespace" >/dev/null 2>&1 || true
             fi
-        done <<< "$aplicaciones_out_of_sync"
+        fi
+        
+        # Verificar recursos del namespace
+        if [[ -n "$target_namespace" ]]; then
+            local recursos_error=$(kubectl get events -n "$target_namespace" --field-selector type=Warning --no-headers 2>/dev/null | head -3)
+            if [[ -n "$recursos_error" ]]; then
+                echo "         ⚠️ Eventos de warning en $target_namespace:"
+                echo "$recursos_error" | sed 's/^/            /'
+            fi
+        fi
+    done
+}
+
+# Función para verificar App of Tools
+verificar_app_of_tools() {
+    echo "   🔍 Verificando App of Tools principal..."
+    
+    if ! kubectl get application app-of-tools-gitops -n argocd >/dev/null 2>&1; then
+        echo "   🚨 App of Tools no encontrada, reaplicando..."
+        if kubectl apply -f argo-apps/app-of-tools-gitops.yaml >/dev/null 2>&1; then
+            echo "   ✅ App of Tools reaplicada"
+        else
+            echo "   ❌ Error reaplicando App of Tools"
+        fi
+    else
+        local sync_status=$(kubectl get application app-of-tools-gitops -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        if [[ "$sync_status" != "Synced" ]]; then
+            echo "   🔄 Forzando sincronización de App of Tools..."
+            kubectl patch application app-of-tools-gitops -n argocd --type merge -p '{"operation":{"sync":{"syncStrategy":{"apply":{"force":true}}}}}' >/dev/null 2>&1 || true
+        fi
     fi
 }
+
+# Función de corrección profunda
+correccion_profunda_aplicaciones() {
+    echo "      🔧 Corrección profunda iniciada..."
+    
+    # Refresh completo de ArgoCD
+    echo "      🔄 Refrescando repositorio en ArgoCD..."
+    kubectl patch application app-of-tools-gitops -n argocd --type merge -p '{"operation":{"refresh":{}}}' >/dev/null 2>&1 || true
+    
+    # Verificar estado de ArgoCD server
+    if ! kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server --no-headers | grep -q Running; then
+        echo "      🚨 ArgoCD server problemático, reiniciando..."
+        kubectl rollout restart deployment argocd-server -n argocd >/dev/null 2>&1 || true
+    fi
+    
+    # Verificar conectividad del repositorio
+    echo "      📡 Verificando conectividad del repositorio..."
+    local repo_status=$(kubectl get applications -n argocd -o jsonpath='{.items[0].status.sourceType}' 2>/dev/null || echo "")
+    if [[ "$repo_status" != "Git" ]]; then
+        echo "      ⚠️ Problema de conectividad del repositorio detectado"
+    fi
+    
+    # Limpiar aplicaciones en estado error
+    echo "      🧹 Limpiando aplicaciones en estado error..."
+    local apps_error=$(kubectl get applications -n argocd -o jsonpath='{range .items[*]}{.metadata.name}:{.status.health.status}{"\n"}{end}' 2>/dev/null | grep ":Unknown\|:Missing" | cut -d: -f1)
+    
+    if [[ -n "$apps_error" ]]; then
+        while read -r app; do
+            if [[ -n "$app" ]]; then
+                echo "      🔄 Recreando aplicación problemática: $app"
+                kubectl patch application "$app" -n argocd --type merge -p '{"operation":{"sync":{"syncStrategy":{"apply":{"force":true},"prune":true}}}}' >/dev/null 2>&1 || true
+            fi
+        done <<< "$apps_error"
+    fi
+}
+
+# Función de corrección de emergencia final
+correccion_emergencia_final() {
+    echo "🚨 Ejecutando corrección de emergencia final..."
+    
+    # Verificar que al menos las herramientas críticas estén funcionando
+    local herramientas_criticas=("grafana" "prometheus-stack" "ingress-nginx" "cert-manager")
+    local criticas_ok=0
+    
+    for tool in "${herramientas_criticas[@]}"; do
+        if kubectl get application "$tool" -n argocd >/dev/null 2>&1; then
+            local sync_status=$(kubectl get application "$tool" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+            local health_status=$(kubectl get application "$tool" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+            
+            if [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" ]]; then
+                ((criticas_ok++))
+                echo "   ✅ Crítica OK: $tool"
+            else
+                echo "   ❌ Crítica PROBLEMA: $tool ($sync_status/$health_status)"
+                # Último intento de corrección
+                kubectl patch application "$tool" -n argocd --type merge -p '{"operation":{"sync":{"syncStrategy":{"apply":{"force":true},"prune":true,"selfHeal":true}}}}' >/dev/null 2>&1 || true
+            fi
+        else
+            echo "   ❌ Crítica FALTANTE: $tool"
+        fi
+    done
+    
+    echo "📊 Herramientas críticas funcionando: $criticas_ok/${#herramientas_criticas[@]}"
+    
+    if [[ $criticas_ok -ge 2 ]]; then
+        echo "✅ Al menos las herramientas críticas básicas están funcionando"
+        echo "💡 El sistema puede continuar, herramientas adicionales se sincronizarán gradualmente"
+        return 0
+    else
+        echo "❌ Demasiadas herramientas críticas fallando"
+        return 1
+    fi
+}
+
+# Función para forzar sincronización de aplicaciones OutOfSync
 
 # Función para mostrar estado final detallado de aplicaciones
 mostrar_estado_final_aplicaciones() {
     echo
-    echo "📊 Estado final de herramientas GitOps:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📊 Estado detallado de todas las herramientas GitOps:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    if kubectl get applications -n argocd >/dev/null 2>&1; then
-        kubectl get applications -n argocd -o custom-columns="HERRAMIENTA:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,VERSION:.spec.source.targetRevision" 2>/dev/null || echo "Error obteniendo estado de aplicaciones"
+    local aplicaciones_esperadas=(
+        "argo-events" "argo-rollouts" "argo-workflows" "cert-manager"
+        "external-secrets" "gitea" "grafana" "ingress-nginx" "jaeger"
+        "kargo" "loki" "minio" "prometheus-stack"
+    )
+    
+    local total_apps=${#aplicaciones_esperadas[@]}
+    local apps_synced=0
+    local apps_healthy=0
+    local apps_completas=0
+    
+    printf "%-18s %-12s %-12s %-15s\n" "APLICACIÓN" "SYNC" "HEALTH" "ESTADO"
+    echo "──────────────────┼────────────┼────────────┼───────────────"
+    
+    for app in "${aplicaciones_esperadas[@]}"; do
+        if ! kubectl get application "$app" -n argocd >/dev/null 2>&1; then
+            printf "%-18s %-12s %-12s %-15s\n" "$app" "NO_EXISTE" "NO_EXISTE" "❌ FALTANTE"
+            continue
+        fi
+        
+        local sync_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        local health_status=$(kubectl get application "$app" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+        
+        # Contadores
+        [[ "$sync_status" == "Synced" ]] && ((apps_synced++))
+        [[ "$health_status" == "Healthy" ]] && ((apps_healthy++))
+        [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" ]] && ((apps_completas++))
+        
+        # Estado visual
+        local estado_visual="❌ PROBLEMA"
+        if [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" ]]; then
+            estado_visual="✅ COMPLETO"
+        elif [[ "$sync_status" == "Synced" ]]; then
+            estado_visual="🔄 SYNC_OK"
+        elif [[ "$health_status" == "Healthy" ]]; then
+            estado_visual="⚠️ HEALTH_OK"
+        fi
+        
+        printf "%-18s %-12s %-12s %-15s\n" "$app" "$sync_status" "$health_status" "$estado_visual"
+    done
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📈 RESUMEN EJECUTIVO:"
+    echo "   🎯 Aplicaciones completas (Synced + Healthy): $apps_completas/$total_apps"
+    echo "   🔄 Aplicaciones sincronizadas: $apps_synced/$total_apps"
+    echo "   💚 Aplicaciones saludables: $apps_healthy/$total_apps"
+    
+    local porcentaje_completas=$((apps_completas * 100 / total_apps))
+    echo "   📊 Porcentaje de éxito: $porcentaje_completas%"
+    
+    if [[ $apps_completas -eq $total_apps ]]; then
+        echo "   🎉 ¡TODAS LAS HERRAMIENTAS GITOPS ESTÁN OPERATIVAS!"
+    elif [[ $apps_completas -ge $((total_apps * 80 / 100)) ]]; then
+        echo "   ✅ La mayoría de herramientas están funcionando correctamente"
+    elif [[ $apps_completas -ge $((total_apps * 50 / 100)) ]]; then
+        echo "   ⚠️ Aproximadamente la mitad de herramientas están funcionando"
     else
-        echo "❌ No se pudo obtener el estado de las aplicaciones"
+        echo "   ❌ La mayoría de herramientas tienen problemas - requiere intervención"
     fi
     
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
     # Verificar configuración multi-cluster
     verificar_configuracion_multicluster

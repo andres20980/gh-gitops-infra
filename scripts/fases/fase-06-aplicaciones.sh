@@ -17,9 +17,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Cargar autocontención
-if [[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]]; then
-    # shellcheck source=../comun/autocontener.sh
-    source "$SCRIPT_DIR/../comun/autocontener.sh"
+if [[ -f "$SCRIPT_DIR/../comun/bootstrap.sh" ]]; then
+    # shellcheck source=../comun/bootstrap.sh
+    source "$SCRIPT_DIR/../comun/bootstrap.sh"
 else
     echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
     echo "   Asegúrate de ejecutar desde la estructura correcta del proyecto" >&2
@@ -156,7 +156,7 @@ desplegar_aplicaciones_custom() {
     
     # REGENERAR APLICACIONES CUSTOM CON INTEGRACIÓN GITOPS COMPLETA
     log_info "🔧 Regenerando aplicaciones custom con integración GitOps completa..."
-    local generador_script="$COMUN_DIR/generar-apps-gitops-completas.sh"
+    local generador_script="$SCRIPT_DIR/../tools/app-generator.sh"
     
     if [[ -f "$generador_script" ]]; then
         # Regenerar demo-project con todas las integraciones GitOps

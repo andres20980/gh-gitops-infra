@@ -17,9 +17,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Cargar autocontención
-if [[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]]; then
-    # shellcheck source=../comun/autocontener.sh
-    source "$SCRIPT_DIR/../comun/autocontener.sh"
+if [[ -f "$SCRIPT_DIR/../comun/bootstrap.sh" ]]; then
+    # shellcheck source=../comun/bootstrap.sh
+    source "$SCRIPT_DIR/../comun/bootstrap.sh"
 else
     echo "❌ Error: No se pudo cargar el módulo de autocontención" >&2
     echo "   Asegúrate de ejecutar desde la estructura correcta del proyecto" >&2

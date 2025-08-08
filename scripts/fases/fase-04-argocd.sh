@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Cargar autocontención
-[[ -f "$SCRIPT_DIR/../comun/autocontener.sh" ]] && source "$SCRIPT_DIR/../comun/autocontener.sh" || {
+[[ -f "$SCRIPT_DIR/../comun/bootstrap.sh" ]] && source "$SCRIPT_DIR/../comun/bootstrap.sh" || {
     echo "❌ Error: Módulo de autocontención no encontrado" >&2; exit 1
 }
 

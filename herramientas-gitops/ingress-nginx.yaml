@@ -13,53 +13,7 @@ spec:
     targetRevision: "v1.13.0"
     helm:
       valueFiles:
-        - values-dev/ingress-nginx-dev-values.yaml
-      values: |
-        # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
-        
-        controller:
-          replicaCount: 1
-          resources:
-            limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          
-          service:
-            type: NodePort
-            ports:
-              http: 80
-              https: 443
-            nodePorts:
-              http: 30080
-              https: 30443
-          
-          metrics:
-            enabled: true
-            serviceMonitor:
-              enabled: true
-          
-          config:
-            log-format-upstream: '$remote_addr - $request - $status'
-            worker-processes: "1"
-            worker-connections: "1024"
-            
-        admissionWebhooks:
-          enabled: true
-          patch:
-            enabled: true
-            resources:
-              limits:
-                cpu: 50m
-                memory: 64Mi
-              requests:
-                cpu: 25m
-                memory: 32Mi
-        
-        defaultBackend:
-          enabled: false
+  - values-dev/ingress-nginx-dev-values.yaml
           
   destination:
     server: https://kubernetes.default.svc

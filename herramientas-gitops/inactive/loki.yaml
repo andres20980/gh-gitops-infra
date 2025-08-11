@@ -1,23 +1,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: argo-workflows
+  name: loki
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://argoproj.github.io/argo-helm
-    chart: argo-workflows
-    targetRevision: 0.45.21
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: "6.35.1"
     helm:
       valueFiles:
-  - values-dev/argo-workflows-dev-values.yaml
-          
+        - values-dev/loki-dev-values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: argo-workflows
+    namespace: monitoring
   syncPolicy:
     automated:
       prune: true

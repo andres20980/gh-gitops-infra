@@ -13,67 +13,7 @@ spec:
     targetRevision: "6.35.1"
     helm:
       valueFiles:
-        - values-dev/loki-dev-values.yaml
-      values: |
-        # === MONOLITHIC MODE FOR DEVELOPMENT ===
-        # Ref: https://grafana.com/docs/loki/latest/setup/install/helm/
-        # "Monolithic: Recommended when running Loki as part of a small meta monitoring stack"
-        
-        deploymentMode: SingleBinary
-        
-        loki:
-          auth_enabled: false
-          server:
-            http_listen_port: 3100
-          limits_config:
-            retention_period: 168h  # 7 days for dev
-            ingestion_rate_mb: 4
-            ingestion_burst_size_mb: 8
-            max_cache_freshness_per_query: 10m
-            reject_old_samples: true
-            reject_old_samples_max_age: 168h
-        
-        # Single binary deployment for minimal resource usage
-        singleBinary:
-          replicas: 1
-          resources:
-            limits:
-              cpu: 200m
-              memory: 512Mi
-            requests:
-              cpu: 100m
-              memory: 256Mi
-          persistence:
-            enabled: true
-            size: 2Gi
-            storageClass: ""
-        
-        # Disable unnecessary components for dev
-        gateway:
-          enabled: false
-        test:
-          enabled: false
-        monitoring:
-          selfMonitoring:
-            enabled: false
-        lokiCanary:
-          enabled: false
-        tableManager:
-          enabled: false
-        ruler:
-          enabled: false
-        indexGateway:
-          enabled: false
-        querier:
-          enabled: false
-        queryFrontend:
-          enabled: false
-        ingester:
-          enabled: false
-        distributor:
-          enabled: false
-        compactor:
-          enabled: false
+  - values-dev/loki-dev-values.yaml
           
   destination:
     server: https://kubernetes.default.svc

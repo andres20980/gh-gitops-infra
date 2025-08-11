@@ -1,23 +1,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: argo-workflows
+  name: minio
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://argoproj.github.io/argo-helm
-    chart: argo-workflows
-    targetRevision: 0.45.21
+    repoURL: https://charts.min.io
+    chart: minio
+    targetRevision: 5.4.0
     helm:
       valueFiles:
-  - values-dev/argo-workflows-dev-values.yaml
-          
+        - values-dev/minio-dev-values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: argo-workflows
+    namespace: storage
   syncPolicy:
     automated:
       prune: true

@@ -13,78 +13,7 @@ spec:
     targetRevision: 12.1.3
     helm:
       valueFiles:
-        - values-dev/gitea-dev-values.yaml
-      values: |
-        # === SINGLE-POD DEV CONFIGURATION (SQLite built-in) ===
-        # Ref: https://gitea.com/gitea/helm-chart - "For a minimal DEV installation"
-        # Single-pod Gitea instance without dependencies and persistence
-        
-        image:
-          repository: gitea/gitea
-          tag: "1.22.7"
-        
-        replicaCount: 1
-        
-        # Minimal resources for single-pod dev setup
-        resources:
-          limits:
-            cpu: 200m
-            memory: 256Mi
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        
-        # No external dependencies for minimal dev setup
-        postgresql:
-          enabled: false
-        redis:
-          enabled: false
-        
-        # SQLite configuration for development (built-in database)
-        gitea:
-          config:
-            database:
-              DB_TYPE: sqlite3
-              PATH: /data/gitea/gitea.db
-            session:
-              PROVIDER: memory
-            cache:
-              ENABLED: false
-            queue:
-              TYPE: level
-            server:
-              HTTP_PORT: 3000
-              DOMAIN: gitea.local
-              SSH_DOMAIN: gitea.local
-              ROOT_URL: http://gitea.local
-            security:
-              INSTALL_LOCK: true
-              SECRET_KEY: changeme-dev-only
-            service:
-              DISABLE_REGISTRATION: false
-            admin:
-              USERNAME: gitea
-              PASSWORD: gitea123
-              EMAIL: admin@gitea.local
-        
-        # Ephemeral storage for dev (can be disabled for truly minimal setup)
-        persistence:
-          enabled: false
-        
-        service:
-          http:
-            type: ClusterIP
-            port: 3000
-        
-        # Simple ingress configuration
-        ingress:
-          enabled: true
-          className: nginx
-          hosts:
-            - host: gitea.local
-              paths:
-                - path: /
-                  pathType: Prefix
+  - values-dev/gitea-dev-values.yaml
           
   destination:
     server: https://kubernetes.default.svc

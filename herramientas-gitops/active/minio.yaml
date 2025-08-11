@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://charts.min.io
+      chart: minio
+      targetRevision: "5.4.0"
+      helm:
+        valueFiles:
+          - $values/herramientas-gitops/values-dev/minio-dev-values.yaml
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
+      targetRevision: HEAD
+      ref: values
+      path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: storage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

@@ -10,8 +10,10 @@ spec:
   source:
     repoURL: https://grafana.github.io/helm-charts
     chart: loki
-    targetRevision: 6.34.0
+    targetRevision: "6.35.1"
     helm:
+      valueFiles:
+        - values-dev/loki-dev-values.yaml
       values: |
         # === MONOLITHIC MODE FOR DEVELOPMENT ===
         # Ref: https://grafana.com/docs/loki/latest/setup/install/helm/

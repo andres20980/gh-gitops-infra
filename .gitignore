@@ -112,12 +112,27 @@ _site/
 # Archivos de Desarrollo Local
 # ==========================================
 *.local
+# Archivos de Desarrollo Local
 *-local.*
 *-dev.*
 *-test.*
 scratch/
 playground/
 sandbox/
+test-manifests/
+
+# ==========================================
+# Respaldos y Archivos Obsoletos
+# ==========================================
+*.orig
+*.old
+*-backup
+*-bak
+*-anterior
+*-nuevo
+*-OLD
+*-NEW
+*-hipermodular*
 .Spotlight-V100
 .Trashes
 ehthumbs.db

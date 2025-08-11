@@ -13,6 +13,8 @@ spec:
     targetRevision: v1.6.2
     path: charts/kargo
     helm:
+      valueFiles:
+        - values-dev/kargo-dev-values.yaml
       values: |
         # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         

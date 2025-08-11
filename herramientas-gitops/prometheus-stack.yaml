@@ -10,8 +10,10 @@ spec:
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack
-    targetRevision: 75.15.2
+    targetRevision: "76.1.0"
     helm:
+      valueFiles:
+        - values-dev/prometheus-stack-dev-values.yaml
       values: |
         # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         

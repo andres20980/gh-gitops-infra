@@ -12,6 +12,8 @@ spec:
     chart: minio
     targetRevision: 5.4.0
     helm:
+      valueFiles:
+        - values-dev/minio-dev-values.yaml
       values: |
         # === TOY-SETUP FOR TESTING PURPOSES ===
         # Ref: https://github.com/minio/minio/tree/master/helm/minio

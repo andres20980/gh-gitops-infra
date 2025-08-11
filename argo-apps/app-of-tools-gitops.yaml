@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/andres20980/gh-gitops-infra.git
     targetRevision: HEAD
-    path: herramientas-gitops
+  path: herramientas-gitops/active
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

@@ -10,8 +10,10 @@ spec:
   source:
     repoURL: https://jaegertracing.github.io/helm-charts
     chart: jaeger
-    targetRevision: 3.4.1
+    targetRevision: "3.4.1"
     helm:
+      valueFiles:
+        - values-dev/jaeger-dev-values.yaml
       values: |
         # === CONFIGURACIÓN MÍNIMA PARA DESARROLLO ===
         

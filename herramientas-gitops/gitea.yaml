@@ -12,6 +12,8 @@ spec:
     chart: gitea
     targetRevision: 12.1.3
     helm:
+      valueFiles:
+        - values-dev/gitea-dev-values.yaml
       values: |
         # === SINGLE-POD DEV CONFIGURATION (SQLite built-in) ===
         # Ref: https://gitea.com/gitea/helm-chart - "For a minimal DEV installation"

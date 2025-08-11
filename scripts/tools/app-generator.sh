@@ -11,7 +11,7 @@ set -euo pipefail
 
 # Cargar funciones base
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/base.sh"
+source "$SCRIPT_DIR/../comun/base.sh"
 
 # ============================================================================
 # FUNCIONES DE GENERACIÓN DE MANIFIESTOS GITOPS

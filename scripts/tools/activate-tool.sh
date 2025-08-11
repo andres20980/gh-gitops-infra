@@ -73,8 +73,7 @@ if [[ "$repo_url" =~ ^https?:// && ! "$repo_url" =~ \\.(git)$ ]]; then
   latest_ver=$(get_latest_chart_version "$repo_url" "$chart" || true)
 fi
 
-# Limpiar activos anteriores
-rm -f "$ACTIVE_DIR"/*.yaml 2>/dev/null || true
+# Mantener activos previos (activación acumulativa)
 
 DEST_APP="$ACTIVE_DIR/${TOOL}.yaml"
 

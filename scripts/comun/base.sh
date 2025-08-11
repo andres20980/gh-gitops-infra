@@ -1,362 +1,212 @@
 #!/bin/bash
 
 # ============================================================================
-# MÓDULO BASE - Funciones fundamentales del sistema GitOps
+# GITOPS INFRA - Cargador Universal de Librerías DRY
 # ============================================================================
-# Proporciona funciones básicas para logging, validación y utilidades comunes
-# Usado por todos los demás módulos del sistema
+# Responsabilidad: Cargar todas las librerías DRY consolidadas
+# Principios: DRY perfecto, Single source of truth, Modular
 # ============================================================================
 
 set -euo pipefail
 
 # ============================================================================
-# CONFIGURACIÓN GLOBAL
+# RUTAS Y CONFIGURACIÓN
 # ============================================================================
 
-# Evitar redefinición de variables si ya están cargadas
-if [[ -z "${GITOPS_BASE_LOADED:-}" ]]; then
-    readonly GITOPS_BASE_LOADED="true"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly LIB_DIR="$SCRIPT_DIR/lib"
+readonly CONFIG_FILE="$SCRIPT_DIR/config.sh"
 
-    # Colores para output
-    readonly COLOR_RESET='\033[0m'
-    readonly COLOR_RED='\033[0;31m'
-    readonly COLOR_GREEN='\033[0;32m'
-    readonly COLOR_YELLOW='\033[1;33m'
-    readonly COLOR_BLUE='\033[0;34m'
-    readonly COLOR_PURPLE='\033[0;35m'
-    readonly COLOR_CYAN='\033[0;36m'
-    readonly COLOR_WHITE='\033[1;37m'
+# ============================================================================
+# CARGA DE LIBRERÍAS DRY
+# ============================================================================
 
-    # Símbolos para diferentes tipos de mensajes
-    readonly SYMBOL_SUCCESS="✅"
-    readonly SYMBOL_ERROR="❌"
-    readonly SYMBOL_WARNING="⚠️"
-    readonly SYMBOL_INFO="ℹ️"
-    readonly SYMBOL_DEBUG="🔍"
-    readonly SYMBOL_RUNNING="🔄"
-    readonly SYMBOL_ROCKET="🚀"
+# Cargar configuración
+if [[ -f "$CONFIG_FILE" ]]; then
+	source "$CONFIG_FILE"
+fi
+
+# Cargar librerías DRY en orden de dependencia
+readonly DRY_LIBS=(
+	"validation.sh"     # Logging y validación (base)
+	"versions.sh"       # Detección de versiones y compatibilidad
+	"sizing.sh"         # Estimación y límites de recursos del sistema
+	"dependencies.sh"   # Dependencias del sistema
+	"kubernetes.sh"     # Gestión de clusters
+	"gitops.sh"         # Herramientas GitOps
+)
+
+_base_supports_emoji() {
+	# Emojis solo si TTY y locale UTF-8; puede forzarse con LOG_EMOJI_MODE
+	local mode="${LOG_EMOJI_MODE:-auto}"
+	if [[ "$mode" == "never" ]]; then return 1; fi
+	if [[ "$mode" == "always" ]]; then return 0; fi
+	# auto
+	[[ -t 1 ]] || return 1
+	local locale_env="${LC_ALL:-${LANG:-}}"
+	[[ "$locale_env" =~ [Uu][Tt][Ff]-?8 ]] || return 1
+	return 0
+}
+
+_base_should_show_lib_load() {
+	# Mostrar carga de librerías solo en TTY por defecto; configurable
+	case "${LOG_SHOW_LIB_LOAD:-auto}" in
+		always) return 0 ;;
+		never) return 1 ;;
+		*) [[ -t 1 ]] && return 0 || return 1 ;;
+	esac
+}
+
+# Función para cargar librería de forma segura
+load_lib() {
+	local lib="$1"
+	local lib_path="$LIB_DIR/$lib"
+    
+	if [[ -f "$lib_path" ]]; then
+		# No usar funciones de log aún, pueden no estar cargadas; usar echo simple
+		# Cargar primero, luego loguear condicionalmente
+		source "$lib_path"
+		if _base_should_show_lib_load; then
+			if _base_supports_emoji; then
+				echo "✅ Librería cargada: $lib"
+			else
+				echo "[OK] Librería cargada: $lib"
+			fi
+		fi
+	else
+		if _base_supports_emoji; then
+			echo "❌ Error: Librería no encontrada: $lib_path" >&2
+		else
+			echo "[ERROR] Librería no encontrada: $lib_path" >&2
+		fi
+		exit 1
+	fi
+}
+
+# Cargar todas las librerías DRY
+for lib in "${DRY_LIBS[@]}"; do
+	load_lib "$lib"
+done
+
+# Activar modo "pretty" por defecto en TTY (sin pisar overrides del usuario)
+if [[ -t 1 ]] && [[ "${LOG_AUTO_PRETTY:-on}" != "off" ]]; then
+	: "${LOG_COLOR_MODE:=always}"
+	: "${LOG_EMOJI_MODE:=always}"
+	: "${LOG_SHOW_WELCOME:=always}"
+	: "${LOG_SHOW_BANNER:=always}"
 fi
 
 # ============================================================================
-# FUNCIONES DE LOGGING
+# FUNCIONES PRINCIPALES CONSOLIDADAS
 # ============================================================================
 
-# Función principal de logging con timestamp
-log_message() {
-    local level="$1"
-    local symbol="$2"
-    local color="$3"
-    local message="$4"
+# Inicialización completa del sistema
+init_gitops_system() {
+	log_section "🚀 Inicialización Sistema GitOps"
     
-    local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+	# 1. Configurar logging
+	setup_logging "${LOG_FILE:-}" "${VERBOSE:-false}" "${QUIET:-false}"
     
-    echo -e "${color}[${timestamp}] ${symbol} [${level}] ${message}${COLOR_RESET}"
-}
-
-# Funciones específicas de logging
-log_success() { log_message "INFO" "$SYMBOL_SUCCESS" "$COLOR_GREEN" "$1"; }
-log_error() { log_message "ERROR" "$SYMBOL_ERROR" "$COLOR_RED" "$1"; }
-log_warning() { log_message "WARNING" "$SYMBOL_WARNING" "$COLOR_YELLOW" "$1"; }
-log_info() { log_message "INFO" "$SYMBOL_INFO" "$COLOR_BLUE" "$1"; }
-log_debug() { 
-    if [[ "${DEBUG:-false}" == "true" ]]; then
-        log_message "DEBUG" "$SYMBOL_DEBUG" "$COLOR_CYAN" "$1"
-    fi
-}
-log_running() { log_message "INFO" "$SYMBOL_RUNNING" "$COLOR_PURPLE" "$1"; }
-
-# Función para secciones principales con estimación de tiempo
-log_section() {
-    local title="$1"
-    local estimated_time="${2:-}"
-    echo
-    echo "================================================================================"
-    if [[ -n "$estimated_time" ]]; then
-        echo -e "${COLOR_CYAN}→ ${title} (⏱️ ~${estimated_time})${COLOR_RESET}"
-    else
-        echo -e "${COLOR_CYAN}→ ${title}${COLOR_RESET}"
-    fi
-    echo "================================================================================"
-    echo
-}
-
-# Variables para seguimiento de tiempo
-FASE_START_TIME=""
-FASE_NUMBER=""
-
-# Función para iniciar medición de tiempo de fase
-iniciar_fase() {
-    local fase_num="$1"
-    local title="$2"
-    local estimated_time="$3"
+	# 2. Mostrar resumen del sistema
+	show_system_summary
     
-    FASE_START_TIME=$(date +%s)
-    FASE_NUMBER="$fase_num"
+	# 3. Validar comandos básicos
+	validate_commands "curl" "grep" "awk" "sed"
     
-    log_section "$title" "$estimated_time"
-}
-
-# Función para finalizar medición de tiempo de fase
-finalizar_fase() {
-    local message="$1"
+	# 4. Validar conectividad
+	validate_network
     
-    if [[ -n "$FASE_START_TIME" ]]; then
-        local end_time
-        end_time=$(date +%s)
-        local duration=$((end_time - FASE_START_TIME))
-        local minutes=$((duration / 60))
-        local seconds=$((duration % 60))
-        
-        if [[ $minutes -gt 0 ]]; then
-            log_success "✅ FASE $FASE_NUMBER completada: $message (⏱️ ${minutes}m ${seconds}s)"
-        else
-            log_success "✅ FASE $FASE_NUMBER completada: $message (⏱️ ${seconds}s)"
-        fi
-    else
-        log_success "✅ FASE $FASE_NUMBER completada: $message"
-    fi
+	log_success "✅ Sistema GitOps inicializado"
+}
+
+# Instalación completa paso a paso
+install_complete_gitops() {
+	log_section "🎯 Instalación GitOps Completa"
     
-    # Reset variables
-    FASE_START_TIME=""
-    FASE_NUMBER=""
-}
-
-# ============================================================================
-# FUNCIONES DE CONTROL
-# ============================================================================
-
-# Verificar si está en modo dry-run
-es_dry_run() {
-    [[ "${DRY_RUN:-false}" == "true" ]]
-}
-
-# Verificar si está en modo verbose
-es_verbose() {
-    [[ "${VERBOSE:-false}" == "true" ]]
-}
-
-# Verificar si está en modo debug
-es_debug() {
-    [[ "${DEBUG:-false}" == "true" ]]
-}
-
-# ============================================================================
-# FUNCIONES DE VALIDACIÓN
-# ============================================================================
-
-# Verificar si un comando existe
-comando_existe() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Verificar si estamos ejecutando como root
-es_root() {
-    [[ $EUID -eq 0 ]]
-}
-
-# Verificar si estamos en WSL
-es_wsl() {
-    [[ -n "${WSL_DISTRO_NAME:-}" ]] || [[ -f /proc/sys/fs/binfmt_misc/WSLInterop ]]
-}
-
-# Verificar si systemd está disponible
-tiene_systemd() {
-    command -v systemctl >/dev/null 2>&1 && systemctl --version >/dev/null 2>&1
-}
-
-# Verificar conectividad a internet
-verificar_internet() {
-    if comando_existe curl; then
-        curl -s --connect-timeout 5 https://www.google.com >/dev/null 2>&1
-    elif comando_existe wget; then
-        wget -q --spider --timeout=5 https://www.google.com >/dev/null 2>&1
-    else
-        return 1
-    fi
-}
-
-# ============================================================================
-# FUNCIONES DE UTILIDAD
-# ============================================================================
-
-# Preguntar confirmación al usuario
-confirmar() {
-    local pregunta="$1"
-    local respuesta
+	# Inicializar sistema
+	init_gitops_system
     
-    while true; do
-        echo -n "$pregunta [s/N]: "
-        read -r respuesta
-        case "$respuesta" in
-            [Ss]|[Ss][Ii]|[Yy]|[Yy][Ee][Ss]) return 0 ;;
-            [Nn]|[Nn][Oo]|"") return 1 ;;
-            *) echo "Por favor responde 's' o 'n'" ;;
-        esac
-    done
+	# Fases de instalación
+	log_info "📋 Ejecutando fases de instalación..."
+    
+	# Fase 1: Dependencias
+	if ! check_all_dependencies; then
+		log_info "🔧 Instalando dependencias..."
+		install_all_dependencies
+	fi
+    
+	# Fase 2: Docker y permisos
+	if ! check_docker_daemon; then
+		log_info "🐳 Configurando Docker..."
+		init_docker_wsl
+		setup_docker_user
+	fi
+    
+	# Fase 3: Cluster
+	if ! check_cluster_available "gitops-dev"; then
+		log_info "☸️ Creando cluster desarrollo..."
+		create_dev_cluster
+	fi
+    
+	# Fase 4: Stack GitOps
+	log_info "🛠️ Instalando stack GitOps..."
+	install_gitops_stack
+    
+	log_success "✅ Instalación GitOps completada"
+	show_gitops_summary
 }
 
-# Obtener distribución de Linux
-obtener_distribucion() {
-    if [[ -f /etc/os-release ]]; then
-        . /etc/os-release
-        echo "$ID"
-    else
-        echo "unknown"
-    fi
+# Mostrar ayuda
+show_help() {
+	log_section "💡 Sistema GitOps - Ayuda"
+    
+	echo "FUNCIONES DISPONIBLES:"
+	echo "  init_gitops_system        - Inicializar sistema"
+	echo "  install_complete_gitops   - Instalación completa"
+	echo "  check_all_dependencies    - Verificar dependencias"
+	echo "  install_all_dependencies  - Instalar dependencias"
+	echo "  create_dev_cluster        - Crear cluster desarrollo"
+	echo "  install_gitops_stack      - Instalar stack GitOps"
+	echo "  show_gitops_summary       - Mostrar resumen"
+	echo "  show_system_summary       - Mostrar sistema"
+	echo ""
+	echo "VARIABLES DE ENTORNO:"
+	echo "  VERBOSE=true              - Modo verbose"
+	echo "  QUIET=true                - Modo silencioso"
+	echo "  LOG_FILE=/path/log        - Archivo de log"
+	echo "  SOLO_DEV=true             - Solo cluster dev"
+	echo "  LOG_COLOR_MODE=auto|always|never"
+	echo "  LOG_EMOJI_MODE=auto|always|never"
+	echo "  LOG_SHOW_WELCOME=auto|always|never"
+	echo "  LOG_SHOW_LIB_LOAD=auto|always|never"
+	echo "  LOG_SHOW_BANNER=auto|always|never"
+	echo ""
+	echo "EJEMPLO:"
+	echo "  source scripts/comun/base.sh && use_pretty_logs && install_complete_gitops"
 }
 
-# Obtener versión del sistema
-obtener_version_sistema() {
-    if [[ -f /etc/os-release ]]; then
-        . /etc/os-release
-        echo "$VERSION_ID"
-    else
-        echo "unknown"
-    fi
-}
+# Exportar funciones principales
+export -f init_gitops_system
+export -f install_complete_gitops
+export -f show_help
 
-# Verificar recursos del sistema
-verificar_recursos() {
-    local min_ram_gb="${1:-4}"
-    local min_disk_gb="${2:-10}"
-    
-    # Verificar RAM
-    local ram_gb
-    ram_gb=$(free -g | awk '/^Mem:/{print $2}')
-    if [[ $ram_gb -lt $min_ram_gb ]]; then
-        log_error "RAM insuficiente: ${ram_gb}GB (mínimo: ${min_ram_gb}GB)"
-        return 1
-    fi
-    
-    # Verificar espacio en disco
-    local disk_gb
-    disk_gb=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
-    if [[ $disk_gb -lt $min_disk_gb ]]; then
-        log_error "Espacio en disco insuficiente: ${disk_gb}GB (mínimo: ${min_disk_gb}GB)"
-        return 1
-    fi
-    
-    log_debug "Recursos verificados: RAM=${ram_gb}GB, Disco=${disk_gb}GB"
-    return 0
-}
-
-# ============================================================================
-# FUNCIONES DE RETRY
-# ============================================================================
-
-# Ejecutar comando con reintentos
-ejecutar_con_retry() {
-    local -a comando=("$@")
-    local max_intentos="${MAX_RETRY_INTENTOS:-3}"
-    local espera="${RETRY_ESPERA:-5}"
-    local intento=1
-    
-    # Extraer parámetros opcionales si están al final
-    if [[ "${!#}" =~ ^[0-9]+$ ]] && [[ $# -gt 1 ]]; then
-        espera="${!#}"
-        unset 'comando[-1]'
-    fi
-    
-    if [[ "${!#}" =~ ^[0-9]+$ ]] && [[ $# -gt 2 ]]; then
-        max_intentos="${comando[-1]}"
-        unset 'comando[-1]'
-    fi
-    
-    while [[ $intento -le $max_intentos ]]; do
-        log_debug "Intento $intento de $max_intentos: ${comando[*]}"
-        
-        if "${comando[@]}"; then
-            return 0
-        fi
-        
-        if [[ $intento -lt $max_intentos ]]; then
-            log_warning "Intento $intento falló, reintentando en ${espera}s..."
-            sleep "$espera"
-        fi
-        
-        ((intento++))
-    done
-    
-    log_error "Comando falló después de $max_intentos intentos: $comando"
-    return 1
-}
-
-# ============================================================================
-# INICIALIZACIÓN
-# ============================================================================
-
-# Función de inicialización del módulo
-    # ============================================================================
-    # FUNCIONES DE GESTIÓN DE FASES
-    # ============================================================================
-    
-    # Validar dependencias de fase
-    validar_dependencia_fase() {
-        local fase="$1"
-        
-        # Cargar dependencias desde config.sh si no están disponibles
-        if [[ -z "${FASE_DEPENDENCIAS[$fase]:-}" ]]; then
-            if [[ -f "$PROJECT_ROOT/scripts/comun/config.sh" ]]; then
-                source "$PROJECT_ROOT/scripts/comun/config.sh"
-            fi
-        fi
-        
-        local dependencia="${FASE_DEPENDENCIAS[$fase]:-}"
-        
-        # Si no tiene dependencias, está OK
-        if [[ -z "$dependencia" ]]; then
-            return 0
-        fi
-        
-        # Verificar si la fase dependiente fue completada
-        local marca_completada="${LOGS_DIR:-logs}/.fase-${dependencia}-completada"
-        if [[ -f "$marca_completada" ]]; then
-            log_info "✅ Dependencia verificada: Fase $dependencia ya completada"
-            return 0
-        else
-            log_error "❌ ERROR: No puedes ejecutar la Fase $fase sin completar primero la Fase $dependencia"
-            log_info "💡 Solución: Ejecuta primero './instalar.sh fase-$dependencia'"
-            return 1
-        fi
-    }
-    
-    # Marcar fase como completada
-    marcar_fase_completada() {
-        local fase="$1"
-        local logs_dir="${LOGS_DIR:-logs}"
-        mkdir -p "$logs_dir" 2>/dev/null || true
-        local marca_completada="$logs_dir/.fase-${fase}-completada"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - Fase $fase completada exitosamente" > "$marca_completada"
-        log_success "✅ Fase $fase marcada como completada"
-    }
-    
-    # Mostrar información de fase con estimación
-    mostrar_info_fase() {
-        local fase="$1"
-        
-        # Cargar información desde config.sh si no está disponible
-        if [[ -z "${FASE_NOMBRES[$fase]:-}" ]]; then
-            if [[ -f "$PROJECT_ROOT/scripts/comun/config.sh" ]]; then
-                source "$PROJECT_ROOT/scripts/comun/config.sh"
-            fi
-        fi
-        
-        local nombre="${FASE_NOMBRES[$fase]:-Desconocida}"
-        local tiempo="${FASE_TIEMPOS[$fase]:-?}"
-        local dependencia="${FASE_DEPENDENCIAS[$fase]:-}"
-        
-        log_info "📊 FASE $fase: $nombre (⏱️ ~${tiempo}min)"
-        if [[ -n "$dependencia" ]]; then
-            log_info "📋 Requiere: Fase $dependencia completada"
-        fi
-    }
-
-inicializar_modulo_base() {
-    log_debug "Módulo base cargado - Funciones fundamentales disponibles"
-}
-
-# Auto-inicialización si se ejecuta directamente
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    inicializar_modulo_base
-fi
+# Mensaje de bienvenida (solo en TTY o si se fuerza)
+case "${LOG_SHOW_WELCOME:-auto}" in
+	always)
+		# Banner opcional
+		if [[ "${LOG_SHOW_BANNER:-auto}" != "never" ]]; then
+			show_banner "GitOps Infra" "DRY · Modular · Automático"
+		fi
+		log_info "Sistema GitOps DRY cargado - usa 'show_help' para ver opciones"
+		;;
+	never)
+		;;
+	*)
+		if [[ -t 1 ]]; then
+			if [[ "${LOG_SHOW_BANNER:-auto}" != "never" ]]; then
+				show_banner "GitOps Infra" "DRY · Modular · Automático"
+			fi
+			log_info "Sistema GitOps DRY cargado - usa 'show_help' para ver opciones"
+		fi
+		;;
+esac

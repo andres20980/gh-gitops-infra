@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-rollouts
+      targetRevision: "2.40.3"
+      helm:
+        valueFiles:
+          - $values/herramientas-gitops/values-dev/argo-rollouts-dev-values.yaml
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
+      targetRevision: HEAD
+      ref: values
+      path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

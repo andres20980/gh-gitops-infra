@@ -95,6 +95,18 @@ if [[ -n "${values_file:-}" ]]; then
     values_file="herramientas-gitops/${values_file}"
   fi
 fi
+# Fallback por convención si no se detectó values_file
+if [[ -z "${values_file:-}" ]]; then
+  if [[ -f "${TOOLS_DIR}/values-dev/${TOOL}-dev-values.yaml" ]]; then
+    values_file="herramientas-gitops/values-dev/${TOOL}-dev-values.yaml"
+  fi
+fi
+
+# Detectar opciones de sync relevantes en el YAML fuente
+opt_server_side_apply="false"
+opt_apply_out_of_sync_only="false"
+grep -q 'ServerSideApply=true' "$SRC_APP" && opt_server_side_apply="true" || true
+grep -q 'ApplyOutOfSyncOnly=true' "$SRC_APP" && opt_apply_out_of_sync_only="true" || true
 
 # Construir Application multi-source si repo_url es Helm chart repo (no .git)
 if [[ "$repo_url" =~ ^https?:// && ! "$repo_url" =~ \\.(git)$ ]]; then
@@ -130,6 +142,8 @@ $(if [[ -n "${values_file:-}" ]]; then echo "          - \$values/${values_file}
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
+$(if [[ "$opt_server_side_apply" == "true" ]]; then echo "    - ServerSideApply=true"; fi)
+$(if [[ "$opt_apply_out_of_sync_only" == "true" ]]; then echo "    - ApplyOutOfSyncOnly=true"; fi)
 EOF
 else
   # Si el origen ya es Git, respetar YAML con posible actualización de targetRevision

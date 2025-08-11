@@ -115,9 +115,13 @@ spec:
     - repoURL: ${repo_url}
       chart: ${chart}
       targetRevision: "${chart_ver}"
+      helm:
+        valueFiles:
+$(if [[ -n "${values_file:-}" ]]; then echo "          - \$values/${values_file}"; else echo "          - values.yaml"; fi)
     - repoURL: https://github.com/andres20980/gh-gitops-infra.git
       targetRevision: HEAD
       ref: values
+      path: .
   destination:
     server: ${dest_server}
     namespace: ${dest_ns}
@@ -127,9 +131,6 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
-  helm:
-    valueFiles:
-$(if [[ -n "${values_file:-}" ]]; then echo "      - \$values/${values_file}"; fi)
 EOF
 else
   # Si el origen ya es Git, respetar YAML con posible actualización de targetRevision

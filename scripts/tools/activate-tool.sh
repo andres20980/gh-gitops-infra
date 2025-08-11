@@ -24,8 +24,14 @@ EOF
 fi
 
 TOOL="$1"
-SRC_APP="$TOOLS_DIR/${TOOL}.yaml"
-[[ -f "$SRC_APP" ]] || die "No existe: $SRC_APP"
+# Origen del Application: priorizar herramientas-gitops/inactive si no existe en raíz
+if [[ -f "$TOOLS_DIR/${TOOL}.yaml" ]]; then
+  SRC_APP="$TOOLS_DIR/${TOOL}.yaml"
+elif [[ -f "$TOOLS_DIR/inactive/${TOOL}.yaml" ]]; then
+  SRC_APP="$TOOLS_DIR/inactive/${TOOL}.yaml"
+else
+  die "No existe ni en raíz ni en inactive: $TOOLS_DIR/{,inactive/}${TOOL}.yaml"
+fi
 
 mkdir -p "$ACTIVE_DIR"
 
@@ -71,16 +77,73 @@ fi
 rm -f "$ACTIVE_DIR"/*.yaml 2>/dev/null || true
 
 DEST_APP="$ACTIVE_DIR/${TOOL}.yaml"
-if [[ -n "$latest_ver" ]]; then
-  log "Actualizando ${TOOL} a chart ${chart} version ${latest_ver}"
-  awk -v ver="$latest_ver" '
-    BEGIN{updated=0}
-    /^\s*targetRevision:/ { print "    targetRevision: " ver; updated=1; next }
-    { print }
-  ' "$SRC_APP" > "$DEST_APP"
+
+# Extraer campos clave del YAML fuente
+app_name=$(awk '/^metadata:/,0 { if ($1=="name:") {print $2; exit} }' "$SRC_APP" | tr -d '"') || true
+[[ -n "${app_name:-}" ]] || app_name="$TOOL"
+dest_ns=$(awk '/^spec:/,/^  syncPolicy:/ { if ($1=="namespace:") {print $2; exit} }' "$SRC_APP" | tr -d '"') || true
+dest_ns=${dest_ns:-argocd}
+dest_server=$(awk '/^spec:/,/^  syncPolicy:/ { if ($1=="server:") {print $2; exit} }' "$SRC_APP" | tr -d '"') || true
+dest_server=${dest_server:-https://kubernetes.default.svc}
+project=$(awk '/^spec:/,/^  source:/ { if ($1=="project:") {print $2; exit} }' "$SRC_APP" | tr -d '"') || true
+project=${project:-default}
+
+# Detectar values file (primera entrada)
+values_file=$(awk '/valueFiles:/,0 { if ($1=="-" && $2!="") {print $2; exit} }' "$SRC_APP" | tr -d '"') || true
+# Normalizar ruta a valores en repo (prefijo herramientas-gitops si faltase)
+if [[ -n "${values_file:-}" ]]; then
+  if [[ "$values_file" != herramientas-gitops/* ]]; then
+    values_file="herramientas-gitops/${values_file}"
+  fi
+fi
+
+# Construir Application multi-source si repo_url es Helm chart repo (no .git)
+if [[ "$repo_url" =~ ^https?:// && ! "$repo_url" =~ \\.(git)$ ]]; then
+  chart_ver=${latest_ver:-$(awk '/^[[:space:]]*targetRevision:/{print $2; exit}' "$SRC_APP" | tr -d '"')}
+  log "Render multi-source para ${TOOL} (chart ${chart}@${chart_ver}) con values ${values_file:-<ninguno>}"
+  cat >"$DEST_APP" <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${app_name}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: ${project}
+  sources:
+    - repoURL: ${repo_url}
+      chart: ${chart}
+      targetRevision: "${chart_ver}"
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: ${dest_server}
+    namespace: ${dest_ns}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+  helm:
+    valueFiles:
+$(if [[ -n "${values_file:-}" ]]; then echo "      - \$values/${values_file}"; fi)
+EOF
 else
-  log "Manteniendo targetRevision actual para ${TOOL} (no se resolvió última versión)"
-  cp "$SRC_APP" "$DEST_APP"
+  # Si el origen ya es Git, respetar YAML con posible actualización de targetRevision
+  if [[ -n "$latest_ver" ]]; then
+    log "Actualizando ${TOOL} a chart ${chart} version ${latest_ver}"
+    awk -v ver="$latest_ver" '
+      BEGIN{updated=0}
+      /^\s*targetRevision:/ { print "    targetRevision: " ver; updated=1; next }
+      { print }
+    ' "$SRC_APP" > "$DEST_APP"
+  else
+    log "Manteniendo targetRevision actual para ${TOOL} (no se resolvió última versión)"
+    cp "$SRC_APP" "$DEST_APP"
+  fi
 fi
 
 # Commit y push a main

@@ -53,6 +53,7 @@ fi
 # Resolver repoURL y chart
 repo_url=$(awk '/^[[:space:]]*repoURL:/{print $2; exit}' "$SRC_APP" | tr -d '"')
 chart=$(awk '/^[[:space:]]*chart:/{print $2; exit}' "$SRC_APP" | tr -d '"')
+path_src=$(awk '/^[[:space:]]*path:/{print $2; exit}' "$SRC_APP" | tr -d '"') || true
 latest_ver=""
 
 get_latest_chart_version() {
@@ -147,21 +148,46 @@ $(if [[ "$opt_apply_out_of_sync_only" == "true" ]]; then echo "    - ApplyOutOfS
 EOF
 else
   # Si el origen ya es Git, respetar YAML con posible actualización de targetRevision
-  if [[ -n "$latest_ver" ]]; then
-    log "Actualizando ${TOOL} a chart ${chart} version ${latest_ver}"
-    awk -v ver="$latest_ver" '
-      BEGIN{updated=0}
-      /^\s*targetRevision:/ { print "    targetRevision: " ver; updated=1; next }
-      { print }
-    ' "$SRC_APP" > "$DEST_APP"
-  else
-    log "Manteniendo targetRevision actual para ${TOOL} (no se resolvió última versión)"
-    cp "$SRC_APP" "$DEST_APP"
-  fi
+  # Multi-source para Git chart path + values repo
+  git_rev=$(awk '/^[[:space:]]*targetRevision:/{print $2; exit}' "$SRC_APP" | tr -d '"')
+  log "Render multi-source (git) para ${TOOL} path ${path_src:-.} @ ${git_rev} con values ${values_file:-<ninguno>}"
+  cat >"$DEST_APP" <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${app_name}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: ${project}
+  sources:
+    - repoURL: ${repo_url}
+      targetRevision: "${git_rev}"
+      path: ${path_src:-.}
+      helm:
+        valueFiles:
+$(if [[ -n "${values_file:-}" ]]; then echo "          - \$values/${values_file}"; else echo "          - values.yaml"; fi)
+    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
+      targetRevision: HEAD
+      ref: values
+      path: .
+  destination:
+    server: ${dest_server}
+    namespace: ${dest_ns}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+$(if [[ "$opt_server_side_apply" == "true" ]]; then echo "    - ServerSideApply=true"; fi)
+$(if [[ "$opt_apply_out_of_sync_only" == "true" ]]; then echo "    - ApplyOutOfSyncOnly=true"; fi)
+EOF
 fi
 
 # Commit y push a main
-git add "$DEST_APP" "$APP_OF_APPS"
+git add -f "$DEST_APP" "$APP_OF_APPS"
 if ! git diff --cached --quiet; then
   git commit -m "feat(gitops): activate ${TOOL} (chart ${chart}${latest_ver:+ -> ${latest_ver}})"
   git push -u origin main

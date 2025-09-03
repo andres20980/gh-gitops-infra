@@ -9,8 +9,8 @@ spec:
   project: default
   sources:
     - repoURL: https://github.com/akuity/kargo.git
-      chart: 
       targetRevision: "v1.6.2"
+      path: charts/kargo
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/kargo-dev-values.yaml

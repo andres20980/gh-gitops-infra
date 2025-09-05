@@ -111,7 +111,7 @@ scripts/
 - ✅ Reutilización de módulos
 
 ### **4. Pruebas**
-- ✅ Testing independiente por fase
+- ✅ Pruebas independiente por fase
 - ✅ Simulación más sencilla
 - ✅ Depuración específica por componente
 
@@ -162,7 +162,7 @@ Para añadir una nueva fase al sistema:
 
 ### **Pruebas de Fases**
 ```bash
-# Test completo en ejecución en seco
+# Prueba completo en ejecución en seco
 ./instalar-modular.sh --ejecucion-en-seco
 
 # Test solo cluster dev
@@ -202,7 +202,7 @@ readonly FASES=(
 |---------|-------------------|-------------------|
 | **Tamaño** | ~1200 líneas | ~400 líneas + 7 módulos |
 | **Mantenibilidad** | Difícil | Fácil |
-| **Testing** | Complejo | Simple |
+| **Pruebas** | Complejo | Simple |
 | **Flexibilidad** | Limitada | Alta |
 | **Escalabilidad** | Difícil | Excelente |
 | **Compatibilidad** | ✅ | ✅ |

@@ -41,7 +41,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 ## [2.2.0] - 2025-08-01
 
 ### Añadido
-- **🎯 bootstrap.sh** - Único script principal con arquitectura modular perfecta
+- **🎯 arranque.sh** - Único script principal con arquitectura modular perfecta
 - **📚 Librerías compartidas** - `scripts/lib/` con common.sh, logging.sh, validation.sh
 - **🔍 Validación granular** - `scripts/validate-prerequisites.sh`
 - **📦 Instalación selectiva** - `--components="argocd,kargo"`
@@ -50,7 +50,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 
 ### Cambiado
 - **🏗️ Arquitectura completamente modular** - Separación clara de responsabilidades
-- **📖 Documentación simplificada** - Un solo punto de entrada: bootstrap.sh
+- **📖 Documentación simplificada** - Un solo punto de entrada: arranque.sh
 - **� Experiencia de usuario optimizada** - Sin confusión, máxima claridad
 
 ### Eliminado
@@ -58,7 +58,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 - **🧹 Código legacy** - Sin duplicación, arquitectura limpia desde cero
 
 ### Beneficios de la Arquitectura Modular
-- ✅ **Un solo punto de entrada**: bootstrap.sh
+- ✅ **Un solo punto de entrada**: arranque.sh
 - ✅ **Modular**: Cada componente en su propio módulo
 - ✅ **Testeable**: Validación granular por componente
 - ✅ **Flexible**: Instalación selectiva, dry-run, validación independiente

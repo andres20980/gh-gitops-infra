@@ -46,7 +46,7 @@
 | **Reutilización** | Funciones comunes centralizadas | Módulo `comun/base.sh` |
 | **Idioma** | Todo en español castellano | Variables, funciones, mensajes |
 | **Calidad** | Cumple estándares de Shell scripting | ShellCheck + mejores prácticas |
-| **Mantenibilidad** | Código fácil de leer y modificar | Documentación inline |
+| - **Mantenibilidad** | Código fácil de leer y modificar | Documentación en línea |
 
 ## 🚀 Orquestador Principal
 
@@ -193,8 +193,8 @@ eliminar_cluster_seguro         # Eliminación con confirmación
 | **Solo Validación** | `./orquestador.sh --validar` | Solo verificar prerrequisitos | Diagnóstico |
 | **Desde Cero** | `./orquestador.sh --desde-cero` | Incluye instalación de dependencias | Primera vez |
 | **Solo Cluster** | `./orquestador.sh --solo-cluster` | Solo configurar cluster K8s | Testing |
-| **Dry Run** | `./orquestador.sh --dry-run` | Simular sin ejecutar | Planificación |
-| **Debug** | `./orquestador.sh --debug` | Salida detallada | Troubleshooting |
+| **Ejecución en seco** | `./orquestador.sh --dry-run` | Simular sin ejecutar | Planificación |
+| **Debug** | `./orquestador.sh --debug` | Salida detallada | Resolución de problemas |
 
 ### 🔄 **Flujo de Ejecución**
 
@@ -242,7 +242,7 @@ graph TD
 ✅ Ideal para troubleshooting
 ```
 
-### 🧪 **Modo Testing**
+### 🧪 **Modo Pruebas**
 ```bash
 # Simular instalación completa
 ./orquestador.sh --dry-run
@@ -461,8 +461,8 @@ function instalar_docker() {
 
 ### 📋 **Guías de Contribución**
 
-1. **Fork y Clone**: Crear fork del repositorio
-2. **Rama Feature**: Crear rama para nueva funcionalidad
+1. **Bifurcar y Clonar**: Crear fork del repositorio
+2. **Rama de Característica**: Crear rama para nueva funcionalidad
 3. **Estándares**: Seguir nomenclatura en español
 4. **Pruebas**: Añadir pruebas para nuevas funciones
 5. **Documentación**: Actualizar README.md si es necesario
@@ -505,7 +505,7 @@ run_orchestrator "$MODO_INSTALACION"
 
 - **gitops/**: Instalación y configuración de ArgoCD, Kargo, etc.
 - **componentes/**: Prometheus, Grafana, External Secrets, Cert-Manager
-- **utilidades/**: Scripts de mantenimiento, backup, update, etc.
+- **utilidades/**: Scripts de mantenimiento, copia de seguridad, actualización, etc.
 
 ### Mejoras Planificadas
 

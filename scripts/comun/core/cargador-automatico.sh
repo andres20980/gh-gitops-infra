@@ -101,7 +101,7 @@ initialize_dry_system() {
     load_required_file "$COMUN_DIR/base.sh" "sistema base"
     
     # 2. Cargar configuración global
-    load_required_file "$COMUN_DIR/config.sh" "configuración global"
+    load_required_file "$COMUN_DIR/configuracion.sh" "configuración global"
     
     # 3. Cargar framework core
     load_directory_files "$CORE_DIR"

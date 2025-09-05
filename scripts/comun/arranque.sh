@@ -38,10 +38,10 @@ fi
 # ============================================================================
 
 # Cargar el autoloader inteligente (que carga todo lo demás)
-readonly AUTOLOADER_PATH="$PROJECT_ROOT/scripts/comun/core/autoloader.sh"
+readonly AUTOLOADER_PATH="$PROJECT_ROOT/scripts/comun/core/cargador-automatico.sh"
 
 if [[ -f "$AUTOLOADER_PATH" ]]; then
-    # shellcheck source=core/autoloader.sh
+    # shellcheck source=core/cargador-automatico.sh
     source "$AUTOLOADER_PATH"
 else
     echo "❌ ERROR: Autoloader DRY no encontrado" >&2

@@ -162,4 +162,4 @@ Para cualquier consulta relacionada con seguridad:
 
 ---
 
-**⚠️ IMPORTANTE**: Este proyecto está configurado para entornos de desarrollo/pruebas. NO usar en producción sin las modificaciones de seguridad correspondientes.
+**⚠️ IMPORTANTE**: Este proyecto está configurado para entornos de desarrollo/pruebas. No usar en producción sin las modificaciones de seguridad correspondientes.

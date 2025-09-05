@@ -1,11 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: demo-database
+  name: app-of-tools-gitops
   namespace: argocd
-  labels:
-    project: demo-project
-    tier: database
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -13,16 +10,21 @@ spec:
   source:
     repoURL: https://github.com/andres20980/gh-gitops-infra.git
     targetRevision: HEAD
-    path: aplicaciones/demo-project/manifests/database
+    path: herramientas-gitops/activas
   destination:
     server: https://kubernetes.default.svc
-    namespace: demo-project
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+      allowEmpty: false
     syncOptions:
-      - CreateNamespace=true
-      - PrunePropagationPolicy=foreground
-      - PruneLast=true
-  revisionHistoryLimit: 3
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

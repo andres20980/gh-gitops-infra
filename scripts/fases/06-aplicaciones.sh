@@ -47,8 +47,8 @@ main() {
     # 2. Desplegar ApplicationSets
     log_info "🚀 Desplegando ApplicationSets..."
     
-    if [[ -f "$APLICACIONES_DIR/appset-aplicaciones.yaml" ]]; then
-        kubectl apply -f "$APLICACIONES_DIR/appset-aplicaciones.yaml"
+    if [[ -f "$APLICACIONES_DIR/conjunto-aplicaciones.yaml" ]]; then
+        kubectl apply -f "$APLICACIONES_DIR/conjunto-aplicaciones.yaml"
         log_success "✅ ApplicationSet principal desplegado"
     else
         log_warning "⚠️ ApplicationSet no encontrado en $APLICACIONES_DIR"

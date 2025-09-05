@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: demo-backend
+  name: demo-frontend
   namespace: argocd
   labels:
     project: demo-project
-    tier: backend
+    tier: frontend
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/andres20980/gh-gitops-infra.git
     targetRevision: HEAD
-    path: aplicaciones/demo-project/manifests/backend
+    path: aplicaciones/proyecto-demostracion/manifests/frontend
   destination:
     server: https://kubernetes.default.svc
     namespace: demo-project

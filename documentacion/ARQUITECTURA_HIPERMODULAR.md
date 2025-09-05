@@ -48,7 +48,7 @@ La **Arquitectura Hipermodular** se basa en la **separación radical de responsa
 ├── 📁 argo-apps/                       # Manifiestos ArgoCD estructurados
 ├── 📁 herramientas-gitops/             # Stack GitOps con App-of-Apps
 ├── 📁 aplicaciones/                    # Aplicaciones de ejemplo
-└── 📁 docs/                           # Documentación técnica completa
+└── 📁 documentacion/                           # Documentación técnica completa
 ```
 
 ## 🧩 **Módulos Detallados**
@@ -181,7 +181,7 @@ FASE_7_VERIFICACION         # Verificación final y reporte
 - Setup de CLI con login automático
 
 # Estructura de aplicaciones:
-app-of-apps.yaml (raíz)
+aplicacion-de-aplicaciones.yaml (raíz)
 ├── herramientas-gitops/ (App-of-Apps por fases)
 └── aplicaciones-custom/ (ApplicationSet dinámico)
 ```

@@ -3,28 +3,28 @@ set -euo pipefail
 
 # Activa una herramienta GitOps (por nombre de archivo YAML en herramientas-gitops)
 # - Actualiza dinámicamente targetRevision al último chart estable
-# - Copia el Application a herramientas-gitops/active/<tool>.yaml (sólo uno activo)
+# - Copia el Application a herramientas-gitops/activas/<tool>.yaml (sólo uno activo)
 # - Commit y push a main
 # - Aplica App-of-Apps si no existe
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
 TOOLS_DIR="$REPO_ROOT/herramientas-gitops"
 ACTIVE_DIR="$TOOLS_DIR/active"
-APP_OF_APPS="$REPO_ROOT/argo-apps/app-of-tools-gitops.yaml"
+APP_OF_APPS="$REPO_ROOT/argo-apps/aplicacion-de-herramientas-gitops.yaml"
 
 log() { echo "[activate-tool] $*"; }
 die() { echo "[activate-tool][ERROR] $*" >&2; exit 1; }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || -z "${1:-}" ]]; then
   cat <<EOF
-Uso: scripts/tools/activate-tool.sh <tool>
-Ej:   scripts/tools/activate-tool.sh cert-manager
+Uso: scripts/herramientas/activar-herramienta.sh <tool>
+Ej:   scripts/herramientas/activar-herramienta.sh cert-manager
 EOF
   exit 0
 fi
 
 TOOL="$1"
-# Origen del Application: priorizar herramientas-gitops/inactive si no existe en raíz
+# Origen del Application: priorizar herramientas-gitops/inactivas si no existe en raíz
 if [[ -f "$TOOLS_DIR/${TOOL}.yaml" ]]; then
   SRC_APP="$TOOLS_DIR/${TOOL}.yaml"
 elif [[ -f "$TOOLS_DIR/inactive/${TOOL}.yaml" ]]; then
@@ -199,4 +199,4 @@ popd >/dev/null
 # Aplicar el App-of-Apps
 kubectl apply -f "$APP_OF_APPS"
 
-log "Activado ${TOOL}. Argo CD sincronizará herramientas-gitops/active."
+log "Activado ${TOOL}. Argo CD sincronizará herramientas-gitops/activas."

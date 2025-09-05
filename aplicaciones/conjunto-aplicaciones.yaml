@@ -26,7 +26,7 @@ spec:
         path: '{{path}}'
         directory:
           recurse: false
-          include: 'app-of-apps.yaml'
+          include: 'aplicacion-de-aplicaciones.yaml'
       destination:
         server: https://kubernetes.default.svc
         namespace: argocd

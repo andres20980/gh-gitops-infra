@@ -13,7 +13,7 @@ set -euo pipefail
 # CONFIGURACIÓN
 # ============================================================================
 
-# Permitir override desde config.sh; usar valores por defecto si no están definidos
+# Permitir override desde configuracion.sh; usar valores por defecto si no están definidos
 : "${ARGOCD_NAMESPACE:=argocd}"
 : "${ARGOCD_VERSION:=stable}"  # Siempre usa la versión estable más reciente
 : "${ARGOCD_TIMEOUT:=300}"

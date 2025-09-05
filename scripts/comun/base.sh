@@ -15,7 +15,7 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly LIB_DIR="$SCRIPT_DIR/lib"
-readonly CONFIG_FILE="$SCRIPT_DIR/config.sh"
+readonly CONFIG_FILE="$SCRIPT_DIR/configuracion.sh"
 
 # ============================================================================
 # CARGA DE LIBRERÍAS DRY
@@ -30,7 +30,7 @@ fi
 readonly DRY_LIBS=(
 	"validation.sh"     # Registro y validación (base)
 	"versions.sh"       # Detección de versiones y compatibilidad
-	"sizing.sh"         # Estimación y límites de recursos del sistema
+	"dimensionamiento.sh"         # Estimación y límites de recursos del sistema
 	"dependencies.sh"   # Dependencias del sistema
 	"kubernetes.sh"     # Gestión de clusters
 	"gitops.sh"         # Herramientas GitOps

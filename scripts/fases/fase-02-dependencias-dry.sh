@@ -16,9 +16,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Cargar sistema DRY
-if [[ -f "$SCRIPT_DIR/../comun/bootstrap.sh" ]]; then
-    # shellcheck source=../comun/bootstrap.sh
-    source "$SCRIPT_DIR/../comun/bootstrap.sh"
+if [[ -f "$SCRIPT_DIR/../comun/arranque.sh" ]]; then
+    # shellcheck source=../comun/arranque.sh
+    source "$SCRIPT_DIR/../comun/arranque.sh"
 else
     echo "❌ ERROR: Sistema DRY no encontrado" >&2
     exit 1

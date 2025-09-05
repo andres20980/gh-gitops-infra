@@ -62,11 +62,46 @@ cd gh-gitops-infra
 ### **Paso 3: Instalación Completa**
 ```bash
 # Instalación autónoma (requiere sudo)
-sudo ./instalador.sh
+sudo ./instalar.sh
 
 # Con opciones específicas
-sudo ./instalador.sh --cluster gitops-dev --metrics-server --verbose
+sudo ./instalar.sh --cluster gitops-dev --metrics-server --verbose
 ```
+
+## ⚙️ **Configuración de Gitea Local**
+
+Para que el ecosistema GitOps funcione de forma totalmente local e independiente de GitHub, los manifiestos de ArgoCD están configurados para apuntar a una instancia de Gitea desplegada dentro de tu clúster local.
+
+**Pasos para configurar tu repositorio local en Gitea:**
+
+1.  **Clonar el repositorio en tu máquina local:**
+    ```bash
+    git clone https://github.com/andres20980/gh-gitops-infra.git
+    cd gh-gitops-infra
+    ```
+
+2.  **Crear un nuevo repositorio en tu instancia local de Gitea:**
+    *   Accede a la interfaz web de Gitea (normalmente `http://localhost:3000` o el puerto que hayas configurado).
+    *   Crea un nuevo repositorio vacío (por ejemplo, `gh-gitops-infra`).
+
+3.  **Subir tu repositorio local a Gitea:**
+    *   Desde el directorio `gh-gitops-infra` en tu máquina local, añade el remoto de Gitea y sube el código:
+        ```bash
+        git remote add gitea http://localhost:3000/TU_USUARIO_GITEA/gh-gitops-infra.git
+        git push -u gitea main
+        ```
+        *(Reemplaza `TU_USUARIO_GITEA` con tu nombre de usuario en Gitea y `gh-gitops-infra.git` con el nombre de tu repositorio si es diferente).*
+
+4.  **Actualizar los manifiestos de ArgoCD:**
+    *   Los manifiestos de ArgoCD (en las carpetas `aplicaciones/` y `argo-apps/`) contienen un placeholder para la URL del repositorio Git: `http://gitea-service/your-user/your-repo.git`.
+    *   **Debes reemplazar este placeholder** con la URL real de tu repositorio en Gitea. La URL interna del servicio Gitea dentro del clúster suele ser `http://gitea-http.gitea.svc.cluster.local/TU_USUARIO_GITEA/TU_REPOSITORIO.git`.
+    *   Puedes usar un comando `find` y `sed` para automatizar este reemplazo en todos los archivos `.yaml`:
+        ```bash
+        find . -type f -name "*.yaml" -exec sed -i 's|http://gitea-service/your-user/your-repo.git|http://gitea-http.gitea.svc.cluster.local/TU_USUARIO_GITEA/TU_REPOSITORIO.git|g' {} +
+        ```
+        *(Recuerda reemplazar `TU_USUARIO_GITEA` y `TU_REPOSITORIO.git` con tus valores reales).*
+
+Una vez realizados estos pasos, tu ecosistema GitOps local utilizará Gitea como fuente de verdad, independizándose de GitHub.
 
 ## 🔄 **Fases de Instalación Detalladas**
 

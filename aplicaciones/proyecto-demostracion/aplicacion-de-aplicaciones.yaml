@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/andres20980/gh-gitops-infra.git
+    repoURL: http://gitea-service/your-user/your-repo.git # CAMBIAR: URL del repositorio Gitea local
     targetRevision: HEAD
     path: projects/demo-project/apps
     directory:

@@ -6,7 +6,7 @@ metadata:
 spec:
   generators:
   - git:
-      repoURL: https://github.com/andres20980/gh-gitops-infra.git
+      repoURL: http://gitea-service/your-user/your-repo.git # CAMBIAR: URL del repositorio Gitea local
       revision: HEAD
       directories:
       - path: aplicaciones/*
@@ -18,7 +18,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/andres20980/gh-gitops-infra.git
+        repoURL: http://gitea-service/your-user/your-repo.git # CAMBIAR: URL del repositorio Gitea local
         targetRevision: HEAD
         path: '{{path}}'
       destination:

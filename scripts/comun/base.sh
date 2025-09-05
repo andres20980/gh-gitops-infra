@@ -4,7 +4,7 @@
 # GITOPS INFRA - Cargador Universal de Librerías DRY
 # ============================================================================
 # Responsabilidad: Cargar todas las librerías DRY consolidadas
-# Principios: DRY perfecto, Single source of truth, Modular
+# Principios: DRY perfecto, Fuente única de verdad, Modular
 # ============================================================================
 
 set -euo pipefail
@@ -28,7 +28,7 @@ fi
 
 # Cargar librerías DRY en orden de dependencia
 readonly DRY_LIBS=(
-	"validation.sh"     # Logging y validación (base)
+	"validation.sh"     # Registro y validación (base)
 	"versions.sh"       # Detección de versiones y compatibilidad
 	"sizing.sh"         # Estimación y límites de recursos del sistema
 	"dependencies.sh"   # Dependencias del sistema
@@ -88,7 +88,7 @@ for lib in "${DRY_LIBS[@]}"; do
 	load_lib "$lib"
 done
 
-# Activar modo "pretty" por defecto en TTY (sin pisar overrides del usuario)
+# Activar modo "bonito" por defecto en TTY (sin pisar sobrescrituras del usuario)
 if [[ -t 1 ]] && [[ "${LOG_AUTO_PRETTY:-on}" != "off" ]]; then
 	: "${LOG_COLOR_MODE:=always}"
 	: "${LOG_EMOJI_MODE:=always}"

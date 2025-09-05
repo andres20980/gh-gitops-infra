@@ -1,4 +1,4 @@
-# 🚨 Guía de Troubleshooting - GitOps España
+# 🚨 Guía de Resolución de Problemas - GitOps España
 
 ## 📋 Índice de Problemas Comunes
 - [🐳 Problemas de Docker](#-problemas-de-docker)
@@ -10,7 +10,7 @@
 
 ## 🐳 Problemas de Docker
 
-### Error: "Docker daemon not running"
+### Error: "Demonio de Docker no en ejecución"
 ```bash
 # Síntomas
 docker: Cannot connect to the Docker daemon at unix:///var/run/docker.sock
@@ -24,7 +24,7 @@ docker --version
 docker ps
 ```
 
-### Error: "Permission denied" con Docker
+### Error: "Permiso denegado" con Docker
 ```bash
 # Síntomas
 Got permission denied while trying to connect to the Docker daemon socket
@@ -54,7 +54,7 @@ docker builder prune -a
 ### Minikube no inicia
 ```bash
 # Síntomas
-😿 minikube start failed
+😿 minikube start falló
 
 # Diagnóstico
 minikube logs
@@ -103,7 +103,7 @@ kubectl get pod <pod-name> -n <namespace> -o yaml
 
 ## 🎯 Problemas de ArgoCD
 
-### ArgoCD Apps stuck en "Progressing"
+### ArgoCD Apps atascadas en "En progreso"
 ```bash
 # Diagnóstico
 kubectl get applications -n argocd
@@ -116,7 +116,7 @@ kubectl logs -n argocd deployment/argocd-application-controller
 kubectl patch application <app-name> -n argocd --type merge -p '{"operation":{"sync":{}}}'
 ```
 
-### Sync failures por validación
+### Fallos de sincronización por validación
 ```bash
 # Síntomas
 Failed to apply resource: admission webhook denied
@@ -140,7 +140,7 @@ kubectl get secret -n argocd argocd-repo-creds-https-github.com
 
 ## 📊 Problemas de Monitoreo
 
-### Prometheus no scraping métricas
+### Prometheus no recopilando métricas
 ```bash
 # Verificar targets
 kubectl port-forward -n monitoring svc/prometheus-server 9090:80
@@ -153,7 +153,7 @@ kubectl get servicemonitor -n monitoring
 kubectl get svc -n <namespace> --show-labels
 ```
 
-### Grafana dashboards vacíos
+### Paneles de Grafana vacíos
 ```bash
 # Verificar datasource
 kubectl logs -n monitoring deployment/grafana
@@ -177,7 +177,7 @@ which docker kubectl helm minikube
 ### Permisos de ejecución
 ```bash
 # Síntomas
-bash: ./instalar.sh: Permission denied
+bash: ./instalar.sh: Permiso denegado
 
 # Solución
 chmod +x instalar.sh
@@ -212,7 +212,7 @@ kubectl get ingress --all-namespaces
 kubectl describe ingress <ingress-name> -n <namespace>
 ```
 
-### DNS resolution issues
+### Problemas de resolución de DNS
 ```bash
 # Verificar CoreDNS
 kubectl get pods -n kube-system | grep coredns

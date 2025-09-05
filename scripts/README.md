@@ -14,8 +14,8 @@
 - [📦 Módulos Especializados](#-módulos-especializados)
 - [🔧 Funciones Principales](#-funciones-principales)
 - [🎯 Modos de Ejecución](#-modos-de-ejecución)
-- [📊 Sistema de Logging](#-sistema-de-logging)
-- [🔍 Debugging y Troubleshooting](#-debugging-y-troubleshooting)
+- [📊 Sistema de Registro](#-sistema-de-registro)
+- [🔍 Depuración y Resolución de Problemas](#-depuración-y-resolución-de-problemas)
 - [📖 Guías de Desarrollo](#-guías-de-desarrollo)
 
 ## 🏗️ Estructura Modular
@@ -257,7 +257,7 @@ graph TD
 ✅ Perfecto para desarrollo
 ```
 
-## 📊 Sistema de Logging
+## 📊 Sistema de Registro
 
 ### 🎨 **Niveles de Log Estructurados**
 
@@ -288,22 +288,22 @@ logs/
 └── gitops-$(date).log       # Logs de herramientas GitOps
 ```
 
-## 🔍 Debugging y Troubleshooting
+## 🔍 Depuración y Resolución de Problemas
 
-### 🛠️ **Herramientas de Debug**
+### 🛠️ **Herramientas de Depuración**
 
 ```bash
-# Activar modo debug global
+# Activar modo depuración global
 export DEBUG="true"
 export VERBOSE="true"
 
-# Debug específico por módulo
+# Depuración específica por módulo
 export DEBUG_DOCKER="true"
 export DEBUG_KUBERNETES="true"
 export DEBUG_GITOPS="true"
 
 # Ejecutar con máximo detalle
-./orquestador.sh --debug --verbose --trace
+./orquestador.sh --depuracion --verbose --trace
 ```
 
 ### 🚨 **Diagnóstico de Problemas Comunes**
@@ -405,21 +405,21 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 ```
 
-### 🧪 **Testing y Validación**
+### 🧪 **Pruebas y Validación**
 
 ```bash
-# Tests unitarios para funciones
+# Pruebas unitarias para funciones
 function test_instalar_docker() {
-    log_section "🧪 Testing: instalar_docker"
+    log_section "🧪 Pruebas: instalar_docker"
     
-    # Mock de comandos para testing
+    # Simulación de comandos para pruebas
     function docker() { echo "Docker version 20.10.0"; }
     
     # Ejecutar función
     if instalar_docker; then
-        log_success "✅ Test pasado: instalar_docker"
+        log_success "✅ Prueba superada: instalar_docker"
     else
-        log_error "❌ Test falló: instalar_docker"
+        log_error "❌ Prueba fallida: instalar_docker"
         return 1
     fi
 }
@@ -464,7 +464,7 @@ function instalar_docker() {
 1. **Fork y Clone**: Crear fork del repositorio
 2. **Rama Feature**: Crear rama para nueva funcionalidad
 3. **Estándares**: Seguir nomenclatura en español
-4. **Testing**: Añadir tests para nuevas funciones
+4. **Pruebas**: Añadir pruebas para nuevas funciones
 5. **Documentación**: Actualizar README.md si es necesario
 6. **Pull Request**: Solicitar revisión de cambios
 
@@ -509,7 +509,7 @@ run_orchestrator "$MODO_INSTALACION"
 
 ### Mejoras Planificadas
 
-- **Tests automatizados**: Suite de tests para cada módulo
+- **Pruebas automatizadas**: Suite de pruebas para cada módulo
 - **Documentación**: Documentación detallada de cada función
 - **CI/CD**: Integración continua para validar cambios
 - **Métricas**: Recopilación de métricas de instalación

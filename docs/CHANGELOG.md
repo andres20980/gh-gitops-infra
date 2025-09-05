@@ -45,7 +45,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 - **📚 Librerías compartidas** - `scripts/lib/` con common.sh, logging.sh, validation.sh
 - **🔍 Validación granular** - `scripts/validate-prerequisites.sh`
 - **📦 Instalación selectiva** - `--components="argocd,kargo"`
-- **🧪 Modo dry-run** - `--dry-run` para testing sin instalación
+- **🧪 Modo ejecución en seco** - `--dry-run` para testing sin instalación
 - **📋 Ayuda completa** - `--help` con documentación detallada
 
 ### Cambiado
@@ -63,8 +63,8 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 - ✅ **Testeable**: Validación granular por componente
 - ✅ **Flexible**: Instalación selectiva, dry-run, validación independiente
 - ✅ **Mantenible**: Código limpio, organizado y sin duplicación
-- ✅ **CI/CD Ready**: Compatible con pipelines automatizados
-- ✅ **Futuro-proof**: Arquitectura moderna que escala
+- ✅ **Listo para CI/CD**: Compatible con pipelines automatizados
+- ✅ **Preparado para el futuro**: Arquitectura moderna que escala
 
 ## [2.1.0] - 2025-08-01
 
@@ -75,7 +75,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 - Gestión mejorada de errores y documentación de resolución de problemas
 
 ### Cambiado
-- **BREAKING**: Kargo ahora usa repositorio Git en lugar de registry OCI
+- **CAMBIO RUPTURISTA**: Kargo ahora usa repositorio Git en lugar de registry OCI
 - Actualizados todos los componentes a las versiones estables más recientes (Agosto 2025)
 - Mejorado README.md con mejor organización y resolución de problemas
 - Mejorado STATUS.md con verificación completa de despliegues
@@ -85,7 +85,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 - Nomenclatura de parámetros de cuenta admin de Kargo (`api.adminAccount.*` en lugar de `admin.*`)
 - Namespace de Kargo cambiado a `kargo-system` para consistencia
 - Estado OutOfSync de Grafana resuelto
-- Todas las 14/14 aplicaciones ahora Synced+Healthy
+- Todas las 14/14 aplicaciones ahora Sincronizado+Saludable
 
 ### Detalles Técnicos
 - Configuración Kargo: `https://github.com/akuity/kargo.git` + ruta `charts/kargo`
@@ -102,7 +102,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 - Script de instalación mejorado con comandos modulares
 
 ### Cambiado
-- **BREAKING**: Migración de instalaciones individuales al patrón App of Apps
+- **CAMBIO RUPTURISTA**: Migración de instalaciones individuales al patrón App of Apps
 - Todos los componentes ahora gestionados por Aplicaciones ArgoCD
 - Proceso de despliegue unificado a través de `app-of-apps-gitops.yaml`
 
@@ -112,67 +112,67 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 
 ## [1.5.0] - 2025-07-30
 
-### Added
+### Añadido
 - Automatic version detection for all components
 - Enhanced diagnostic and management scripts
 - Port-forwarding automation for all web UIs
 - Multi-cluster support (DEV/PRE/PRO)
 
-### Changed
+### Cambiado
 - Improved installation script reliability
 - Better error handling and recovery
 - Enhanced logging and output formatting
 
 ## [1.4.0] - 2025-07-29
 
-### Added
+### Añadido
 - Argo Events v2.4.8 for event-driven automation
 - Argo Workflows v0.45.21 for workflow orchestration
 - Argo Rollouts v2.40.2 for progressive delivery
 - Complete observability stack integration
 
-### Changed
+### Cambiado
 - Unified component versions across the stack
 - Improved resource allocation for development environments
 
 ## [1.3.0] - 2025-07-28
 
-### Added
+### Añadido
 - MinIO v5.2.0 for S3-compatible object storage
 - Gitea v12.1.2 for internal Git repository management
 - External Secrets v0.18.2 for secure secrets management
 - Cert-Manager v1.18.2 for automatic TLS certificates
 
-### Changed
+### Cambiado
 - Enhanced security configuration across all components
 - Improved integration between observability tools
 
 ## [1.2.0] - 2025-07-27
 
-### Added
+### Añadido
 - Grafana v9.3.0 with pre-configured dashboards
 - Loki v6.8.0 for centralized logging
 - Jaeger v3.4.1 for distributed tracing
 - Complete observability stack integration
 
-### Changed
+### Cambiado
 - Improved Prometheus configuration with better targets
 - Enhanced Grafana dashboard organization
 
 ## [1.1.0] - 2025-07-26
 
-### Added
+### Añadido
 - Prometheus Stack v75.15.1 for metrics collection
 - NGINX Ingress v4.13.0 for load balancing
 - Enhanced monitoring capabilities
 
-### Changed
+### Cambiado
 - Improved ArgoCD configuration for better performance
 - Better resource management for development environments
 
 ## [1.0.0] - 2025-07-25
 
-### Added
+### Añadido
 - Initial release with ArgoCD v3.0.12
 - Complete GitOps infrastructure setup
 - Automated installation script (`instalar-todo.sh`)
@@ -196,9 +196,9 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 - **Patch (X.Y.Z)**: Bug fixes, minor improvements
 
 ### Change Categories
-- **Added**: New features, components, or capabilities
-- **Changed**: Changes in existing functionality
-- **Deprecated**: Soon-to-be removed features
-- **Removed**: Removed features
-- **Fixed**: Bug fixes
-- **Security**: Security improvements
+- **Añadido**: Nuevas características, componentes o capacidades
+- **Cambiado**: Cambios en la funcionalidad existente
+- **Obsoleto**: Características que serán eliminadas pronto
+- **Eliminado**: Características eliminadas
+- **Corregido**: Corrección de errores
+- **Seguridad**: Mejoras de seguridad

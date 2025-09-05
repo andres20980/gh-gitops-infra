@@ -2,4 +2,4 @@ Esta carpeta contiene las Applications no activas. El App-of-Apps apunta a herra
 
 Flujo:
 - scripts/tools/activate-tool.sh <tool> copia desde la raíz a active/<tool>.yaml y actualiza targetRevision.
-- Mantén los values en herramientas-gitops/values-dev y evita valores inline en las Applications.
+- Mantén los values en herramientas-gitops/values-dev y evita valores en línea en las Applications.

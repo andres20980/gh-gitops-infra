@@ -55,7 +55,7 @@ spec:
 - **Credenciales simples**: `admin/admin123` para facilitar pruebas
 - **Persistencia básica**: Tamaños pequeños (1-2Gi)
 - **Sin autenticación compleja**: Acceso simplificado para desarrollo
-- **Monitoreo deshabilitado**: Reduce overhead en entorno dev
+- **Monitoreo deshabilitado**: Reduce sobrecarga en entorno dev
 
 ## 🔄 Actualización Automática
 
@@ -72,7 +72,7 @@ El sistema:
 4. Commitea y pushea cambios
 5. Aplica la configuración via ArgoCD
 
-## 🌐 Multi-Cluster
+## 🌐 Multi-Clúster
 
 Esta estructura permite fácilmente crear valores para otros entornos:
 

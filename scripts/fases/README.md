@@ -11,7 +11,7 @@ scripts/
 ├── fases/                          # ← NUEVA: Módulos por fases
 │   ├── fase-01-permisos.sh         # Gestión inteligente de permisos
 │   ├── fase-02-dependencias.sh     # Dependencias del sistema
-│   ├── fase-03-clusters.sh         # Docker y clusters Kubernetes
+│   ├── fase-03-clusters.sh         # Docker y clústeres Kubernetes
 │   ├── fase-04-argocd.sh          # Instalación de ArgoCD
 │   ├── fase-05-herramientas.sh    # Herramientas GitOps
 │   ├── fase-06-aplicaciones.sh    # Aplicaciones custom
@@ -44,7 +44,7 @@ scripts/
 ### **FASE 1: Gestión Inteligente de Permisos**
 - **Archivo:** `scripts/fases/fase-01-permisos.sh`
 - **Funciones:**
-  - `gestionar_permisos_inteligente()` - Auto-escalation/de-escalation de permisos
+  - `gestionar_permisos_inteligente()` - Autoescalado/desescalado de permisos
   - `verificar_contexto_permisos()` - Verificación de contexto por fase
 - **Responsabilidad:** Manejo automático de sudo para dependencias y usuario normal para clusters
 
@@ -55,7 +55,7 @@ scripts/
   - `verificar_dependencias_criticas()` - Verificación rápida (modo --skip-deps)
 - **Responsabilidad:** Docker, kubectl, minikube, helm, git
 
-### **FASE 3: Clusters Kubernetes**
+### **FASE 3: Clústeres Kubernetes**
 - **Archivo:** `scripts/fases/fase-03-clusters.sh`
 - **Funciones:**
   - `configurar_docker_automatico()` - Configuración automática de Docker
@@ -68,7 +68,7 @@ scripts/
 - **Funciones:**
   - `instalar_argocd_maestro()` - Instalación de ArgoCD última versión
   - `verificar_argocd_healthy()` - Verificación de estado
-- **Responsabilidad:** GitOps controller principal
+- **Responsabilidad:** GitOps controlador principal
 
 ### **FASE 5: Herramientas GitOps**
 - **Archivo:** `scripts/fases/fase-05-herramientas.sh`
@@ -77,13 +77,13 @@ scripts/
   - `verificar_sistema_gitops_healthy()` - Verificación de 13 herramientas críticas
 - **Responsabilidad:** Argo*, Prometheus, Grafana, Jaeger, Loki, etc.
 
-### **FASE 6: Aplicaciones Custom**
+### **FASE 6: Aplicaciones Personalizadas**
 - **Archivo:** `scripts/fases/fase-06-aplicaciones.sh`
 - **Funciones:**
   - `desplegar_aplicaciones_custom()` - Aplicaciones con integración GitOps completa
   - `generar_commit_aplicaciones_custom()` - Commit automático
-  - `verificar_aplicaciones_custom_synced()` - Verificación de estado
-- **Responsabilidad:** demo-project, simple-app con integración completa
+  - `verificar_aplicaciones_custom_synced()` - Verificación de estado de sincronización
+- **Responsabilidad:** Aplicaciones de demostración y ejemplos
 
 ### **FASE 7: Finalización**
 - **Archivo:** `scripts/fases/fase-07-finalizacion.sh`
@@ -110,10 +110,10 @@ scripts/
 - ✅ Modificación independiente de cada fase
 - ✅ Reutilización de módulos
 
-### **4. Testing**
+### **4. Pruebas**
 - ✅ Testing independiente por fase
-- ✅ Mocking más sencillo
-- ✅ Debug específico por componente
+- ✅ Simulación más sencilla
+- ✅ Depuración específica por componente
 
 ### **5. Flexibilidad**
 - ✅ Ejecución parcial de fases
@@ -144,12 +144,12 @@ Para añadir una nueva fase al sistema:
 3. Agregar a lista de fases en instalar.sh
 4. Documentar en este README
 
-## 📊 **Logging y Debugging**
+## 📊 **Registro y Depuración**
 
 - Logs centralizados en `PROJECT_ROOT/logs/`
-- Soporte para dry-run en todas las fases
-- Debug granular por fase individual
-- Logging estructurado con timestamps
+- Soporte para ejecución en seco en todas las fases
+- Depuración granular por fase individual
+- Registro estructurado con marcas de tiempo
 
 ## 🎯 **Uso Recomendado**
 
@@ -160,19 +160,19 @@ Para añadir una nueva fase al sistema:
 **Para nuevas instalaciones:** Usar `./instalar.sh`
 ```
 
-### **Testing de Fases**
+### **Pruebas de Fases**
 ```bash
-# Test completo en dry-run
-./instalar-modular.sh --dry-run
+# Test completo en ejecución en seco
+./instalar-modular.sh --ejecucion-en-seco
 
 # Test solo cluster dev
 ./instalar-modular.sh --solo-dev --verbose
 
-# Debug específico
+# Depuración específica
 ./instalar-modular.sh --debug --log-file debug-modular.log
 ```
 
-### **Customización**
+### **Personalización**
 ```bash
 # Crear nueva fase
 cp scripts/fases/fase-06-aplicaciones.sh scripts/fases/fase-08-monitoreo.sh

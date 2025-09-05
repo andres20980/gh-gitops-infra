@@ -3,7 +3,7 @@
 # ============================================================================
 # SCRIPT DE ACCESOS A HERRAMIENTAS GITOPS
 # ============================================================================
-# Configura port-forwards para acceder a todas las herramientas GitOps
+# Configura reenvíos de puertos para acceder a todas las herramientas GitOps
 # Uso: ./scripts/accesos-herramientas.sh [start|stop|status|list]
 # ============================================================================
 
@@ -61,7 +61,7 @@ declare -A HERRAMIENTAS_SERVICIOS=(
 
 # Función para iniciar port-forwards
 start_port_forwards() {
-    log_info "🚀 Iniciando port-forwards para herramientas GitOps..."
+    log_info "🚀 Iniciando reenvíos de puertos para herramientas GitOps..."
     
     for herramienta in "${!HERRAMIENTAS_PUERTOS[@]}"; do
         local namespace="${HERRAMIENTAS_NAMESPACES[$herramienta]}"
@@ -87,12 +87,12 @@ start_port_forwards() {
         fi
     done
     
-    log_success "✅ Port-forwards configurados (en background)"
+    log_success "✅ Reenvíos de puertos configurados (en segundo plano)"
 }
 
 # Función para parar port-forwards
 stop_port_forwards() {
-    log_info "🛑 Deteniendo port-forwards de herramientas GitOps..."
+    log_info "🛑 Deteniendo reenvíos de puertos de herramientas GitOps..."
     
     for herramienta in "${!HERRAMIENTAS_PUERTOS[@]}"; do
         local puerto_local="${HERRAMIENTAS_PUERTOS[$herramienta]%:*}"
@@ -105,7 +105,7 @@ stop_port_forwards() {
         fi
     done
     
-    log_success "✅ Todos los port-forwards detenidos"
+    log_success "✅ Todos los reenvíos de puertos detenidos"
 }
 
 # Función para mostrar estado
@@ -135,21 +135,21 @@ list_tools() {
     echo "  • Ingress-NGINX (Ingress)  : Automático (sin UI específica)"
     echo
     echo "� OBSERVABILIDAD Y MONITOREO:"
-    echo "  • Grafana (Dashboards)     : http://localhost:8081"
+    echo "  • Grafana (Paneles)     : http://localhost:8081"
     echo "  • Prometheus (Métricas)    : http://localhost:8082"
     echo "  • AlertManager (Alertas)   : http://localhost:8083"
-    echo "  • Jaeger (Tracing)         : http://localhost:8084"
-    echo "  • Loki (Logs)              : http://localhost:8086"
+    echo "  • Jaeger (Trazabilidad)         : http://localhost:8084"
+    echo "  • Loki (Registros)              : http://localhost:8086"
     echo
     echo "🚀 HERRAMIENTAS GITOPS AVANZADAS:"
     echo "  • Argo Workflows (CI/CD)   : http://localhost:8089"
     echo "  • Argo Events (Eventos)    : http://localhost:8090"
-    echo "  • Argo Rollouts (Deploy)   : http://localhost:8091"
+    echo "  • Argo Rollouts (Despliegue)   : http://localhost:8091"
     echo "  • Kargo (Promoción)        : http://localhost:8085"
     echo
     echo "�📦 ALMACENAMIENTO Y CÓDIGO:"
-    echo "  • MinIO (S3 Storage)       : http://localhost:8087"
-    echo "  • Gitea (Git Server)       : http://localhost:8088"
+    echo "  • MinIO (Almacenamiento S3)       : http://localhost:8087"
+    echo "  • Gitea (Servidor Git)       : http://localhost:8088"
     echo
 }
 

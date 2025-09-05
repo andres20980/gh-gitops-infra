@@ -14,7 +14,7 @@ Actualmente damos soporte de seguridad a las siguientes versiones de la infraest
 ## Componentes Críticos de Seguridad
 
 ### 🔒 Componentes con Implicaciones de Seguridad
-- **ArgoCD v3.0.12**: Gestión centralizada de deployments
+- **ArgoCD v3.0.12**: Gestión centralizada de despliegues
 - **Kargo v1.6.2**: Promoción automatizada entre entornos (SUPER IMPORTANTE)
 - **External Secrets v0.18.2**: Gestión de secretos de fuentes externas
 - **Cert-Manager v1.18.2**: Gestión automática de certificados TLS
@@ -26,8 +26,8 @@ Actualmente damos soporte de seguridad a las siguientes versiones de la infraest
 #### Entorno de Desarrollo/Pruebas
 - **Credenciales por defecto**: Se usan credenciales conocidas (`admin`/`admin123`)
 - **Recursos limitados**: Configuración optimizada para desarrollo, no para producción
-- **Logs verbosos**: Mayor nivel de logging para debugging
-- **Sin cifrado end-to-end**: Configuraciones simplificadas para testing
+- **Logs verbosos**: Mayor nivel de logging para depuración
+- **Sin cifrado de extremo a extremo**: Configuraciones simplificadas para testing
 
 #### Migración a Producción
 Antes de llevar esta configuración a producción, es CRÍTICO:
@@ -104,7 +104,7 @@ Si reportas una vulnerabilidad válida:
 3. **Secrets**: Usa External Secrets para gestión segura de secretos
 4. **Certificados**: Implementa cert-manager con ACME para certificados automáticos
 5. **RBAC**: Revisa y endurece todas las configuraciones RBAC
-6. **Logs**: Implementa logging centralizado con Loki para auditoría
+6. **Registros**: Implementa registro centralizado con Loki para auditoría
 7. **Monitorización**: Usa Prometheus/Grafana para detectar anomalías
 
 ### 🔧 Configuraciones Recomendadas
@@ -148,10 +148,10 @@ controller:
 
 ### 📚 Recursos Adicionales
 
-- [OWASP Kubernetes Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Kubernetes_Security_Cheat_Sheet.html)
-- [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes)
-- [Kubernetes Security Best Practices](https://kubernetes.io/docs/concepts/security/)
-- [ArgoCD Security Documentation](https://argo-cd.readthedocs.io/en/stable/operator-manual/security/)
+- [OWASP Kubernetes Security Hoja de Referencia Rápida](https://cheatsheetseries.owasp.org/cheatsheets/Kubernetes_Security_Cheat_Sheet.html)
+- [CIS Kubernetes Evaluación Comparativa](https://www.cisecurity.org/benchmark/kubernetes)
+- [Kubernetes Security Mejores Prácticas](https://kubernetes.io/docs/concepts/security/)
+- [ArgoCD Documentación de Seguridad](https://argo-cd.readthedocs.io/en/stable/operator-manual/security/)
 
 ## Contacto
 

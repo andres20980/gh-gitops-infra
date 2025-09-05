@@ -1,20 +1,20 @@
-# Logs Directory
+# Directorio de Registros
 
 Este directorio contiene todos los logs del instalador GitOps.
 
-## Estructura de Logs
+## Estructura de Registros
 
-- `instalador-YYYYMMDD-HHMMSS.log` - Logs principales del instalador
-- `docker-YYYYMMDD-HHMMSS.log` - Logs específicos de Docker daemon
-- `cluster-FASE-YYYYMMDD-HHMMSS.log` - Logs por fase cuando sea necesario
+- `instalador-YYYYMMDD-HHMMSS.log` - Registros principales del instalador
+- `docker-YYYYMMDD-HHMMSS.log` - Registros específicos de Docker demonio
+- `cluster-FASE-YYYYMMDD-HHMMSS.log` - Registros por fase cuando sea necesario
 
-## Rotación de Logs
+## Rotación de Registros
 
-Los logs se rotan automáticamente por fecha y se mantienen los últimos 30 días.
+Los registros se rotan automáticamente por fecha y se mantienen los últimos 30 días.
 
 ## Configuración
 
 - Nivel por defecto: INFO
 - Formato: `[TIMESTAMP] LEVEL [COMPONENT] MESSAGE`
-- Encoding: UTF-8
-- Max size: 100MB por archivo
+- Codificación: UTF-8
+- Tamaño máximo: 100MB por archivo

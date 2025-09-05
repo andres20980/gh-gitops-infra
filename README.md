@@ -33,7 +33,7 @@
 ### 🎯 **Instalación Flexible por Fases**
 - **Fases individuales**: `./instalar.sh fase-03` para testing específico
 - **Rangos de fases**: `./instalar.sh fase-01-04` para procesos parciales
-- **Debug granular**: Logging y dry-run por fase individual
+- **Debug granular**: Registro y ejecución en seco por fase individual
 - **Desarrollo ágil**: Iteración rápida en componentes específicos
 
 ### �️ **Arquitectura Hipermodular v3.0.0**
@@ -72,7 +72,7 @@ cd gh-gitops-infra
 2. ✅ Instalar minikube + cluster gitops-dev (capacidad completa)
 3. ✅ Instalar ArgoCD (última versión)
 4. ✅ Actualizar helm-charts y desplegar herramientas GitOps
-5. ✅ Verificar que todo esté synced y healthy
+5. ✅ Verificar que todo esté sincronizado y saludable
 6. ✅ Desplegar aplicaciones custom
 7. ✅ Crear clusters gitops-pre y gitops-pro
 8. ✅ Configurar promoción de entornos con Kargo
@@ -348,8 +348,8 @@ Una vez instalado, accede a:
 | **Jaeger Traces** | Trazas de microservicios | Jaeger UI |
 
 ### 🚨 **Alertas Preconfiguradas**
-- CPU/Memory elevado en nodos
-- Aplicaciones en estado unhealthy
+- CPU/Memoria elevado en nodos
+- Aplicaciones en estado no saludable
 - Certificados SSL próximos a expirar
 - Fallos en sincronización de ArgoCD
 - Espacio en disco bajo
@@ -403,7 +403,7 @@ dev → pre → pro
 - Configuración de aplicaciones custom
 - Integración con CI/CD externos
 - Gestión de secretos y certificados
-- Troubleshooting común
+- Resolución de problemas común
 
 ### 🔧 **Scripts de Utilidad**
 

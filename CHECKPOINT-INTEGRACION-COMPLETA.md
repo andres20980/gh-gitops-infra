@@ -3,24 +3,24 @@
 ## ✅ COMPLETADO EN ESTA SESIÓN
 
 ### 🎯 Verificación Estricta de Herramientas GitOps
-- **Implementado**: Verificación obligatoria de que TODAS las tools estén `Synced + Healthy`
+- **Implementado**: Verificación obligatoria de que TODAS las herramientas estén `Sincronizado + Saludable`
 - **Bloqueo**: Las custom-apps NO se despliegan hasta que las 13 herramientas estén 100% operativas
-- **Monitoring**: 10 intentos con 30s entre cada uno para verificación completa
+- **Monitorización**: 10 intentos con 30s entre cada uno para verificación completa
 
 ### 🛠️ Generador de Aplicaciones GitOps Completas
 - **Archivo**: `scripts/comun/generar-apps-gitops-completas.sh`
 - **Funcionalidad**: Genera manifiestos con integración total GitOps
 - **Integraciones Incluidas**:
-  - ✅ **Argo Rollouts** - Progressive delivery automático con canary deployments
+  - ✅ **Argo Rollouts** - Entrega progresiva automática con canary deployments
   - ✅ **Prometheus** - ServiceMonitor y métricas automáticas
-  - ✅ **Grafana** - Dashboards y alerting rules automáticos
-  - ✅ **Jaeger** - Distributed tracing automático
-  - ✅ **Loki** - Log aggregation automático
+  - ✅ **Grafana** - Dashboards y reglas de alerta automáticos
+  - ✅ **Jaeger** - Trazabilidad distribuida automática
+  - ✅ **Loki** - Agregación de logs automática
   - ✅ **External Secrets** - Gestión segura de secretos
-  - ✅ **Cert Manager** - TLS certificates automáticos
-  - ✅ **Argo Workflows** - CI/CD pipeline completo
-  - ✅ **Kargo** - Promotion pipeline entre entornos
-  - ✅ **Ingress NGINX** - Traffic routing optimizado
+  - ✅ **Cert Manager** - Certificados TLS automáticos
+  - ✅ **Argo Workflows** - pipeline CI/CD completo
+  - ✅ **Kargo** - pipeline de promoción entre entornos
+  - ✅ **Ingress NGINX** - Enrutamiento de tráfico optimizado
 
 ### 🔧 Mejoras en el Instalador Principal
 - **Archivo**: `instalar.sh` v2.4.0
@@ -30,18 +30,18 @@
 
 ### 📊 Herramientas GitOps Críticas Monitorizadas
 1. **argo-events** - Event-driven workflows
-2. **argo-rollouts** - Progressive delivery
-3. **argo-workflows** - CI/CD workflows
-4. **cert-manager** - TLS certificates
-5. **external-secrets** - Secrets management
-6. **gitea** - Git repository
-7. **grafana** - Monitoring dashboards
-8. **ingress-nginx** - Traffic ingress
-9. **jaeger** - Distributed tracing
-10. **kargo** - Promotion pipeline
-11. **loki** - Log aggregation
-12. **minio** - Object storage
-13. **prometheus-stack** - Metrics & alerting
+2. **argo-rollouts** - Entrega progresiva
+3. **argo-workflows** - workflows CI/CD
+4. **cert-manager** - Certificados TLS
+5. **external-secrets** - Gestión de secretos
+6. **gitea** - Repositorio Git
+7. **grafana** - Paneles de monitorización
+8. **ingress-nginx** - Ingreso de tráfico
+9. **jaeger** - Trazabilidad distribuida
+10. **kargo** - Pipeline de promoción
+11. **loki** - Agregación de logs
+12. **minio** - Almacenamiento de objetos
+13. **prometheus-stack** - Métricas y alertas
 
 ## 🚀 ESTADO ACTUAL
 
@@ -51,12 +51,12 @@
 - [x] Verificación estricta Synced + Healthy
 - [x] Generador de manifiestos GitOps completos
 - [x] Integración automática en instalador
-- [x] Cleanup de clusters minikube (RAM liberada)
+- [x] Limpieza de clusters minikube (RAM liberada)
 - [x] Todo commiteado y pusheado a GitHub
 
 ### 🔄 Pendiente para próxima sesión
 - [ ] Testing completo del instalador desde cero
-- [ ] Verificar que todas las herramientas sync correctamente
+- [ ] Verificar que todas las herramientas sincronicen correctamente
 - [ ] Probar generación de custom apps con integración completa
 - [ ] Validar que el bloqueo funciona correctamente
 - [ ] Testing de clusters multi-entorno (DEV/PRE/PRO)
@@ -68,7 +68,7 @@
    ./instalar.sh --verbose
    ```
 
-2. **Verificar que todas las tools estén healthy**:
+2. **Verificar que todas las herramientas estén saludables**:
    ```bash
    kubectl get applications -n argocd
    ```
@@ -82,16 +82,16 @@
    - ArgoCD UI para ver sincronización
    - Prometheus para métricas
    - Grafana para dashboards
-   - Jaeger para tracing
+   - Jaeger para trazabilidad
 
 ## 🎯 RESULTADO ESPERADO
 
 Un entorno GitOps absolutamente completo donde:
 - ✅ 13 herramientas GitOps funcionando en armonía
 - ✅ Custom apps con integración total automática
-- ✅ Progressive delivery, monitoring, logging, tracing
-- ✅ Secrets management, TLS, CI/CD, promotion pipelines
-- ✅ Todo automático, production-ready, GitOps-native
+- ✅ Entrega progresiva, monitorización, registro, trazabilidad
+- ✅ Gestión de secretos, TLS, CI/CD, pipelines de promoción
+- ✅ Todo automático, listo para producción, GitOps-native
 
 ¡El futuro del DevOps está aquí! 🚀
 

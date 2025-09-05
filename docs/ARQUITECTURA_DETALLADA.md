@@ -19,21 +19,21 @@ Sistema GitOps completo para gestión de infraestructura Kubernetes con enfoque 
 
 ### Principios Arquitectónicos
 1. **Infrastructure as Code (IaC)**: Todo definido en código versionado
-2. **GitOps Flow**: Git como única fuente de verdad
-3. **Declarative Configuration**: Estado deseado vs imperativo
-4. **Immutable Infrastructure**: Despliegues sin modificaciones in-place
-5. **Security by Default**: Configuraciones seguras desde el inicio
+2. **Flujo GitOps**: Git como única fuente de verdad
+3. **Configuración Declarativa**: Estado deseado vs imperativo
+4. **Infraestructura Inmutable**: Despliegues sin modificaciones in-place
+5. **Seguridad por Defecto**: Configuraciones seguras desde el inicio
 
 ## 🏛️ Arquitectura Técnica
 
-### Stack Tecnológico
+### Pila Tecnológica
 ```
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │   DESARROLLO    │  │   STAGING/PRE   │  │   PRODUCCIÓN    │
 │                 │  │                 │  │                 │
-│ • DEV Cluster   │  │ • PRE Cluster   │  │ • PRO Cluster   │
+│ • DEV Clúster   │  │ • PRE Clúster   │  │ • PRO Clúster   │
 │ • 4 CPU/8GB     │  │ • 2 CPU/2GB     │  │ • 2 CPU/2GB     │
-│ • Full Stack    │  │ • Minimal Stack │  │ • Minimal Stack │
+│ • Pila Completa │  │ • Pila Mínima   │  │ • Pila Mínima   │
 └─────────────────┘  └─────────────────┘  └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
@@ -41,7 +41,7 @@ Sistema GitOps completo para gestión de infraestructura Kubernetes con enfoque 
                     ┌─────────────────┐
                     │   ARGOCD HUB    │
                     │                 │
-                    │ • Master Control│
+                    │ • Control Maestro│
                     │ • 3 Clusters    │
                     │ • GitHub Source │
                     └─────────────────┘
@@ -49,61 +49,61 @@ Sistema GitOps completo para gestión de infraestructura Kubernetes con enfoque 
 
 ### Componentes Core
 
-#### 🎛️ Control Plane (ArgoCD)
+#### 🎛️ Plano de Control (ArgoCD)
 - **Propósito**: Orchestrador central GitOps
 - **Ubicación**: Cluster DEV (master controller)
 - **Responsabilidades**:
   - Sincronización con GitHub
   - Despliegue declarativo en 3 entornos
   - Rollback automático en fallos
-  - Audit trail completo
+  - Registro de auditoría completo
 
-#### 🔍 Observabilidad Stack
+#### 🔍 Pila de Observabilidad
 - **Prometheus**: Métricas y alertas
 - **Grafana**: Dashboards y visualización
 - **Loki**: Agregación de logs
-- **Jaeger**: Tracing distribuido
+- **Jaeger**: Trazabilidad distribuida
 
-#### 🔒 Seguridad Stack
+#### 🔒 Pila de Seguridad
 - **Cert-Manager**: Gestión automática de certificados TLS
-- **External-Secrets**: Integración segura con sistemas de secrets
+- **External-Secrets**: Integración segura con sistemas de secretos
 - **RBAC**: Control de acceso basado en roles
 
-#### 🌐 Networking Stack
-- **Ingress-NGINX**: Reverse proxy y load balancer
+#### 🌐 Pila de Red
+- **Ingress-NGINX**: Proxy inverso y balanceador de carga
 - **Service Mesh** (futuro): Comunicación segura entre servicios
 
 ## 🔄 Flujo de Datos
 
-### GitOps Workflow
+### Flujo de Trabajo GitOps
 ```
 ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐
-│  CODE   │───▶│   GIT   │───▶│ ARGOCD  │───▶│ CLUSTER │
+│  CAMBIOS DE CÓDIGO   │───▶│   COMMIT EN GIT   │───▶│ SINCRONIZACIÓN ARGOCD  │───▶│ DESPLIEGUE EN CLÚSTER │
 │ CHANGES │    │ COMMIT  │    │  SYNC   │    │ DEPLOY  │
 └─────────┘    └─────────┘    └─────────┘    └─────────┘
      │                                             │
-     └─────────────── FEEDBACK LOOP ──────────────┘
+     └─────────────── BUCLE DE RETROALIMENTACIÓN ──────────────┘
 ```
 
 ### Proceso de Despliegue
 1. **Desarrollo**: Cambios en manifiestos/configuraciones
 2. **Git Push**: Código versionado en GitHub
-3. **ArgoCD Detection**: Polling cada 3 minutos
-4. **Validation**: Verificación de sintaxis y políticas
-5. **Deployment**: Aplicación declarativa en clusters
-6. **Verification**: Health checks y validaciones
+3. **Detección por ArgoCD**: Polling cada 3 minutos
+4. **Validación**: Verificación de sintaxis y políticas
+5. **Despliegue**: Aplicación declarativa en clusters
+6. **Verification**: Comprobaciones de salud y validaciones
 7. **Rollback**: Automático si falla la verificación
 
 ## 🛡️ Seguridad
 
 ### Capas de Seguridad
-1. **Network Security**: Ingress controlado, TLS automático
-2. **Identity & Access**: RBAC, service accounts mínimos
-3. **Secrets Management**: External secrets, rotación automática
-4. **Image Security**: Scanning, políticas de admisión
-5. **Runtime Security**: Monitoring, detección de anomalías
+1. **Seguridad de Red**: Ingress controlado, TLS automático
+2. **Identidad y Acceso**: RBAC, cuentas de servicio mínimas
+3. **Gestión de Secretos**: External secrets, rotación automática
+4. **Seguridad de Imágenes**: Escaneo, políticas de admisión
+5. **Seguridad en Tiempo de Ejecución**: Monitorización, detección de anomalías
 
-### Compliance
+### Cumplimiento
 - **SOC 2**: Controles de acceso y auditoría
 - **GDPR**: Gestión de datos y privacidad
 - **ISO 27001**: Gestión de seguridad de información
@@ -111,17 +111,17 @@ Sistema GitOps completo para gestión de infraestructura Kubernetes con enfoque 
 ## 📊 Monitoreo
 
 ### Métricas Clave
-- **SLA/SLO**: 99.9% uptime objetivo
+- **SLA/SLO**: 99.9% tiempo de actividad objetivo
 - **MTTR**: < 15 minutos tiempo de recuperación
-- **Deploy Frequency**: Multiple deploys diarios
-- **Change Failure Rate**: < 5%
+- **Frecuencia de Despliegue**: Múltiples despliegues diarios
+- **Tasa de Fallo de Cambios**: < 5%
 
 ### Alertas Críticas
-- Cluster health
-- ArgoCD sync failures
-- Certificate expiration
-- Resource exhaustion
-- Security incidents
+- Salud del clúster
+- fallos de sincronización de ArgoCD
+- caducidad de certificados
+- agotamiento de recursos
+- incidentes de seguridad
 
 ---
 

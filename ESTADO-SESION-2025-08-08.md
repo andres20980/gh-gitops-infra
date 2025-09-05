@@ -9,7 +9,7 @@
 ### 📊 NUEVA ARQUITECTURA MODULAR
 ```
 scripts/comun/modules/
-├── autodiscovery.sh       - 149 líneas (Autodescubrimiento GitOps)
+├── autodescubrimiento.sh       - 149 líneas (Autodescubrimiento GitOps)
 ├── version-manager.sh     - 174 líneas (Gestión de versiones)
 ├── monitoring.sh          - 287 líneas (Monitoreo activo)
 ├── reporting.sh           - 271 líneas (Reporting detallado)
@@ -18,15 +18,15 @@ scripts/comun/modules/
 
 scripts/comun/helpers/
 ├── gitops-helper-modular.sh           - 89 líneas (Orquestador principal)
-└── gitops-helper-monolitico-backup.sh - Backup del archivo original
+└── gitops-helper-monolitico-backup.sh - Copia de seguridad del archivo original
 ```
 
 ### 🎯 PRINCIPIOS IMPLEMENTADOS
-- ✅ **Single Responsibility Principle** - Cada módulo una responsabilidad
-- ✅ **DRY (Don't Repeat Yourself)** - Zero duplicación
-- ✅ **Separation of Concerns** - Funcionalidades separadas
-- ✅ **Modular Architecture** - Carga dinámica de módulos
-- ✅ **Maintainability** - Archivos < 300 líneas cada uno
+- ✅ **Principio de Responsabilidad Única** - Cada módulo una responsabilidad
+- ✅ **DRY (No te repitas)** - Zero duplicación
+- ✅ **Separación de Preocupaciones** - Funcionalidades separadas
+- ✅ **Arquitectura Modular** - Carga dinámica de módulos
+- ✅ **Mantenibilidad** - Archivos < 300 líneas cada uno
 
 ### 🔍 SISTEMA AUTODESCUBRIBLE FUNCIONAL
 - ✅ **13 herramientas GitOps** detectadas automáticamente
@@ -53,7 +53,7 @@ scripts/comun/helpers/
 - **Rama activa**: `optimizar-fase-05`
 - **Cluster**: `gitops-dev` (funcionando)
 - **ArgoCD**: Instalado y operativo
-- **App of Tools**: `Synced` y `Healthy`
+- **App of Tools**: `Sincronizado` y `Saludable`
 - **Sistema modular**: Completamente funcional
 - **Commits**: Todos sincronizados con GitHub
 

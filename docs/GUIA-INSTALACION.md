@@ -56,7 +56,7 @@ cd gh-gitops-infra
 # - Conectividad de red
 # - Versiones compatibles de dependencias
 
-./instalador.sh --verificar-solo
+./instalador.sh --verificar-solo # Modo de ejecución en seco
 ```
 
 ### **Paso 3: Instalación Completa**
@@ -94,10 +94,10 @@ sudo ./instalador.sh --cluster gitops-dev --metrics-server --verbose
 ```bash
 # Configuración de minikube:
 - Perfil: gitops-dev (configurable)
-- Driver: docker
+- Controlador: docker
 - Kubernetes: versión 'stable' (auto-detectada)
 - Recursos: 8GB RAM, 4 CPU cores
-- Addons: metrics-server (habilitado automáticamente)
+- Complementos: metrics-server (habilitado automáticamente)
 ```
 
 ### **FASE 4: Instalación de ArgoCD**
@@ -114,7 +114,7 @@ sudo ./instalador.sh --cluster gitops-dev --metrics-server --verbose
 # App-of-Apps estructura:
 📦 herramientas-gitops (6 fases ordenadas)
 ├── FASE 1: cert-manager + ingress-nginx
-├── FASE 2: minio (storage S3)
+├── FASE 2: minio (almacenamiento S3)
 ├── FASE 3: prometheus-stack + grafana + loki + jaeger
 ├── FASE 4: argo-workflows + argo-rollouts + argo-events + kargo
 ├── FASE 5: gitea (repositorio interno)
@@ -134,7 +134,7 @@ sudo ./instalador.sh --cluster gitops-dev --metrics-server --verbose
 # Verificaciones post-instalación:
 - ✅ Estado de todos los pods
 - ✅ Conectividad de servicios
-- ✅ Dashboards accesibles
+- ✅ Paneles accesibles
 - ✅ ArgoCD sincronizado
 - ✅ Métricas funcionando
 ```
@@ -143,7 +143,7 @@ sudo ./instalador.sh --cluster gitops-dev --metrics-server --verbose
 
 ### **Acceso a Servicios**
 ```bash
-# Port-forwarding automático configurado:
+# Reenvío de puertos automático configurado:
 kubectl port-forward -n argocd service/argocd-server 8080:80 &
 kubectl port-forward -n monitoring service/grafana 3000:80 &
 kubectl port-forward -n monitoring service/prometheus-server 9090:80 &
@@ -262,10 +262,10 @@ docker system prune -a -f
 
 Si encuentras problemas durante la instalación:
 
-1. **Logs del instalador**: Revisa `logs/instalacion-$(date +%Y%m%d).log`
+1. **Registros del instalador**: Revisa `logs/instalacion-$(date +%Y%m%d).log`
 2. **Diagnóstico**: Ejecuta `./scripts/utilidades/diagnosticos.sh`
 3. **Issues**: Reporta en [GitHub Issues](https://github.com/asanchez-dev/gh-gitops-infra/issues)
 
 ---
 
-> **Nota**: Esta guía se actualiza continuamente. Para la última versión, consulta la [documentación online](https://github.com/asanchez-dev/gh-gitops-infra/docs).
+> **Nota**: Esta guía se actualiza continuamente. Para la última versión, consulta la [documentación en línea](https://github.com/asanchez-dev/gh-gitops-infra/docs).

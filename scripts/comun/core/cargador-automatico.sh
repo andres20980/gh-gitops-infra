@@ -88,7 +88,7 @@ load_directory_files() {
     local file
     while IFS= read -r -d '' file; do
         load_optional_file "$file"
-    done < <(find "$dir_path" -maxdepth 1 -name "$pattern" -type f -print0 2>/dev/null)
+    done < <(find "$dir_path" -maxdepth 1 -name "$pattern" -not -name "cargador-automatico.sh" -type f -print0 2>/dev/null)
 }
 
 # ============================================================================

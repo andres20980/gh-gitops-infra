@@ -32,6 +32,9 @@ obtener_ultima_version() {
         minikube)
             curl -fsSL https://api.github.com/repos/kubernetes/minikube/releases/latest | grep -oP '(?<="tag_name": "v)\d+\.\d+\.\d+' 2>/dev/null || echo "1.32"
             ;;
+        "kind")
+            curl -fsSL https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | grep -oP '(?<="tag_name": "v)\d+\.\d+\.\d+' 2>/dev/null || echo "0.17.0"
+            ;;
         kubectl)
             curl -fsSL https://dl.k8s.io/release/stable.txt | sed 's/^v//' 2>/dev/null || echo "1.28"
             ;;

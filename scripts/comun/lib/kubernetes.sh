@@ -49,6 +49,51 @@ check_docker_daemon() {
     fi
 }
 
+# Crear cluster kind
+create_kind_cluster() {
+    local profile="$1"
+    local description="$2"
+
+    log_info "Creando cluster kind: $profile ($description)"
+
+    # Verificar si el cluster ya existe
+    if kind get clusters | grep -q "^$profile$"; then
+        log_success "✅ Cluster kind $profile ya existe"
+        return 0
+    fi
+
+    # Crear archivo de configuración para kind
+    cat <<EOF > "/tmp/kind-config-${profile}.yaml"
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ${profile}
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 8081
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 8444
+    protocol: TCP
+EOF
+
+    log_info "🆕 Creando nuevo cluster kind $profile..."
+    if kind create cluster --config "/tmp/kind-config-${profile}.yaml"; then
+        log_success "✅ Cluster kind $profile creado correctamente"
+        return 0
+    else
+        log_error "❌ Error creando cluster kind $profile"
+        return 1
+    fi
+}
+
 # Inicializar Docker en WSL
 init_docker_wsl() {
     log_info "🐳 Inicializando Docker daemon..."
@@ -127,7 +172,7 @@ check_cluster_health() {
     log_info "🏥 Verificando salud del cluster $profile..."
     
     # Cambiar contexto
-    kubectl config use-context "$profile" >/dev/null 2>&1
+    kubectl config use-context "kind-${profile}" >/dev/null 2>&1
     
     # Verificar conectividad
     if ! kubectl cluster-info >/dev/null 2>&1; then
@@ -156,7 +201,7 @@ check_cluster_health() {
     return 0
 }
 
-# Crear cluster minikube
+# Crear cluster (ahora usa kind)
 create_minikube_cluster() {
     local profile="$1"
     local cpus="$2"
@@ -164,88 +209,7 @@ create_minikube_cluster() {
     local preset="$4"
     local description="$5"
 
-    # Ajuste dinámico para dev
-    if [[ "$profile" == "gitops-dev" && ( "$cpus" == "auto" || "$memory" == "auto" ) ]]; then
-        local d_cpus d_mem
-        read -r d_cpus d_mem < <(proponer_sizing_dev)
-        cpus="$d_cpus"; memory="$d_mem"
-    fi
-
-    log_info "Creando cluster: $profile ($description)"
-    log_info "   CPUs: $cpus | Memoria: ${memory}MB | Preset: $preset"
-    
-    # Verificar cluster existente
-    if minikube profile list 2>/dev/null | grep -q "^$profile"; then
-        log_info "📋 Cluster $profile existe, verificando estado..."
-        
-        local status
-        status=$(minikube status --profile="$profile" --format='{{.Host}}' 2>/dev/null || echo "Stopped")
-        
-        if [[ "$status" == "Running" ]]; then
-            log_success "✅ Cluster $profile ya running"
-            return 0
-        else
-            log_info "🔄 Iniciando cluster existente..."
-            minikube start --profile="$profile"
-        fi
-    else
-        log_info "🆕 Creando nuevo cluster $profile..."
-        
-    case "$preset" in
-            "full")
-        minikube start \
-                    --profile="$profile" \
-                    --driver="$MINIKUBE_DRIVER" \
-                    --cpus="$cpus" \
-                    --memory="${memory}m" \
-                    --disk-size=20g \
-                    --network="$MINIKUBE_NETWORK" \
-                    --addons=ingress,metrics-server,dashboard \
-                    --kubernetes-version=stable
-                ;;
-            "minimal")
-        # Intento con mínimos estrictos; si falla, backoff suave
-        if ! minikube start \
-                    --profile="$profile" \
-                    --driver="$MINIKUBE_DRIVER" \
-                    --cpus="$cpus" \
-                    --memory="${memory}m" \
-                    --disk-size=10g \
-                    --network="$MINIKUBE_NETWORK" \
-                    --addons=metrics-server \
-            --kubernetes-version=stable; then
-            log_warning "Inicio fallido con mínimos ($cpus CPU, ${memory}MB), reintentando con +1 CPU y +512MB"
-            local retry_cpus=$((cpus+1))
-            local retry_mem=$((memory+512))
-            minikube start \
-            --profile="$profile" \
-            --driver="$MINIKUBE_DRIVER" \
-            --cpus="$retry_cpus" \
-            --memory="${retry_mem}m" \
-            --disk-size=10g \
-            --network="$MINIKUBE_NETWORK" \
-            --addons=metrics-server \
-            --kubernetes-version=stable
-        fi
-                ;;
-            *)
-                log_error "❌ Preset desconocido: $preset"
-                return 1
-                ;;
-        esac
-    fi
-    
-    # Actualizar contexto kubectl
-    minikube update-context --profile="$profile"
-    
-    # Verificar salud
-    if check_cluster_health "$profile"; then
-        log_success "✅ Cluster $profile creado correctamente"
-        return 0
-    else
-        log_error "❌ Cluster $profile no está healthy"
-        return 1
-    fi
+    create_kind_cluster "$profile" "$description"
 }
 
 # Obtener línea de configuración para un perfil
@@ -441,39 +405,28 @@ setup_cluster_addons() {
     
     log_info "🔧 Configurando addons para $profile..."
     
-    minikube profile "$profile"
+    kubectl config use-context "kind-${profile}"
+
+    log_info "🔌 Instalando NGINX Ingress Controller..."
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
     
-    case "$preset" in
-        "full")
-            minikube addons enable ingress
-            minikube addons enable metrics-server
-            minikube addons enable dashboard
-            minikube addons enable storage-provisioner
-            log_success "✅ Addons completos habilitados"
-            ;;
-        "minimal")
-            minikube addons enable metrics-server
-            minikube addons enable storage-provisioner
-            log_success "✅ Addons mínimos habilitados"
-            ;;
-    esac
-    
-    # Esperar disponibilidad
-    sleep 10
-    
-    # Verificar addons críticos
-    if kubectl get pods -n kube-system | grep -q "metrics-server"; then
-        log_success "✅ Metrics server disponible"
-    else
-        log_warning "⚠️ Metrics server no disponible"
-    fi
+    log_info "📊 Instalando Metrics Server..."
+    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+    log_info "⏳ Esperando que los addons esten listos..."
+    kubectl wait --namespace ingress-nginx \
+      --for=condition=ready pod \
+      --selector=app.kubernetes.io/component=controller \
+      --timeout=90s
+
+    log_success "✅ Addons configurados para $profile"
 }
 
 # Asegurar addon metrics-server habilitado (idempotente)
 ensure_metrics_server() {
     local profile="$1"
-    log_info "Asegurando metrics-server habilitado en $profile..."
-    minikube addons enable metrics-server --profile="$profile" >/dev/null 2>&1 || true
+    log_info "Asegurando addons habilitados en $profile..."
+    setup_cluster_addons "$profile" ""
 }
 
 # ============================================================================
@@ -490,10 +443,11 @@ check_cluster_available() {
     local current_context
     current_context=$(kubectl config current-context 2>/dev/null || echo "ninguno")
     
-    if [[ "$current_context" != "$expected_context" ]]; then
-        log_info "🔄 Cambiando contexto a $expected_context..."
-        if ! kubectl config use-context "$expected_context" >/dev/null 2>&1; then
-            log_error "❌ Contexto $expected_context no disponible"
+    local kind_context="kind-${expected_context}"
+    if [[ "$current_context" != "$kind_context" ]]; then
+        log_info "🔄 Cambiando contexto a $kind_context..."
+        if ! kubectl config use-context "$kind_context" >/dev/null 2>&1; then
+            log_error "❌ Contexto $kind_context no disponible"
             return 1
         fi
     fi
@@ -526,12 +480,13 @@ list_contexts() {
 # Cambiar contexto activo
 switch_context() {
     local context="$1"
+    local kind_context="kind-${context}"
     
-    if kubectl config use-context "$context" >/dev/null 2>&1; then
-        log_success "✅ Contexto cambiado a: $context"
+    if kubectl config use-context "$kind_context" >/dev/null 2>&1; then
+        log_success "✅ Contexto cambiado a: $kind_context"
         return 0
     else
-        log_error "❌ No se pudo cambiar a contexto: $context"
+        log_error "❌ No se pudo cambiar a contexto: $kind_context"
         return 1
     fi
 }
@@ -608,9 +563,9 @@ create_promotion_clusters() {
 show_clusters_summary() {
     log_section "📋 Resumen de Clusters"
     
-    if command -v minikube >/dev/null 2>&1; then
-        log_info "🔍 Clusters minikube:"
-        minikube profile list 2>/dev/null || log_info "  Ningún cluster encontrado"
+    if command -v kind >/dev/null 2>&1; then
+        log_info "🔍 Clusters kind:"
+        kind get clusters || log_info "  Ningún cluster encontrado"
     fi
     
     log_info "🔍 Contextos kubectl:"

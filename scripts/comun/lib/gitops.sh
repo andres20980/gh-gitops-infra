@@ -426,8 +426,8 @@ install_gitops_tool() {
     
     log_info "🔧 Instalando herramienta GitOps: $tool"
     
-    local chart_file="/home/asanchez/gh-gitops-infra/herramientas-gitops/${tool}.yaml"
-    local values_file="/home/asanchez/gh-gitops-infra/herramientas-gitops/values-dev/${tool}-dev-values.yaml"
+    local chart_file="$PROJECT_ROOT/herramientas-gitops/${tool}.yaml"
+    local values_file="$PROJECT_ROOT/herramientas-gitops/values-dev/${tool}-dev-values.yaml"
     
     if [[ ! -f "$chart_file" ]]; then
         log_error "❌ Chart file no encontrado: $chart_file"

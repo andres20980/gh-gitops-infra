@@ -21,20 +21,8 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
     readonly GITOPS_DESCRIPTION="Instalador modular para infraestructura GitOps"
     
     # Directorios del proyecto (se configuran automáticamente)
-    if [[ -z "${PROJECT_ROOT:-}" ]]; then
-        if [[ -f "instalar.sh" ]]; then
-            # Ejecutándose desde el directorio raíz
-            readonly PROJECT_ROOT="$(pwd)"
-        else
-            # Ejecutándose desde subdirectorio
-            readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-        fi
-    fi
     
-    readonly SCRIPTS_DIR="${PROJECT_ROOT}/scripts"
-    readonly COMUN_DIR="${SCRIPTS_DIR}/comun"
-    readonly FASES_DIR="${SCRIPTS_DIR}/fases"
-    readonly LOGS_DIR="${PROJECT_ROOT}/logs"
+    LOGS_DIR="${PROJECT_ROOT}/logs"
     
     # ============================================================================
     # CONFIGURACIÓN DE CLUSTERS

@@ -15,8 +15,8 @@ set -euo pipefail
 
 readonly REQUIRED_TOOLS=(
     "docker:latest:Docker Engine para containers"
-    "minikube:latest:Kubernetes local cluster"
-    "kubectl:auto:Cliente Kubernetes (compatible con minikube)"
+    "kind:latest:Kubernetes local cluster"
+    "kubectl:latest:Cliente Kubernetes"
     "helm:latest:Gestor de paquetes Kubernetes"
     "git:latest:Control de versiones"
 )
@@ -65,6 +65,9 @@ check_tool() {
             ;;
         "minikube")
             current_version=$(minikube version 2>/dev/null | grep -oP '(?<=version: v)\d+\.\d+\.\d+' || echo "0.0.0")
+            ;;
+        "kind")
+            current_version=$(kind version 2>/dev/null | grep -oP '(?<=v)\d+\.\d+\.\d+' || echo "0.0.0")
             ;;
         "kubectl")
             # Verificar integridad básica del binario
@@ -242,6 +245,22 @@ install_minikube() {
     log_success "minikube v$version instalado"
 }
 
+# Instalar kind más reciente
+install_kind() {
+    log_info "Instalando kind más reciente..."
+
+    # Obtener última versión
+    local version
+    version=$(get_latest_version "kind")
+
+    log_info "Descargando kind v$version..."
+    curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${version}/kind-linux-amd64"
+    chmod +x ./kind
+    sudo mv ./kind /usr/local/bin/kind
+
+    log_success "kind v$version instalado"
+}
+
 # Instalar Helm más reciente
 install_helm() {
     log_info "Instalando Helm más reciente..."
@@ -279,6 +298,7 @@ install_tool() {
         "docker") install_docker ;;
         "kubectl") install_kubectl ;;
         "minikube") install_minikube ;;
+        "kind") install_kind ;;
         "helm") install_helm ;;
         "git") install_git ;;
         *) 
@@ -347,6 +367,7 @@ show_dependencies_summary() {
             case "$tool" in
                 "docker") version=$(docker --version 2>/dev/null | grep -oP '(?<=version )\d+\.\d+' || echo "N/A") ;;
                 "minikube") version=$(minikube version 2>/dev/null | grep -oP '(?<=version: v)\d+\.\d+' || echo "N/A") ;;
+                "kind") version=$(kind version 2>/dev/null | grep -oP '(?<=v)\d+\.\d+\.\d+' || echo "N/A") ;;
                 "kubectl")
                     if ! version=$(get_kubectl_version short 2>/dev/null); then
                         version="N/A"

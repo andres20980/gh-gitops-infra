@@ -9,15 +9,6 @@
 
 set -euo pipefail
 
-# ============================================================================
-# CARGA DE LIBRERÍAS DRY
-# ============================================================================
-
-# Detectar directorio del script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Cargar librerías DRY consolidadas
-source "$SCRIPT_DIR/../comun/base.sh"
 
 # ============================================================================
 # FASE 4: ARGOCD

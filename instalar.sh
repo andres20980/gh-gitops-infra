@@ -18,12 +18,12 @@ readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PROJECT_ROOT
 
 # Cargar sistema de autocontención
-if [[ -f "$PROJECT_ROOT/scripts/comun/bootstrap.sh" ]]; then
-    # shellcheck source=scripts/comun/bootstrap.sh
-    source "$PROJECT_ROOT/scripts/comun/bootstrap.sh"
+if [[ -f "$PROJECT_ROOT/scripts/comun/arranque.sh" ]]; then
+    # shellcheck source=scripts/comun/arranque.sh
+    source "$PROJECT_ROOT/scripts/comun/arranque.sh"
 else
     echo "❌ Error: Sistema de autocontención no encontrado" >&2
-    echo "   Archivo requerido: scripts/comun/bootstrap.sh" >&2
+    echo "   Archivo requerido: scripts/comun/arranque.sh" >&2
     exit 1
 fi
 

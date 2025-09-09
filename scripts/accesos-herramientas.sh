@@ -19,14 +19,14 @@ declare -A HERRAMIENTAS_PUERTOS=(
     ["grafana"]="8081:80" 
     ["prometheus"]="8082:9090"
     ["alertmanager"]="8083:9093"
-    ["jaeger"]="8084:16686"
+    ["jaeger"]="8084:80"
     ["kargo"]="8085:80"
     ["loki"]="8086:3100"
     ["minio"]="8087:9000"
     ["gitea"]="8088:3000"
     ["argo-workflows"]="8089:2746"
     ["argo-events"]="8090:80"
-    ["argo-rollouts"]="8091:80"
+    ["argo-rollouts"]="8091:3100"
 )
 
 declare -A HERRAMIENTAS_NAMESPACES=(
@@ -34,10 +34,10 @@ declare -A HERRAMIENTAS_NAMESPACES=(
     ["grafana"]="monitoring"
     ["prometheus"]="monitoring"
     ["alertmanager"]="monitoring"
-    ["jaeger"]="jaeger"
+    ["jaeger"]="observability"
     ["kargo"]="kargo"
-    ["loki"]="loki"
-    ["minio"]="minio"
+    ["loki"]="monitoring"
+    ["minio"]="storage"
     ["gitea"]="gitea"
     ["argo-workflows"]="argo-workflows"
     ["argo-events"]="argo-events"
@@ -59,6 +59,24 @@ declare -A HERRAMIENTAS_SERVICIOS=(
     ["argo-rollouts"]="argo-rollouts-dashboard"
 )
 
+# Servicios alternativos por herramienta (para auto-descubrir si el principal no existe)
+declare -A HERRAMIENTAS_SERVICIOS_ALT=(
+    ["grafana"]="grafana"
+    ["jaeger"]="jaeger-query,query,jaeger"
+    ["kargo"]="kargo-api,kargo"
+    ["loki"]="loki,loki-read,loki-headless,loki-gateway"
+    ["minio"]="minio,minio-console"
+)
+
+# Selectores de pods por herramienta para fallback cuando no hay Service
+declare -A HERRAMIENTAS_POD_SELECTOR=(
+    ["grafana"]='-l app.kubernetes.io/name=grafana'
+    ["jaeger"]='-l app.kubernetes.io/component=query'
+    ["kargo"]='-l app.kubernetes.io/name=kargo'
+    ["loki"]='-l app.kubernetes.io/name=loki'
+    ["argo-rollouts"]='-l app.kubernetes.io/name=argo-rollouts-dashboard'
+)
+
 # Función para iniciar port-forwards
 start_port_forwards() {
     log_info "🚀 Iniciando reenvíos de puertos para herramientas GitOps..."
@@ -70,20 +88,56 @@ start_port_forwards() {
         local puerto_local="${puerto%:*}"
         local puerto_remoto="${puerto#*:}"
         
-        # Verificar si el namespace y servicio existen
-        if kubectl get namespace "$namespace" >/dev/null 2>&1 && \
-           kubectl get service "$servicio" -n "$namespace" >/dev/null 2>&1; then
+        # Resolver servicio real (principal o alternativos)
+        local servicio_real=""
+        if kubectl get namespace "$namespace" >/dev/null 2>&1; then
+            if kubectl get service "$servicio" -n "$namespace" >/dev/null 2>&1; then
+                servicio_real="$servicio"
+            else
+                IFS=',' read -r -a candidates <<< "${HERRAMIENTAS_SERVICIOS_ALT[$herramienta]:-}"
+                for cand in "${candidates[@]}"; do
+                    [[ -z "$cand" ]] && continue
+                    if kubectl get service "$cand" -n "$namespace" >/dev/null 2>&1; then
+                        servicio_real="$cand"; break
+                    fi
+                done
+            fi
+        fi
+
+        if [[ -n "$servicio_real" ]]; then
             
             # Verificar si ya hay un port-forward activo
             if ! lsof -i ":$puerto_local" >/dev/null 2>&1; then
                 log_info "  🔗 $herramienta: localhost:$puerto_local"
-                kubectl port-forward -n "$namespace" "service/$servicio" "$puerto" >/dev/null 2>&1 &
+                kubectl port-forward -n "$namespace" "service/$servicio_real" "$puerto" >/dev/null 2>&1 &
                 sleep 1
             else
                 log_warning "  ⚠️ $herramienta: puerto $puerto_local ya en uso"
             fi
         else
-            log_warning "  ❌ $herramienta: servicio no disponible ($namespace/$servicio)"
+            # Fallback: intentar port-forward a un Pod si existe
+            local selector="${HERRAMIENTAS_POD_SELECTOR[$herramienta]:-}"
+            if [[ -n "$selector" ]] && kubectl get pods -n "$namespace" $selector --no-headers 2>/dev/null | head -n1 | grep -q .; then
+                local pod_name
+                pod_name=$(kubectl get pods -n "$namespace" $selector -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                if [[ -n "$pod_name" ]]; then
+                    # Detectar primer containerPort si es posible
+                    local cport
+                    cport=$(kubectl get pod "$pod_name" -n "$namespace" -o jsonpath='{.spec.containers[0].ports[0].containerPort}' 2>/dev/null || echo "")
+                    [[ -z "$cport" ]] && cport="${puerto_remoto}"
+                    if ! lsof -i ":$puerto_local" >/dev/null 2>&1; then
+                        log_info "  🔗 $herramienta (pod): localhost:$puerto_local"
+                        kubectl -n "$namespace" port-forward "pod/$pod_name" "$puerto_local:$cport" >/dev/null 2>&1 &
+                        sleep 1
+                    else
+                        log_warning "  ⚠️ $herramienta: puerto $puerto_local ya en uso"
+                    fi
+                else
+                    log_warning "  ❌ $herramienta: servicio/pod no disponible ($namespace/$servicio)"
+                fi
+            else
+                log_warning "  ❌ $herramienta: servicio no disponible ($namespace/$servicio)"
+            fi
         fi
     done
     

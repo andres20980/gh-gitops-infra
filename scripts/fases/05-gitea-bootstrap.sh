@@ -200,6 +200,16 @@ EOF
     if [[ -f "$app_tools" ]]; then
         log_info "🚀 Aplicando Application de herramientas GitOps (app-of-tools)"
         kubectl apply -f "$app_tools"
+        # Forzar refresh/sync para que recoja los cambios recién publicados en Gitea
+        log_info "🔄 Forzando refresh/sync de app-of-tools-gitops"
+        # Intentar con CLI si está disponible (autologin incluido en setup_argocd_cli)
+        setup_argocd_cli || true
+        if command -v argocd >/dev/null 2>&1; then
+            argocd app sync app-of-tools-gitops --prune --timeout 300 >/dev/null 2>&1 || true
+        fi
+        # Anotar recurso para refresh hard como respaldo
+        kubectl -n argocd annotate applications.argoproj.io/app-of-tools-gitops \
+            argocd.argoproj.io/refresh=hard --overwrite >/dev/null 2>&1 || true
     else
         log_warning "⚠️ No se encontró $app_tools"
     fi

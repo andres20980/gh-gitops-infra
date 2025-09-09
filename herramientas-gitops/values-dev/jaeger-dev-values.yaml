@@ -7,3 +7,9 @@ resources:
     cpu: 200m
     memory: 256Mi
 replicaCount: 1
+
+# Asegurar servicio de Query para UI
+query:
+  service:
+    type: ClusterIP
+    port: 80

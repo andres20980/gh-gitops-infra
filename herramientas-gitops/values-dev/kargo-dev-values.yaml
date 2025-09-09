@@ -7,3 +7,12 @@ resources:
     cpu: 200m
     memory: 256Mi
 replicaCount: 1
+
+# Exponer API/UI de Kargo para entorno local
+api:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 80
+ui:
+  enabled: true

@@ -42,7 +42,10 @@ main() {
 
     # 4. Validación de herramientas: estado ArgoCD (Synced+Healthy) y acceso UI
     log_section "✅ Validación de Herramientas (Estado + UI)"
-    validar_herramientas_y_uis || true
+    if ! validar_herramientas_y_uis; then
+        log_error "❌ Validación no superada: hay herramientas sin UI accesible o no Synced+Healthy"
+        return 1
+    fi
     
     # 4. Mensaje final con próximos pasos
     log_section "🎉 Instalación GitOps Completada"

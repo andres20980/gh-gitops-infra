@@ -87,6 +87,22 @@ main() {
             echo "GitOps en Español Infrastructure v$GITOPS_VERSION"
             exit 0
             ;;
+        excelente)
+            # Modo excelencia: bootstrap + validación con reintentos
+            local intentos=0
+            local max_intentos=3
+            while (( intentos < max_intentos )); do
+                intentos=$((intentos+1))
+                echo "[EXCELENTE] Intento ${intentos}/${max_intentos}: fase-05 + fase-07"
+                if ejecutar_fase_individual 05 && ejecutar_fase_individual 07; then
+                    echo "[EXCELENTE] ✅ Instalación validada (Synced+Healthy + UIs accesibles)"
+                    exit 0
+                fi
+                echo "[EXCELENTE] Reintentando en 10s..."; sleep 10
+            done
+            echo "[EXCELENTE] ❌ No se logró validar la instalación tras ${max_intentos} intentos" >&2
+            exit 1
+            ;;
         fase-*)
             # Extraer número de fase
             local fase_num="${comando#fase-}"

@@ -123,7 +123,7 @@ main() {
     # Verificar git ls-remote (acceso al repo) desde el cluster (sin y con credenciales)
     local repo_http_url="${svc_url}/${gitea_user}/${repo_name}.git"
     if kubectl -n argocd run --rm -i gitea-git-check --image=alpine/git:latest --restart=Never -- \
-        git ls-remote "$repo_http_url" >/dev/null 2>&1; then
+        ls-remote "$repo_http_url" >/dev/null 2>&1; then
         log_success "✅ Acceso git anónimo al repositorio OK"
     else
         log_warning "⚠️ Acceso git anónimo falló; configurando credenciales en ArgoCD"
@@ -144,7 +144,7 @@ stringData:
 EOF
         # Reintentar ls-remote con credenciales embebidas
         if kubectl -n argocd run --rm -i gitea-git-check --image=alpine/git:latest --restart=Never -- \
-            git ls-remote "http://${gitea_user}:${gitea_pass}@${svc_url#http://}/${gitea_user}/${repo_name}.git" >/dev/null 2>&1; then
+            ls-remote "http://${gitea_user}:${gitea_pass}@${svc_url#http://}/${gitea_user}/${repo_name}.git" >/dev/null 2>&1; then
             log_success "✅ Acceso git con credenciales OK (ls-remote)"
         else
             log_error "❌ No se pudo acceder al repositorio ni con credenciales: $repo_http_url"

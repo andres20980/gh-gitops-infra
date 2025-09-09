@@ -34,16 +34,29 @@ main() {
         return 1
     fi
 
-    # 3) Esperar a que Gitea esté disponible (servicio HTTP)
+    # 3) Esperar a que Gitea esté disponible (servicio HTTP y endpoints listos)
     log_info "⏳ Esperando servicio de Gitea..."
     if ! kubectl -n gitea wait --for=condition=available --timeout=300s deployment -l app.kubernetes.io/name=gitea >/dev/null 2>&1; then
         log_warning "⚠️ Timeout esperando Gitea; continuamos con mejor esfuerzo"
     fi
+    # Esperar endpoints del servicio
+    local waited=0; local max_wait=120
+    until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do
+        sleep 2; waited=$((waited+2)); [[ $waited -ge $max_wait ]] && break
+    done
 
-    # 4) Configurar port-forward temporal para Gitea y crear repo
+    # 4) Configurar port-forward temporal para Gitea y validar API
     log_info "🔌 Iniciando port-forward temporal a Gitea (localhost:8088)"
     kubectl -n gitea port-forward svc/gitea-http 8088:3000 >/tmp/gitea-pf.log 2>&1 &
-    local pf_pid=$!; sleep 3
+    local pf_pid=$!
+    # Esperar a que responda la API
+    waited=0; max_wait=60
+    until curl -fsS http://localhost:8088/api/v1/version >/dev/null 2>&1; do
+        sleep 2; waited=$((waited+2)); if (( waited >= max_wait )); then
+            log_warning "⚠️ Gitea API no respondió a tiempo; se continúa"
+            break
+        fi
+    done
 
     local gitea_user="admin" gitea_pass="admin" repo_name="gitops-infra"
     local api="http://localhost:8088/api/v1"
@@ -83,7 +96,15 @@ main() {
     find "$PROJECT_ROOT/aplicaciones" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/herramientas-gitops" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
 
-    # 7) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea
+    # 7) Validación previa: comprobar que el repo es accesible desde el cluster (HTTP)
+    #    Esto no prueba git clone, pero asegura conectividad básica a gitea-http.
+    local svc_url="http://gitea-http.gitea.svc.cluster.local"
+    kubectl -n argocd run --rm -i --tty gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \
+        -sSf ${svc_url}/api/v1/version >/dev/null 2>&1 && \
+        log_success "✅ Conectividad a Gitea desde el cluster verificada" || \
+        log_warning "⚠️ No se pudo verificar conectividad a Gitea desde el cluster (curl pod)"
+
+    # 8) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea
     local app_tools="$PROJECT_ROOT/argo-apps/aplicacion-de-herramientas-gitops.yaml"
     if [[ -f "$app_tools" ]]; then
         log_info "🚀 Aplicando Application de herramientas GitOps (app-of-tools)"
@@ -92,13 +113,13 @@ main() {
         log_warning "⚠️ No se encontró $app_tools"
     fi
 
-    # 8) Registrar clusters pre/pro en ArgoCD (si CLI disponible)
+    # 9) Registrar clusters pre/pro en ArgoCD (si CLI disponible)
     register_additional_clusters || true
 
-    # 9) Esperar a que todas las Applications estén en Sync/Healthy
+    # 10) Esperar a que todas las Applications estén en Sync/Healthy
     wait_all_apps_healthy argocd 600 || true
 
-    # 10) Limpiar port-forward
+    # 11) Limpiar port-forward
     if ps -p "$pf_pid" >/dev/null 2>&1; then
         kill "$pf_pid" >/dev/null 2>&1 || true
     fi

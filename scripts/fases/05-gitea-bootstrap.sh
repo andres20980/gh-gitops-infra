@@ -80,7 +80,7 @@ main() {
         log_info "✅ Repositorio ya existe: $gitea_user/$repo_name"
     fi
 
-    # 5) Empujar contenido local al nuevo remoto
+    # 5) Empujar contenido local al nuevo remoto (primera publicación)
     local remote_url="http://$gitea_user:$gitea_pass@localhost:8088/$gitea_user/$repo_name.git"
     log_info "🔁 Publicando repositorio actual en Gitea..."
     (
@@ -110,6 +110,16 @@ main() {
     find "$PROJECT_ROOT/argo-apps" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/aplicaciones" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/herramientas-gitops" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
+
+    # 6b) Publicar cambios de sustitución (asegura que Gitea contiene manifests correctos antes de Argo)
+    log_info "🔁 Publicando cambios de placeholders en Gitea..."
+    (
+        set -e
+        cd "$PROJECT_ROOT"
+        git add -A
+        git commit -m "chore(bootstrap): sustituye URLs a Gitea interno (:3000)" >/dev/null 2>&1 || true
+        git push -u gitea main >/dev/null 2>&1 || true
+    )
 
     # 7) Validación previa: conectividad y acceso git al repo desde el cluster
     local svc_url="http://gitea-http.gitea.svc.cluster.local:3000"
@@ -150,6 +160,18 @@ EOF
             log_error "❌ No se pudo acceder al repositorio ni con credenciales: $repo_http_url"
             return 1
         fi
+    fi
+
+    # 7b) Validación de contenido del repo: deben existir manifests para App-of-Tools
+    log_info "🔎 Verificando contenido esencial en el repositorio remoto..."
+    if curl -fsS -u "$gitea_user:$gitea_pass" \
+         "$api/repos/$gitea_user/$repo_name/contents/argo-apps/aplicacion-de-herramientas-gitops.yaml?ref=main" >/dev/null 2>&1 && \
+       curl -fsS -u "$gitea_user:$gitea_pass" \
+         "$api/repos/$gitea_user/$repo_name/contents/herramientas-gitops/activas?ref=main" >/dev/null 2>&1; then
+        log_success "✅ Repo contiene App-of-Tools y carpeta de herramientas activas"
+    else
+        log_error "❌ El repo no contiene los manifests requeridos (argo-apps/ y herramientas-gitops/activas)."
+        return 1
     fi
 
     # 8) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea

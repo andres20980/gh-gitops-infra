@@ -194,14 +194,18 @@ install_docker() {
 
 # Instalar kubectl compatible con minikube
 install_kubectl() {
-    log_info "Instalando kubectl compatible con minikube..."
-    
-    # Obtener versión compatible
+    log_info "Instalando kubectl (estable y compatible)..."
+
+    # Intentar resolver versión compatible con el cluster objetivo; si no, usar la estable de Kubernetes
     local version
-    version=$(get_compatible_kubectl_version)
+    version=$(get_compatible_kubectl_version 2>/dev/null || true)
     if [[ -z "$version" ]]; then
-        log_error "No se pudo resolver la versión de kubectl"
-        return 1
+        log_info "No se detectó versión específica; usando estable de Kubernetes"
+        version=$(curl -fsSL https://dl.k8s.io/release/stable.txt 2>/dev/null | sed 's/^v//')
+        if [[ -z "$version" ]]; then
+            log_error "No se pudo resolver la versión estable de kubectl"
+            return 1
+        fi
     fi
 
     # Detectar arquitectura

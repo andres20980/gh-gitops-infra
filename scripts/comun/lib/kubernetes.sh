@@ -62,6 +62,11 @@ create_kind_cluster() {
         return 0
     fi
 
+    # Asegurar almacenamiento de Docker listo tras resets "from-scratch"
+    _ensure_docker_storage_ready
+    # Limpieza agresiva de cachés/recursos de Docker (from-scratch)
+    docker system prune -af --volumes >/dev/null 2>&1 || true
+
     # Crear archivo de configuración para kind
     cat <<EOF > "/tmp/kind-config-${profile}.yaml"
 kind: Cluster
@@ -86,12 +91,167 @@ EOF
 
     log_info "🆕 Creando nuevo cluster kind $profile..."
     if kind create cluster --config "/tmp/kind-config-${profile}.yaml"; then
+        # Asegurar contextos kubectl
+        kubectl config use-context "kind-${profile}" >/dev/null 2>&1 || true
+        kubectl config set-context "${profile}" --cluster "kind-${profile}" --user "kind-${profile}" >/dev/null 2>&1 || true
         log_success "✅ Cluster kind $profile creado correctamente"
         return 0
+    fi
+
+    # Fallback: intentar con una imagen anterior estable por si la pull falla por digest
+    log_warning "⚠️ Creación falló; probando con imagen anterior kindest/node:v1.33.1"
+    if kind create cluster --config "/tmp/kind-config-${profile}.yaml" --image kindest/node:v1.33.1; then
+        kubectl config use-context "kind-${profile}" >/dev/null 2>&1 || true
+        kubectl config set-context "${profile}" --cluster "kind-${profile}" --user "kind-${profile}" >/dev/null 2>&1 || true
+        log_success "✅ Cluster kind $profile creado con imagen fallback v1.33.1"
+        return 0
+    fi
+
+    log_error "❌ Error creando cluster kind $profile (incluso con imagen fallback)"
+    return 1
+}
+
+# Asegurar directorios de almacenamiento Docker/containerd listos y daemon activo
+_ensure_docker_storage_ready() {
+    # Crear directorios si no existen (post purga)
+    if [[ ! -d /var/lib/docker/tmp ]]; then
+        log_info "🔧 Preparando /var/lib/docker/tmp"
+        sudo mkdir -p /var/lib/docker/tmp 2>/dev/null || true
+        sudo chown -R root:root /var/lib/docker 2>/dev/null || true
+    fi
+    if [[ ! -d /var/lib/containerd ]]; then
+        log_info "🔧 Preparando /var/lib/containerd"
+        sudo mkdir -p /var/lib/containerd 2>/dev/null || true
+        sudo chown -R root:root /var/lib/containerd 2>/dev/null || true
+    fi
+
+    # Crear estructura overlay2 si no existe (evita errores de symlink en pulls)
+    if [[ ! -d /var/lib/docker/overlay2 ]]; then
+        log_info "🔧 Preparando /var/lib/docker/overlay2"
+        sudo mkdir -p /var/lib/docker/overlay2 2>/dev/null || true
+        sudo chown -R root:root /var/lib/docker/overlay2 2>/dev/null || true
+    fi
+    if [[ ! -d /var/lib/docker/overlay2/l ]]; then
+        log_info "🔧 Preparando /var/lib/docker/overlay2/l"
+        sudo mkdir -p /var/lib/docker/overlay2/l 2>/dev/null || true
+        sudo chown -R root:root /var/lib/docker/overlay2/l 2>/dev/null || true
+    fi
+
+    # Reiniciar/arrancar containerd y docker segun entorno
+    if command -v systemctl >/dev/null 2>&1 && [[ "$(ps -p 1 -o comm=)" == "systemd" ]]; then
+        sudo systemctl restart containerd 2>/dev/null || true
+        sudo systemctl restart docker 2>/dev/null || true
     else
-        log_error "❌ Error creando cluster kind $profile"
+        _start_dockerd_nonsystemd || true
+    fi
+
+    # Esperar daemon operativo
+    local tries=0; local max=15
+    until docker info >/dev/null 2>&1; do
+        sleep 2; tries=$((tries+1)); [[ $tries -ge $max ]] && break
+    done
+    if ! docker info >/dev/null 2>&1; then
+        log_warning "⚠️ Docker daemon no responde tras preparar almacenamiento"
+        return 0
+    fi
+
+    # Warm-up: probar un pull simple para inicializar overlay2 en instalaciones recién limpiadas
+    if ! docker pull --quiet busybox:latest >/dev/null 2>&1; then
+        log_warning "⚠️ Primer pull falló; intentando hard reset de almacenamiento Docker"
+        _docker_hard_reset_storage
+    fi
+}
+
+# Hard reset del almacenamiento de Docker/containerd y warm-up de imagen base
+_docker_hard_reset_storage() {
+    _ensure_kernel_overlay_module || true
+    _ensure_docker_daemon_config_overlay2 || true
+    if command -v systemctl >/dev/null 2>&1 && [[ "$(ps -p 1 -o comm=)" == "systemd" ]]; then
+        sudo systemctl stop docker 2>/dev/null || true
+        sudo systemctl stop containerd 2>/dev/null || true
+    else
+        sudo pkill -9 dockerd 2>/dev/null || true
+        sudo pkill -9 containerd 2>/dev/null || true
+    fi
+    sudo rm -rf /var/lib/docker /var/lib/containerd 2>/dev/null || true
+    sudo mkdir -p /var/lib/docker/overlay2/l /var/lib/containerd 2>/dev/null || true
+    sudo chown -R root:root /var/lib/docker /var/lib/containerd 2>/dev/null || true
+    if command -v systemctl >/dev/null 2>&1 && [[ "$(ps -p 1 -o comm=)" == "systemd" ]]; then
+        sudo systemctl start containerd 2>/dev/null || true
+        sudo systemctl start docker 2>/dev/null || true
+    else
+        _start_dockerd_nonsystemd || true
+    fi
+    local tries=0; local max=20
+    until docker info >/dev/null 2>&1; do
+        sleep 2; tries=$((tries+1)); [[ $tries -ge $max ]] && break
+    done
+    if ! docker info >/dev/null 2>&1; then
+        log_error "❌ Docker no arrancó tras hard reset de almacenamiento"
         return 1
     fi
+    if ! docker pull --quiet busybox:latest >/dev/null 2>&1; then
+        log_error "❌ Docker pull sigue fallando tras hard reset"
+        return 1
+    fi
+    log_success "✅ Almacenamiento Docker inicializado correctamente"
+}
+
+# Arrancar dockerd en entornos sin systemd (p.ej., WSL o contenedores)
+_start_dockerd_nonsystemd() {
+    # Matar dockerd previo si existe
+    sudo pkill -9 dockerd 2>/dev/null || true
+    # Asegurar socket libre
+    sudo rm -f /var/run/docker.pid /var/run/docker.sock 2>/dev/null || true
+    # Lanzar dockerd con data-root nuevo y overlay2
+    local daemon_log="/tmp/dockerd-start.log"
+    sudo nohup dockerd \
+      --data-root=/var/lib/docker-data \
+      --storage-driver=overlay2 \
+      --host=unix:///var/run/docker.sock \
+      --host=tcp://0.0.0.0:2375 \
+      >"$daemon_log" 2>&1 &
+    # Esperar a que responda
+    local tries=0; local max=30
+    until docker info >/dev/null 2>&1; do
+        sleep 1; tries=$((tries+1)); [[ $tries -ge $max ]] && break
+    done
+    if ! docker info >/dev/null 2>&1; then
+        log_warning "⚠️ dockerd no respondió en entorno sin systemd (ver $daemon_log)"
+        return 1
+    fi
+    return 0
+}
+
+# Asegurar que el módulo del kernel overlay está cargado
+_ensure_kernel_overlay_module() {
+    if lsmod 2>/dev/null | grep -q '^overlay'; then
+        return 0
+    fi
+    if command -v modprobe >/dev/null 2>&1; then
+        sudo modprobe overlay 2>/dev/null || true
+        lsmod 2>/dev/null | grep -q '^overlay'
+    else
+        return 0
+    fi
+}
+
+# Asegurar configuración básica de Docker para overlay2
+_ensure_docker_daemon_config_overlay2() {
+    local daemon_json="/etc/docker/daemon.json"
+    local data_root="/var/lib/docker-data"
+    sudo mkdir -p /etc/docker "$data_root" 2>/dev/null || true
+    # Siempre forzar overlay2 y un data-root fresco en from-scratch
+    cat <<EOF | sudo tee "$daemon_json" >/dev/null
+{
+  "storage-driver": "overlay2",
+  "data-root": "$data_root",
+  "log-driver": "json-file",
+  "log-opts": {"max-size": "100m"}
+}
+EOF
+    sudo chown -R root:root "$data_root" 2>/dev/null || true
+    return 0
 }
 
 # Inicializar Docker en WSL
@@ -316,7 +476,7 @@ _sum_requests_from_values_dir() {
         return 0
     fi
 
-    # Requiere GNU awk; si no está disponible, omitir y devolver 0 0
+    # Requiere GNU awk; si no está disponible, omitir y devolver 0 0 (silencioso)
     if ! awk --version 2>/dev/null | grep -qi "GNU Awk"; then
         echo "0 0"
         return 0
@@ -347,7 +507,7 @@ _sum_requests_from_values_dir() {
                 if ($0 ~ /memory:[[:space:]]*/) { gsub(/.*memory:[[:space:]]*/, "", $0); printf("MEM %s\n", $0) }
               }
             }
-        ' "$f")
+        ' "$f" 2>/dev/null)
     done
 
     echo "$total_cpu_m $total_mem_mi"

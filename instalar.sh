@@ -87,20 +87,27 @@ main() {
             echo "GitOps en Español Infrastructure v$GITOPS_VERSION"
             exit 0
             ;;
-        excelente)
-            # Modo excelencia: bootstrap + validación con reintentos
+        from-scratch)
+            # Reset total y luego instalación completa + validación sin intervención
+            echo "[FROM-SCRATCH] 🧹 Reset total (fase-00)"
+            ejecutar_fase_individual 00 || { log_error "Reset falló"; exit 1; }
+            echo "[FROM-SCRATCH] 🚀 Instalación completa"
+            if ! ejecutar_proceso_completo; then
+                echo "[FROM-SCRATCH] ❌ Falló la instalación completa" >&2; exit 1
+            fi
+            # Reintentos de validación final (fase-07)
             local intentos=0
             local max_intentos=3
             while (( intentos < max_intentos )); do
                 intentos=$((intentos+1))
-                echo "[EXCELENTE] Intento ${intentos}/${max_intentos}: fase-05 + fase-07"
-                if ejecutar_fase_individual 05 && ejecutar_fase_individual 07; then
-                    echo "[EXCELENTE] ✅ Instalación validada (Synced+Healthy + UIs accesibles)"
+                echo "[FROM-SCRATCH] Intento de validación ${intentos}/${max_intentos}: fase-07"
+                if ejecutar_fase_individual 07; then
+                    echo "[FROM-SCRATCH] ✅ Instalación validada (Synced+Healthy + UIs accesibles)"
                     exit 0
                 fi
-                echo "[EXCELENTE] Reintentando en 10s..."; sleep 10
+                echo "[FROM-SCRATCH] Reintentando en 15s..."; sleep 15
             done
-            echo "[EXCELENTE] ❌ No se logró validar la instalación tras ${max_intentos} intentos" >&2
+            echo "[FROM-SCRATCH] ❌ No se logró validar la instalación tras ${max_intentos} intentos" >&2
             exit 1
             ;;
         fase-*)
@@ -113,11 +120,29 @@ main() {
             fi
             ;;
         completo|"")
+            # Instalación EXCELENTE por defecto (desatendida):
+            # - Ejecuta TODAS las fases disponibles en orden (incluida 00-reset si existe)
+            # - Ejecuta validación final (fase-07) con reintentos para asegurar Synced+Healthy + UIs accesibles
             if [[ ${#args[@]} -gt 0 ]]; then
                 ejecutar_proceso_completo "${args[@]}"
             else
                 ejecutar_proceso_completo
             fi
+
+            # Reintentos de validación final (fase-07)
+            local intentos=0
+            local max_intentos=3
+            while (( intentos < max_intentos )); do
+                intentos=$((intentos+1))
+                echo "[COMPLETO] Intento de validación ${intentos}/${max_intentos}: fase-07"
+                if ejecutar_fase_individual 07; then
+                    echo "[COMPLETO] ✅ Instalación validada (Synced+Healthy + UIs accesibles)"
+                    exit 0
+                fi
+                echo "[COMPLETO] Reintentando en 15s..."; sleep 15
+            done
+            echo "[COMPLETO] ❌ No se logró validar la instalación tras ${max_intentos} intentos" >&2
+            exit 1
             ;;
         *)
             log_error "Comando desconocido: $comando"

@@ -23,7 +23,16 @@ main() {
         show_dependencies_summary
     else
         log_info "🔧 Instalando dependencias faltantes..."
-        install_all_dependencies
+        if ! install_all_dependencies; then
+            log_error "❌ No fue posible instalar todas las dependencias"
+            return 1
+        fi
+        # Verificación final
+        if ! check_all_dependencies; then
+            log_error "❌ Dependencias aún incompletas tras la instalación"
+            return 1
+        fi
+        show_dependencies_summary
     fi
     
     log_success "✅ Fase 2 completada exitosamente"

@@ -31,9 +31,13 @@ ejecutar_proceso_completo_impl() {
         return 1
     fi
 
-    # Crear un array con las fases ordenadas
+    # Crear un array con las fases ordenadas (permitiendo omitir 00-* salvo que se solicite)
     local fases=()
     while IFS= read -r -d '' file; do
+        # Si es fase 00-* y no se pidió preparar entorno, saltarla
+        if [[ "$(basename "$file")" == 00-* ]] && [[ "${PREPARAR_ENTORNO:-false}" != "true" ]]; then
+            continue
+        fi
         fases+=("$file")
     done < <(find "$fases_dir" -maxdepth 1 -name "??-*.sh" -print0 | sort -z)
 
@@ -43,28 +47,21 @@ ejecutar_proceso_completo_impl() {
         return 0
     fi
 
-    # Ejecutar cada fase
+    # Ejecutar cada fase (fail-fast por defecto)
     for fase_script in "${fases[@]}"; do
         log_section "Ejecutando fase: $(basename "$fase_script")"
 
         # Usar 'source' para que la fase se ejecute en el mismo contexto de shell
         if ! source "$fase_script"; then
-            log_error "La fase '$(basename "$fase_script")' falló."
-            # Preguntar al usuario si desea continuar
-            if ! confirmar "Se ha producido un error. ¿Desea intentar continuar con la siguiente fase?"; then
-                log_error "Instalación abortada por el usuario."
-                return 1
-            fi
+            log_error "La fase '$(basename "$fase_script")' no pudo cargarse. Abortando (fail-fast)."
+            return 1
         fi
 
         # Convención: cada fase define función main(); ejecutarla tras el source
         if declare -F main >/dev/null 2>&1; then
             if ! main; then
-                log_error "La fase '$(basename "$fase_script")' retornó error."
-                if ! confirmar "¿Continuar con la siguiente fase?"; then
-                    log_error "Instalación abortada por el usuario."
-                    return 1
-                fi
+                log_error "La fase '$(basename "$fase_script")' retornó error. Abortando (fail-fast)."
+                return 1
             fi
         else
             log_warning "La fase '$(basename "$fase_script")' no define función main(); se continúa."
@@ -77,22 +74,6 @@ ejecutar_proceso_completo_impl() {
 
 verificar_dependencias_criticas() {
     check_all_dependencies
-}
-
-# Confirmación interactiva segura (auto-continúa en entornos no interactivos)
-confirmar() {
-    local prompt="${1:-¿Desea continuar? [S/n]}"
-    if [[ -t 0 ]]; then
-        read -r -p "$prompt " resp || true
-        case "${resp:-S}" in
-            s|S|si|SI|y|Y|yes|YES) return 0 ;;
-            *) return 1 ;;
-        esac
-    else
-        # No TTY: continuar por defecto
-        log_info "Entorno no interactivo: continuar por defecto"
-        return 0
-    fi
 }
 
 # Ejecutar una fase individual por número (ej: "01", "02", "05", etc.)

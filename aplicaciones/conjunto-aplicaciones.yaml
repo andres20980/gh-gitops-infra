@@ -8,7 +8,7 @@ metadata:
 spec:
   generators:
   - git:
-      repoURL: http://gitea-service/your-user/your-repo.git # CAMBIAR: URL del repositorio Gitea local
+      repoURL: http://gitea-http.gitea.svc.cluster.local/gitea/gitops-infra.git # CAMBIAR: URL del repositorio Gitea local
       revision: HEAD
       directories:
       - path: aplicaciones/*
@@ -21,7 +21,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: http://gitea-service/your-user/your-repo.git # CAMBIAR: URL del repositorio Gitea local
+        repoURL: http://gitea-http.gitea.svc.cluster.local/gitea/gitops-infra.git # CAMBIAR: URL del repositorio Gitea local
         targetRevision: HEAD
         path: '{{path}}'
         directory:

@@ -41,7 +41,13 @@ main() {
     log_info "Creando clusters mínimos pre/pro..."
     create_promotion_clusters || log_warning "Algunas creaciones de pre/pro fallaron"
 
-    # 4. Resumen
+    # 4. Mitigación DNS: si el host usa DNS privados, forzar CoreDNS a 1.1.1.1/8.8.8.8 en los tres clusters
+    log_info "Asegurando DNS funcional en clusters..."
+    ensure_cluster_dns "gitops-dev" || true
+    ensure_cluster_dns "gitops-pre" || true
+    ensure_cluster_dns "gitops-pro" || true
+
+    # 5. Resumen
     show_clusters_summary
     log_success "Fase 3 completada exitosamente"
 }

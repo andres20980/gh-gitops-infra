@@ -429,6 +429,48 @@ ensure_metrics_server() {
     setup_cluster_addons "$profile" ""
 }
 
+# Detectar si los nameservers del host son privados (RFC1918), lo que suele romper DNS en Docker/kind
+_host_has_private_dns() {
+    local ns
+    while read -r ns; do
+        case "$ns" in
+            10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[0-1].*) return 0 ;;
+        esac
+    done < <(grep -E '^nameserver ' /etc/resolv.conf | awk '{print $2}')
+    return 1
+}
+
+# Parchear CoreDNS para usar DNS públicos
+patch_coredns_upstreams_to_public() {
+    local ns1="${1:-1.1.1.1}" ns2="${2:-8.8.8.8}"
+    log_info "🧩 Parcheando CoreDNS para usar forwards: $ns1 $ns2"
+    if ! kubectl -n kube-system get configmap coredns >/dev/null 2>&1; then
+        log_warning "⚠️ ConfigMap coredns no encontrado"
+        return 1
+    fi
+    local tmp=/tmp/coredns.$$; kubectl -n kube-system get configmap coredns -o yaml > "$tmp"
+    # Sustituir cualquier línea forward . ... por forward . ns1 ns2
+    sed -i -E "s|forward \. .*|forward . ${ns1} ${ns2}|" "$tmp"
+    kubectl -n kube-system apply -f "$tmp" >/dev/null
+    kubectl -n kube-system rollout restart deployment coredns >/dev/null 2>&1 || true
+    log_success "✅ CoreDNS parcheado y reiniciado"
+}
+
+# Asegurar DNS del cluster funcional: si el host usa DNS privado, forzar públicos en CoreDNS
+ensure_cluster_dns() {
+    local profile="$1"
+    log_info "🔎 Verificando DNS del cluster $profile..."
+    kubectl config use-context "kind-${profile}" >/dev/null 2>&1 || true
+    if _host_has_private_dns; then
+        log_warning "⚠️ Nameservers privados detectados en el host; actualizando CoreDNS"
+        patch_coredns_upstreams_to_public 1.1.1.1 8.8.8.8 || true
+        # Esperar CoreDNS listo
+        kubectl -n kube-system rollout status deployment coredns --timeout=90s >/dev/null 2>&1 || true
+    else
+        log_info "✅ Nameservers del host parecen públicos; no se cambia CoreDNS"
+    fi
+}
+
 # ============================================================================
 # FUNCIONES DE CONTEXTO
 # ============================================================================

@@ -11,7 +11,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: http://gitea-service/your-user/your-repo.git # CAMBIAR: URL del repositorio Gitea local
+    repoURL: http://gitea-http.gitea.svc.cluster.local/gitea/gitops-infra.git # CAMBIAR: URL del repositorio Gitea local
     targetRevision: HEAD
     path: aplicaciones/proyecto-demostracion/manifests/backend
   destination:

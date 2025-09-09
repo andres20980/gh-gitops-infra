@@ -18,3 +18,8 @@ gitea:
   config:
     server:
       DISABLE_SSH: true
+    service:
+      REQUIRE_SIGNIN_VIEW: false
+    repository:
+      DEFAULT_PRIVATE: public
+      ALLOW_ANONYMOUS_GIT_ACCESS: true

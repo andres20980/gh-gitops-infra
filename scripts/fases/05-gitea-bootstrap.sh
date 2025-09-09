@@ -98,6 +98,11 @@ main() {
         git push -u gitea main >/dev/null 2>&1 || true
     )
 
+    # 5b) Forzar repo público por si la instancia requiere autenticación por defecto
+    log_info "🔓 Asegurando visibilidad pública del repo..."
+    curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
+        -X PATCH "$api/repos/$gitea_user/$repo_name" -d '{"private": false}' >/dev/null 2>&1 || true
+
     # 6) Reemplazar placeholders de repoURL con la URL interna del servicio Gitea (para uso dentro del cluster)
     # IMPORTANTE: el Service gitea-http suele exponer el puerto 3000; incluirlo en la URL
     local internal_repo_url="http://gitea-http.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"

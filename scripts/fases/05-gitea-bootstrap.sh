@@ -90,7 +90,8 @@ main() {
     )
 
     # 6) Reemplazar placeholders de repoURL con la URL interna del servicio Gitea (para uso dentro del cluster)
-    local internal_repo_url="http://gitea-http.gitea.svc.cluster.local/$gitea_user/$repo_name.git"
+    # IMPORTANTE: el Service gitea-http suele exponer el puerto 3000; incluirlo en la URL
+    local internal_repo_url="http://gitea-http.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"
     log_info "📝 Sustituyendo placeholders con: $internal_repo_url"
     find "$PROJECT_ROOT/argo-apps" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/aplicaciones" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
@@ -98,7 +99,7 @@ main() {
 
     # 7) Validación previa: comprobar que el repo es accesible desde el cluster (HTTP)
     #    Esto no prueba git clone, pero asegura conectividad básica a gitea-http.
-    local svc_url="http://gitea-http.gitea.svc.cluster.local"
+    local svc_url="http://gitea-http.gitea.svc.cluster.local:3000"
     kubectl -n argocd run --rm -i --tty gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \
         -sSf ${svc_url}/api/v1/version >/dev/null 2>&1 && \
         log_success "✅ Conectividad a Gitea desde el cluster verificada" || \

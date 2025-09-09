@@ -104,12 +104,33 @@ main() {
         -X PATCH "$api/repos/$gitea_user/$repo_name" -d '{"private": false}' >/dev/null 2>&1 || true
 
     # 6) Reemplazar placeholders de repoURL con la URL interna del servicio Gitea (para uso dentro del cluster)
-    # IMPORTANTE: el Service gitea-http suele exponer el puerto 3000; incluirlo en la URL
-    local internal_repo_url="http://gitea-http.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"
+    # IMPORTANTE: el Service gitea-http es headless; creamos un Service estable ClusterIP para endpoints Ready-only
+    log_info "🔧 Creando Service estable para Gitea (ClusterIP)"
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-http-stable
+  namespace: gitea
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: gitea
+    app.kubernetes.io/instance: gitea
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+EOF
+
+    # Usar el service estable para URLs internas
+    local internal_repo_url="http://gitea-http-stable.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"
     log_info "📝 Sustituyendo placeholders con: $internal_repo_url"
     find "$PROJECT_ROOT/argo-apps" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/aplicaciones" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/herramientas-gitops" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
+    # Reescribir si ya existía referencia a gitea-http headless
+    grep -RIl "gitea-http.gitea.svc.cluster.local:3000" "$PROJECT_ROOT" | xargs -r sed -i "s|http://gitea-http.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git|$internal_repo_url|g"
 
     # 6b) Publicar cambios de sustitución (asegura que Gitea contiene manifests correctos antes de Argo)
     log_info "🔁 Publicando cambios de placeholders en Gitea..."
@@ -122,7 +143,7 @@ main() {
     )
 
     # 7) Validación previa: conectividad y acceso git al repo desde el cluster
-    local svc_url="http://gitea-http.gitea.svc.cluster.local:3000"
+    local svc_url="http://gitea-http-stable.gitea.svc.cluster.local:3000"
     if kubectl -n argocd run --rm -i gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \
         -sSf ${svc_url}/api/v1/version >/dev/null 2>&1; then
         log_success "✅ Conectividad HTTP a Gitea OK"

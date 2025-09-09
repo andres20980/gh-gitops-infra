@@ -21,10 +21,21 @@ spec:
               cpu: 200m
               memory: 256Mi
           replicaCount: 1
+          # Evitar dependencias pesadas: usar SQLite y sin redis/postgres
+          persistence:
+            enabled: false
+          postgresql-ha:
+            enabled: false
+          postgresql:
+            enabled: false
+          redis-cluster:
+            enabled: false
+          valkey:
+            enabled: false
           gitea:
             admin:
               username: "admin"
-              password: "admin"
+              password: "admin1234"
             config:
               server:
                 DISABLE_SSH: true
@@ -34,6 +45,13 @@ spec:
                 DEFAULT_PRIVATE: public
                 ALLOW_ANONYMOUS_GIT_ACCESS: true
                 DISABLE_HTTP_GIT: false
+              database:
+                DB_TYPE: sqlite3
+                PATH: /data/gitea/gitea.db
+              cache:
+                ADAPTER: memory
+              session:
+                PROVIDER: memory
   destination:
     server: https://kubernetes.default.svc
     namespace: gitea

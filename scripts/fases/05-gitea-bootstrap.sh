@@ -58,7 +58,7 @@ main() {
         fi
     done
 
-    local gitea_user="admin" gitea_pass="admin" repo_name="gitops-infra"
+    local gitea_user="admin" gitea_pass="admin1234" repo_name="gitops-infra"
     local api="http://localhost:8088/api/v1"
 
     # Intento de autenticación: admin/admin; si falla probamos gitea/gitea
@@ -68,7 +68,7 @@ main() {
         # Intentar con admin/admin crear repo público; fallback a gitea/gitea
         if ! curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
             -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
-            gitea_user="gitea"; gitea_pass="gitea"
+        gitea_user="gitea"; gitea_pass="gitea"
             log_warning "⚠️ admin/admin no válido; probando gitea/gitea"
             # Rechequear existencia con nuevo usuario
             if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then

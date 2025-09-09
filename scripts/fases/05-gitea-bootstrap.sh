@@ -120,14 +120,36 @@ main() {
         log_error "❌ Conectividad HTTP a Gitea falló; no se aplicarán Applications"
         return 1
     fi
-    # Verificar git ls-remote (acceso al repo) desde el cluster
+    # Verificar git ls-remote (acceso al repo) desde el cluster (sin y con credenciales)
     local repo_http_url="${svc_url}/${gitea_user}/${repo_name}.git"
     if kubectl -n argocd run --rm -i gitea-git-check --image=alpine/git:latest --restart=Never -- \
         git ls-remote "$repo_http_url" >/dev/null 2>&1; then
-        log_success "✅ Acceso git al repositorio OK (ls-remote)"
+        log_success "✅ Acceso git anónimo al repositorio OK"
     else
-        log_error "❌ No se pudo acceder al repositorio via git HTTP: $repo_http_url"
-        return 1
+        log_warning "⚠️ Acceso git anónimo falló; configurando credenciales en ArgoCD"
+        # Crear Secret de repositorio en ArgoCD
+        cat <<EOF | kubectl apply -n argocd -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-gitea-gitops-infra
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  url: ${repo_http_url}
+  username: ${gitea_user}
+  password: ${gitea_pass}
+  type: git
+EOF
+        # Reintentar ls-remote con credenciales embebidas
+        if kubectl -n argocd run --rm -i gitea-git-check --image=alpine/git:latest --restart=Never -- \
+            git ls-remote "http://${gitea_user}:${gitea_pass}@${svc_url#http://}/${gitea_user}/${repo_name}.git" >/dev/null 2>&1; then
+            log_success "✅ Acceso git con credenciales OK (ls-remote)"
+        else
+            log_error "❌ No se pudo acceder al repositorio ni con credenciales: $repo_http_url"
+            return 1
+        fi
     fi
 
     # 8) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea

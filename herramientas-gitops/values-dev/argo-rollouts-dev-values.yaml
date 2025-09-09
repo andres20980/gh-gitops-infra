@@ -11,3 +11,4 @@ dashboard:
   enabled: true
   service:
     type: ClusterIP
+    port: 3100

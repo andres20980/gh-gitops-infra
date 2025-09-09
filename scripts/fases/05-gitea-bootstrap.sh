@@ -81,6 +81,7 @@ main() {
     log_info "📝 Sustituyendo placeholders con: $internal_repo_url"
     find "$PROJECT_ROOT/argo-apps" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/aplicaciones" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
+    find "$PROJECT_ROOT/herramientas-gitops" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
 
     # 7) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea
     local app_tools="$PROJECT_ROOT/argo-apps/aplicacion-de-herramientas-gitops.yaml"
@@ -108,4 +109,3 @@ main() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi
-

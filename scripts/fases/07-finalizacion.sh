@@ -35,7 +35,7 @@ main() {
     log_info "📝 PRÓXIMOS PASOS:"
     log_info "   1. Acceder a ArgoCD para gestionar aplicaciones"
     log_info "   2. Usar: ./scripts/accesos-herramientas.sh start"
-    log_info "   3. Generar apps: ./scripts/herramientas/generador-aplicaciones.sh"
+    log_info "   3. Revisar apps: argo-apps/ y aplicaciones/ (ya gestionadas por ArgoCD)"
     log_info "   4. Ver reporte: cat /tmp/gitops-final-report.txt"
     log_info ""
     log_info "📚 DOCUMENTACIÓN:"

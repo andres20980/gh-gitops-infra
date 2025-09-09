@@ -36,11 +36,10 @@ main() {
         ensure_metrics_server "gitops-dev"
     fi
 
-    # 3. Opcional: crear clusters mínimos de pre/pro si se solicita
-    if [[ "${CREAR_PREPRO:-false}" == "true" ]]; then
-        log_info "Creando clusters mínimos pre/pro..."
-        create_promotion_clusters || log_warning "Algunas creaciones de pre/pro fallaron"
-    fi
+    # 3. Crear clusters mínimos de pre/pro (por defecto activado)
+    #    Requisito del proyecto: disponer de gitops-pre y gitops-pro siempre
+    log_info "Creando clusters mínimos pre/pro..."
+    create_promotion_clusters || log_warning "Algunas creaciones de pre/pro fallaron"
 
     # 4. Resumen
     show_clusters_summary

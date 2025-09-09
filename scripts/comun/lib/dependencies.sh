@@ -19,6 +19,8 @@ readonly REQUIRED_TOOLS=(
     "kubectl:latest:Cliente Kubernetes"
     "helm:latest:Gestor de paquetes Kubernetes"
     "git:latest:Control de versiones"
+    "argocd:latest:CLI ArgoCD"
+    "jq:latest:Procesador JSON"
 )
 
 readonly DOCKER_SOURCES="/etc/apt/sources.list.d/docker.list"
@@ -88,6 +90,12 @@ check_tool() {
             ;;
         "git")
             current_version=$(git --version 2>/dev/null | grep -oP '(?<=version )\d+\.\d+\.\d+' || echo "0.0.0")
+            ;;
+        "argocd")
+            current_version=$(argocd version --client --short 2>/dev/null | grep -oP '(?<=v)\d+\.\d+\.\d+' || echo "0.0.0")
+            ;;
+        "jq")
+            current_version=$(jq --version 2>/dev/null | grep -oP '(?<=jq-)\d+\.\d+(\.\d+)?' | head -1 || echo "0.0.0")
             ;;
         *)
             log_error "Herramienta no soportada: $tool"
@@ -301,6 +309,8 @@ install_tool() {
         "kind") install_kind ;;
         "helm") install_helm ;;
         "git") install_git ;;
+        "argocd") install_argocd_cli ;;
+        "jq") install_jq ;;
         *) 
             log_error "Instalador no disponible para: $tool"
             return 1
@@ -312,6 +322,42 @@ install_tool() {
         return 0
     else
     log_error "Falló la verificación post-instalación de $tool"
+        return 1
+    fi
+}
+
+# Instalar jq
+install_jq() {
+    log_info "Instalando jq..."
+    sudo apt-get update
+    sudo apt-get install -y jq
+    log_success "jq instalado"
+}
+
+# Instalar ArgoCD CLI más reciente
+install_argocd_cli() {
+    log_info "Instalando ArgoCD CLI..."
+    local version arch os
+    # Resolver arquitectura
+    case "$(uname -m)" in
+        x86_64) arch="amd64" ;;
+        aarch64|arm64) arch="arm64" ;;
+        *) arch="amd64" ;;
+    esac
+    os="linux"
+    # Intentar obtener última versión estable desde GitHub API (si no, usar estable conocida)
+    local url
+    url="https://github.com/argoproj/argo-cd/releases/latest/download/argocd-${os}-${arch}"
+    curl -fsSLo /tmp/argocd "$url" || {
+        log_warning "No se pudo descargar última versión; intentando fallback v2.11.0"
+        curl -fsSLo /tmp/argocd "https://github.com/argoproj/argo-cd/releases/download/v2.11.0/argocd-${os}-${arch}"
+    }
+    chmod +x /tmp/argocd
+    sudo mv /tmp/argocd /usr/local/bin/argocd
+    if command -v argocd >/dev/null 2>&1; then
+        log_success "ArgoCD CLI instalada"
+    else
+        log_error "ArgoCD CLI no quedó instalada"
         return 1
     fi
 }
@@ -375,6 +421,8 @@ show_dependencies_summary() {
                     ;;
                 "helm") version=$(helm version 2>/dev/null | grep -oP '(?<=Version:"v)\d+\.\d+' || echo "N/A") ;;
                 "git") version=$(git --version 2>/dev/null | grep -oP '(?<=version )\d+\.\d+' || echo "N/A") ;;
+                "argocd") version=$(argocd version --client --short 2>/dev/null | grep -oP '(?<=v)\d+\.\d+' | head -1 || echo "N/A") ;;
+                "jq") version=$(jq --version 2>/dev/null | grep -oP '(?<=jq-)\d+\.\d+' || echo "N/A") ;;
                 *) version="N/A" ;;
             esac
             log_info "    $tool v$version - $description"

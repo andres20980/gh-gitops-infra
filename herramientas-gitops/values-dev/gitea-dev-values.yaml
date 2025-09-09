@@ -7,3 +7,14 @@ resources:
     cpu: 200m
     memory: 256Mi
 replicaCount: 1
+
+# Preferencias mínimas para entorno local sin complicaciones.
+# Si el chart soporta creación de admin, intentamos usar admin/admin.
+# En caso contrario, se podrá ajustar manualmente en el primer acceso.
+gitea:
+  admin:
+    username: "admin"
+    password: "admin"
+  config:
+    server:
+      DISABLE_SSH: true

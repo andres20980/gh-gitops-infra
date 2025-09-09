@@ -507,8 +507,16 @@ install_gitops_stack() {
         expose_argocd || true
     fi
     
-    # 3. Instalar herramientas GitOps
-    install_all_gitops_tools
+    # 3. Declarar herramientas vía Argo Application (App-of-Tools)
+    local app_tools_file="$PROJECT_ROOT/argo-apps/aplicacion-de-herramientas-gitops.yaml"
+    if [[ -f "$app_tools_file" ]]; then
+        log_info "📦 Aplicando Application de herramientas GitOps"
+        kubectl apply -f "$app_tools_file"
+        # Esperar que las apps queden en estado Synced/Healthy
+        wait_all_apps_healthy argocd 600 || true
+    else
+        log_warning "⚠️ No se encontró $app_tools_file; omitiendo despliegue de herramientas"
+    fi
     
     # 4. Mostrar información final
     show_argocd_access
@@ -543,4 +551,48 @@ show_gitops_summary() {
             log_info "  ❌ $tool ($category)"
         fi
     done
+}
+
+# Registrar clusters adicionales (pre y pro) en ArgoCD para despliegue multi-cluster
+register_additional_clusters() {
+    if ! command -v argocd >/dev/null 2>&1; then
+        log_warning "⚠️ ArgoCD CLI no está instalada; no se pueden registrar clusters automáticamente"
+        return 0
+    fi
+
+    # Asegurar CLI logueada y server accesible
+    setup_argocd_cli || true
+
+    local contexts=("kind-gitops-pre" "kind-gitops-pro")
+    for ctx in "${contexts[@]}"; do
+        if kubectl config get-contexts "$ctx" >/dev/null 2>&1; then
+            log_info "🔗 Registrando cluster en ArgoCD: $ctx"
+            if argocd cluster add "$ctx" --yes >/dev/null 2>&1; then
+                log_success "✅ Cluster registrado: $ctx"
+            else
+                log_warning "⚠️ No se pudo registrar el cluster $ctx (quizá ya existe)"
+            fi
+        else
+            log_warning "⚠️ Contexto no encontrado y no registrado: $ctx"
+        fi
+    done
+}
+
+# Esperar a que todas las Applications estén Sync/Healthy
+wait_all_apps_healthy() {
+    local ns="${1:-argocd}" timeout="${2:-300}" sleep_s=5 waited=0
+    log_info "⏳ Esperando Applications (Sync+Healthy) en namespace $ns..."
+    while (( waited < timeout )); do
+        # Contar apps no healthy o out-of-sync
+        local bad
+        bad=$(kubectl get applications -n "$ns" -o json 2>/dev/null | jq -r \
+            '[.items[] | select(.status.sync.status != "Synced" or .status.health.status != "Healthy")] | length' 2>/dev/null || echo "0")
+        if [[ "$bad" == "0" ]]; then
+            log_success "✅ Todas las Applications están Synced + Healthy"
+            return 0
+        fi
+        sleep "$sleep_s"; waited=$((waited+sleep_s))
+    done
+    log_warning "⚠️ Timeout esperando Applications Synced+Healthy (continuando)"
+    return 1
 }

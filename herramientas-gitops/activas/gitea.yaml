@@ -14,7 +14,9 @@ spec:
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/gitea-dev-values.yaml
-    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
+    # El repositorio para los values debe apuntar a la misma fuente de verdad (Gitea local).
+    # Este placeholder será sustituido automáticamente en la fase de bootstrap.
+    - repoURL: http://gitea-service/your-user/your-repo.git
       targetRevision: HEAD
       ref: values
       path: .

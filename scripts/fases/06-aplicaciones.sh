@@ -14,7 +14,8 @@ set -euo pipefail
 # CONFIGURACIÓN DE APLICACIONES
 # ============================================================================
 
-readonly APLICACIONES_DIR="/home/asanchez/gh-gitops-infra/aplicaciones"
+# Usar la raíz del proyecto detectada por el sistema DRY
+readonly APLICACIONES_DIR="${PROJECT_ROOT}/aplicaciones"
 
 # ============================================================================
 # FASE 6: APLICACIONES

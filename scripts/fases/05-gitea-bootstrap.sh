@@ -62,13 +62,22 @@ main() {
     local api="http://localhost:8088/api/v1"
 
     # Intento de autenticación: admin/admin; si falla probamos gitea/gitea
-    log_info "📚 Creando repositorio en Gitea: $repo_name"
-    if ! curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
-        -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
-        gitea_user="gitea"; gitea_pass="gitea"
-        log_warning "⚠️ admin/admin no válido; probando gitea/gitea"
-        curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
-            -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
+    log_info "📚 Asegurando repositorio en Gitea: $repo_name"
+    # Comprobar si existe
+    if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+        # Intentar con admin/admin crear repo público; fallback a gitea/gitea
+        if ! curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
+            -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
+            gitea_user="gitea"; gitea_pass="gitea"
+            log_warning "⚠️ admin/admin no válido; probando gitea/gitea"
+            # Rechequear existencia con nuevo usuario
+            if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+                curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
+                    -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
+            fi
+        fi
+    else
+        log_info "✅ Repositorio ya existe: $gitea_user/$repo_name"
     fi
 
     # 5) Empujar contenido local al nuevo remoto
@@ -97,13 +106,24 @@ main() {
     find "$PROJECT_ROOT/aplicaciones" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
     find "$PROJECT_ROOT/herramientas-gitops" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
 
-    # 7) Validación previa: comprobar que el repo es accesible desde el cluster (HTTP)
-    #    Esto no prueba git clone, pero asegura conectividad básica a gitea-http.
+    # 7) Validación previa: conectividad y acceso git al repo desde el cluster
     local svc_url="http://gitea-http.gitea.svc.cluster.local:3000"
-    kubectl -n argocd run --rm -i --tty gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \
-        -sSf ${svc_url}/api/v1/version >/dev/null 2>&1 && \
-        log_success "✅ Conectividad a Gitea desde el cluster verificada" || \
-        log_warning "⚠️ No se pudo verificar conectividad a Gitea desde el cluster (curl pod)"
+    if kubectl -n argocd run --rm -i gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \
+        -sSf ${svc_url}/api/v1/version >/dev/null 2>&1; then
+        log_success "✅ Conectividad HTTP a Gitea OK"
+    else
+        log_error "❌ Conectividad HTTP a Gitea falló; no se aplicarán Applications"
+        return 1
+    fi
+    # Verificar git ls-remote (acceso al repo) desde el cluster
+    local repo_http_url="${svc_url}/${gitea_user}/${repo_name}.git"
+    if kubectl -n argocd run --rm -i gitea-git-check --image=alpine/git:latest --restart=Never -- \
+        git ls-remote "$repo_http_url" >/dev/null 2>&1; then
+        log_success "✅ Acceso git al repositorio OK (ls-remote)"
+    else
+        log_error "❌ No se pudo acceder al repositorio via git HTTP: $repo_http_url"
+        return 1
+    fi
 
     # 8) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea
     local app_tools="$PROJECT_ROOT/argo-apps/aplicacion-de-herramientas-gitops.yaml"

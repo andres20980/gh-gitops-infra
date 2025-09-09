@@ -582,17 +582,59 @@ register_additional_clusters() {
 wait_all_apps_healthy() {
     local ns="${1:-argocd}" timeout="${2:-300}" sleep_s=5 waited=0
     log_info "⏳ Esperando Applications (Sync+Healthy) en namespace $ns..."
+
+    # Verificar que el CRD esté disponible
+    if ! kubectl api-resources | grep -q "applications.argoproj.io" 2>/dev/null; then
+        log_warning "⚠️ CRD Application no disponible aún; esperando a ArgoCD"
+    fi
+
+    # Esperar a que haya al menos 1 Application (hasta 60s), para evitar bucles vacíos
+    local has_apps=false start_check=$SECONDS
+    while (( SECONDS - start_check < 60 )); do
+        local count
+        count=$(kubectl get applications -n "$ns" --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo 0)
+        if [[ "$count" =~ ^[0-9]+$ ]] && (( count > 0 )); then
+            has_apps=true; break
+        fi
+        sleep 2
+    done
+
     while (( waited < timeout )); do
-        # Contar apps no healthy o out-of-sync
-        local bad
-        bad=$(kubectl get applications -n "$ns" -o json 2>/dev/null | jq -r \
-            '[.items[] | select(.status.sync.status != "Synced" or .status.health.status != "Healthy")] | length' 2>/dev/null || echo "0")
-        if [[ "$bad" == "0" ]]; then
+        # Obtener listado de apps y detectar no healthy / out-of-sync
+        local bad_json bad_count
+        bad_json=$(kubectl get applications -n "$ns" -o json 2>/dev/null | jq -r '
+          [.items[] | select(.status.sync.status != "Synced" or .status.health.status != "Healthy") | {name: .metadata.name, sync: .status.sync.status, health: .status.health.status}]'
+          2>/dev/null || echo '[]')
+        bad_count=$(jq -r 'length' <<<"$bad_json" 2>/dev/null || echo 0)
+
+        # Si no hay apps y no hubo ninguna, considerar éxito (nada que esperar)
+        if ! $has_apps; then
+            log_success "✅ No hay Applications que esperar (continuando)"
+            return 0
+        fi
+
+        if [[ "$bad_count" == "0" ]]; then
             log_success "✅ Todas las Applications están Synced + Healthy"
             return 0
         fi
+
+        # Mostrar progreso cada iteración
+        log_info "⌛ Apps pendientes: $bad_count"
+        jq -r '.[] | "  - \(.name): sync=\(.sync) health=\(.health)"' <<<"$bad_json" 2>/dev/null || true
+
+        # Intentar sincronizar las que faltan si tenemos CLI disponible
+        if command -v argocd >/dev/null 2>&1; then
+            while read -r appname; do
+                [[ -z "$appname" ]] && continue
+                log_info "🔁 Sincronizando app: $appname"
+                argocd app sync "$appname" --timeout 120 >/dev/null 2>&1 || true
+            done < <(jq -r '.[].name' <<<"$bad_json" 2>/dev/null)
+        fi
+
         sleep "$sleep_s"; waited=$((waited+sleep_s))
     done
-    log_warning "⚠️ Timeout esperando Applications Synced+Healthy (continuando)"
+    log_warning "⚠️ Timeout esperando Applications Synced+Healthy"
+    # Mostrar último estado para diagnóstico
+    kubectl get applications -n "$ns" || true
     return 1
 }

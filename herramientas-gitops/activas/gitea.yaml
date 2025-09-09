@@ -33,6 +33,7 @@ spec:
               repository:
                 DEFAULT_PRIVATE: public
                 ALLOW_ANONYMOUS_GIT_ACCESS: true
+                DISABLE_HTTP_GIT: false
   destination:
     server: https://kubernetes.default.svc
     namespace: gitea

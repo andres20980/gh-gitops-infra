@@ -9,15 +9,42 @@ mkdir -p "$VENDOR_DIR"
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "Falta dependencia: $1" >&2; exit 1; }; }
 need helm; need awk; need sed; need jq
 
+vendor_known() {
+  # Loki
+  mkdir -p "$VENDOR_DIR/loki"
+  if [[ ! -d "$VENDOR_DIR/loki/5.44.0" ]]; then
+    helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
+    helm repo update grafana >/dev/null 2>&1 || true
+    helm pull grafana/loki --version 5.44.0 --untar --untardir "$VENDOR_DIR/loki"
+    echo "[vendor] loki@5.44.0"
+  fi
+  # Kargo
+  mkdir -p "$VENDOR_DIR/kargo"
+  if [[ ! -d "$VENDOR_DIR/kargo/0.6.0" ]]; then
+    helm repo add kargo https://charts.kargo.akuity.io >/dev/null 2>&1 || true
+    helm repo update kargo >/dev/null 2>&1 || true
+    helm pull kargo/kargo --version 0.6.0 --untar --untardir "$VENDOR_DIR/kargo"
+    echo "[vendor] kargo@0.6.0"
+  fi
+}
+
 # vendor_one <app_yaml>
 vendor_one(){
   local app_file="$1"
   local chart repo ver name subdir
   # Extraer del application YAML (primer source tipo repo Helm)
-  repo="$(awk '/^\s*sources?:\s*$/{in=1;next} in && /repoURL: (http|https):\/\//{print $2; exit} in && /^\s*[^- ]/{in=0}' "$app_file" | tr -d '"')"
+  repo="$(awk '
+    /^\s*sources?:\s*$/ {in=1; next}
+    in && /repoURL:/ {print $2; exit}
+    in && /^\s*[^- ]/ {in=0}
+  ' "$app_file" | tr -d '"')"
   chart="$(awk '/^\s*sources?:\s*$/{in=1;next} in && /chart: /{print $2; exit} in && /^\s*[^- ]/{in=0}' "$app_file" | tr -d '"')"
   ver="$(awk '/^\s*sources?:\s*$/{in=1;next} in && /targetRevision: /{print $2; exit} in && /^\s*[^- ]/{in=0}' "$app_file" | tr -d '"')"
-  [[ -z "$repo" || -z "$chart" || -z "$ver" ]] && { echo "[skip] No se pudo extraer repo/chart/version de $app_file" >&2; return 0; }
+  if [[ -z "$repo" || -z "$chart" || -z "$ver" ]]; then
+    echo "[warn] $app_file: no se pudo extraer repo/chart/version; usando vendor_known()" >&2
+    vendor_known
+    return 0
+  fi
   name="$chart"
   subdir="$VENDOR_DIR/$name/$ver"
   if [[ -d "$subdir" ]]; then
@@ -60,7 +87,11 @@ if [[ $# -gt 0 ]]; then
   for f in "$@"; do vendor_one "$f"; done
 else
   # Vendorizar todos los Application manifests activos que referencien charts helm
-  while IFS= read -r -d '' f; do vendor_one "$f"; done < <(find "$ROOT_DIR/herramientas-gitops/activas" -maxdepth 1 -type f -name '*.yaml' -print0)
+  any=0
+  while IFS= read -r -d '' f; do vendor_one "$f"; any=1; done < <(find "$ROOT_DIR/herramientas-gitops/activas" -maxdepth 1 -type f -name '*.yaml' -print0)
+  if [[ "$any" == "0" ]]; then
+    vendor_known
+  fi
 fi
 
 echo "[done] charts vendorizados en $VENDOR_DIR"

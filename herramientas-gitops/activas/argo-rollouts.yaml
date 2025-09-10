@@ -28,6 +28,10 @@ spec:
         - /spec/versions
         - /spec/conversion
         - /metadata/annotations
+      jqPathExpressions:
+        - .spec.versions[].schema.openAPIV3Schema
+        - .spec.conversion
+        - .metadata.annotations
   syncPolicy:
     automated:
       prune: true

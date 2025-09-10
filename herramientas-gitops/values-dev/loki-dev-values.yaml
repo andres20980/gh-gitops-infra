@@ -14,6 +14,10 @@ service:
 
 # Configuración mínima para Loki con filesystem en entorno local
 loki:
+  # Imagen explícita para evitar valores nil en helpers
+  image:
+    repository: grafana/loki
+    tag: "2.9.6"
   # for chart 5.x, ensure single binary mode
 deploymentMode: SingleBinary
 singleBinary:
@@ -55,3 +59,10 @@ write:
 
 persistence:
   enabled: false
+
+# Desactivar dashboards/monitoring para simplificar en dev
+monitoring:
+  dashboards:
+    enabled: false
+  serviceMonitor:
+    enabled: false

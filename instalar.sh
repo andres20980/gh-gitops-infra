@@ -90,7 +90,7 @@ main() {
         from-scratch)
             # Reset total y luego instalación completa + validación sin intervención
             echo "[FROM-SCRATCH] 🧹 Reset total (fase-00)"
-            ejecutar_fase_individual 00 || { log_error "Reset falló"; exit 1; }
+            ejecutar_fase_individual 00 --yes || { log_error "Reset falló"; exit 1; }
             echo "[FROM-SCRATCH] 🚀 Instalación completa"
             if ! ejecutar_proceso_completo; then
                 echo "[FROM-SCRATCH] ❌ Falló la instalación completa" >&2; exit 1

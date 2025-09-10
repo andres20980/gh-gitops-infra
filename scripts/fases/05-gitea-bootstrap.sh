@@ -125,12 +125,20 @@ EOF
 
     # Usar el service estable para URLs internas
     local internal_repo_url="http://gitea-http-stable.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"
-    log_info "📝 Sustituyendo placeholders con: $internal_repo_url"
-    find "$PROJECT_ROOT/argo-apps" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
-    find "$PROJECT_ROOT/aplicaciones" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
-    find "$PROJECT_ROOT/herramientas-gitops" -type f -name "*.yaml" -print0 | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
-    # Reescribir si ya existía referencia a gitea-http headless
-    grep -RIl "gitea-http.gitea.svc.cluster.local:3000" "$PROJECT_ROOT" | xargs -r sed -i "s|http://gitea-http.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git|$internal_repo_url|g"
+    log_info "📝 Sustituyendo URLs de repo hacia: $internal_repo_url"
+    # Placeholder genérico
+    find "$PROJECT_ROOT" -type f -name "*.yaml" -print0 \
+      | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
+    # Variantes conocidas sin puerto, con hostname antiguo y/o ruta con 'gitea/'
+    grep -RIl "http://gitea-http\.gitea\.svc\.cluster\.local" "$PROJECT_ROOT" 2>/dev/null \
+      | xargs -r sed -i \
+        -e "s|http://gitea-http.gitea.svc.cluster.local/$gitea_user/$repo_name.git|$internal_repo_url|g" \
+        -e "s|http://gitea-http.gitea.svc.cluster.local/gitea/$repo_name.git|$internal_repo_url|g" \
+        -e "s|http://gitea-http.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git|$internal_repo_url|g"
+    # Variantes sobre hostname estable pero sin puerto explícito
+    grep -RIl "http://gitea-http-stable\.gitea\.svc\.cluster\.local" "$PROJECT_ROOT" 2>/dev/null \
+      | xargs -r sed -i \
+        -e "s|http://gitea-http-stable.gitea.svc.cluster.local/$gitea_user/$repo_name.git|$internal_repo_url|g"
 
     # 6b) Publicar cambios de sustitución (asegura que Gitea contiene manifests correctos antes de Argo)
     log_info "🔁 Publicando cambios de placeholders en Gitea..."

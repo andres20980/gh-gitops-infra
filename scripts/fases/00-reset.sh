@@ -12,6 +12,31 @@ set -euo pipefail
 main() {
     log_section "🧹 FASE 0: Reset Limpio del Entorno"
 
+    # Confirmación fuerte salvo ejecución no interactiva con --yes o variable
+    local force="false"
+    while [[ ${1:-} ]]; do
+      case "$1" in
+        --yes|-y) force="true"; shift ;;
+        *) shift ;;
+      esac
+    done
+    if [[ "${GITOPS_FORCE_RESET:-}" == "true" || "${GITOPS_FORCE_RESET:-}" == "1" ]]; then
+      force="true"
+    fi
+    if [[ "$force" != "true" ]]; then
+      if [[ -t 0 ]]; then
+        echo "ADVERTENCIA: Esta acción eliminará clusters kind, binarios (kubectl/helm/kind/argocd) y datos Docker/containerd." >&2
+        read -r -p "¿Deseas continuar? Escribe 'YES' para confirmar: " ans
+        if [[ "$ans" != "YES" ]]; then
+          log_warning "Reset cancelado por el usuario"
+          return 0
+        fi
+      else
+        log_error "Fase 0 requiere confirmación. Reintenta con --yes o GITOPS_FORCE_RESET=true"
+        return 1
+      fi
+    fi
+
     # 0. Detener port-forwards locales (rangos 8080-8091 y conocidos)
     log_info "Deteniendo port-forwards en puertos 8080-8091..."
     for p in $(seq 8080 8091); do

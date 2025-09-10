@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
 APPS_DIR="$ROOT_DIR/herramientas-gitops/activas"
+APPS_DIR2="$ROOT_DIR/aplicaciones"
 WRITE=false
 ONLY_FILE=""
 
@@ -29,17 +30,40 @@ files=()
 if [[ -n "$ONLY_FILE" ]]; then
   files=("$ONLY_FILE")
 else
-  mapfile -t files < <(find "$APPS_DIR" -maxdepth 1 -type f -name '*.yaml' | sort)
+  # Manifests de herramientas activas
+  while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$APPS_DIR" -maxdepth 1 -type f -name '*.yaml' -print0)
+  # Manifests de aplicaciones que referencian charts directamente
+  while IFS= read -r -d '' f; do files+=("$f"); done < <(find "$APPS_DIR2" -type f -name '*.yaml' -print0)
 fi
 
 pin_file(){
   local file="$1"
-  # Extraer primer repoURL y chart bajo 'sources:' (primer item)
+  # Extraer repoURL y chart del primer bloque. Soporta 'sources:' (lista) o 'source:' (objeto)
   local repo chart
-  repo="$(awk '/^\s*sources:\s*$/{flag=1;next} flag && /repoURL:/{print $2; exit} flag && /^\s*[^- ]/{flag=0}' "$file" | tr -d '"')"
-  chart="$(awk '/^\s*sources:\s*$/{flag=1;next} flag && /chart:/{print $2; exit} flag && /^\s*[^- ]/{flag=0}' "$file" | tr -d '"')"
+  repo="$(awk '
+    /^\s*sources:\s*$/ {in=1; next}
+    in && /^\s*-\s*repoURL:/ {gsub(/repoURL: */,"",$0); gsub(/"/,"",$0); print $0; exit}
+    in && /^\s*[^ -]/ {in=0}
+    /^\s*source:\s*$/ {in2=1; next}
+    in2 && /^\s*repoURL:/ {gsub(/repoURL: */,"",$0); gsub(/"/,"",$0); print $0; exit}
+    in2 && /^\s*[^ ]/ {in2=0}
+  ' "$file")"
+  chart="$(awk '
+    /^\s*sources:\s*$/ {in=1; next}
+    in && /^\s*-\s*repoURL:/ {seen=1}
+    in && seen && /^\s*chart:/ {gsub(/chart: */,"",$0); gsub(/"/,"",$0); print $0; exit}
+    in && /^\s*[^ -]/ {in=0}
+    /^\s*source:\s*$/ {in2=1; next}
+    in2 && /^\s*chart:/ {gsub(/chart: */,"",$0); gsub(/"/,"",$0); print $0; exit}
+    in2 && /^\s*[^ ]/ {in2=0}
+  ' "$file")"
   if [[ -z "$repo" || -z "$chart" ]]; then
     echo "[skip] $file: no se pudo extraer repoURL/chart" >&2
+    return 0
+  fi
+  # Ignorar repos internos de Gitea u otros repos no Helm
+  if grep -qi 'gitea\.svc\.cluster\.local' <<<"$repo"; then
+    echo "[skip] $file: repo interno ($repo)" >&2
     return 0
   fi
   # Derivar alias del repo a partir del host y path
@@ -53,7 +77,7 @@ pin_file(){
   # Buscar última versión estable
   local name latest
   name="$alias/$chart"
-  latest="$(helm search repo "$name" --versions -o json 2>/dev/null | jq -r --arg n "$name" '[.[] | select(.name==$n) | .version | select(test("-")|not)][0] // (.[0].version // "")')"
+  latest="$(helm search repo "$name" --versions -o json 2>/dev/null | jq -r --arg n "$name" '[.[] | select(.name==$n) | .version | select(test("-rc|-alpha|-beta")|not)][0] // (.[0].version // "")')"
   if [[ -z "$latest" ]]; then
     echo "[warn] $file: no se pudo resolver versión para $name" >&2
     return 0
@@ -63,15 +87,23 @@ pin_file(){
     # Reemplazar la primera targetRevision dentro del primer bloque de source
     local tmp; tmp="$(mktemp)"
     awk -v chart="$chart" -v ver="$latest" '
-      BEGIN{in_sources=0; in_first=0; pinned=0}
+      BEGIN{in_sources=0; in_first=0; in_source=0; pinned=0; matched_chart=0}
       /^\s*sources:\s*$/ {in_sources=1}
       in_sources && /^\s*-\s*repoURL:/ {in_first=1}
-      in_first && /^\s*chart:\s*/ {
-        if ($2==chart) { in_chart=1 } else { in_chart=0 }
+      in_sources && in_first && /^\s*chart:\s*/ {
+        matched_chart=($2==chart)
       }
-      in_chart && /^\s*targetRevision:\s*/ && pinned==0 {
+      in_sources && matched_chart && /^\s*targetRevision:\s*/ && pinned==0 {
         sub(/targetRevision:.*/, "      targetRevision: \"" ver "\""); pinned=1
       }
+      in_sources && /^\s*[^ -]/ {in_sources=0}
+      
+      /^\s*source:\s*$/ {in_source=1}
+      in_source && /^\s*chart:\s*/ { matched_chart=($2==chart) }
+      in_source && matched_chart && /^\s*targetRevision:\s*/ && pinned==0 {
+        sub(/targetRevision:.*/, "    targetRevision: \"" ver "\""); pinned=1
+      }
+      in_source && /^\s*[^ ]/ {in_source=0}
       { print }
     ' "$file" > "$tmp" && mv "$tmp" "$file"
   fi
@@ -84,4 +116,3 @@ done
 if ! $WRITE; then
   echo "(uso --write para aplicar cambios)" >&2
 fi
-

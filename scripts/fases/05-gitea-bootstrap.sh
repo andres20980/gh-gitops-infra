@@ -150,6 +150,29 @@ EOF
         git push -u gitea main >/dev/null 2>&1 || true
     )
 
+    # 6c) (Nuevo) Pin de versiones Helm: fija targetRevision a la última estable antes de aplicar herramientas
+    if [[ -x "$PROJECT_ROOT/scripts/utilidades/pin-helm-versions.sh" ]]; then
+        log_info "📌 Pinneando versiones de charts Helm (latest estable) antes del despliegue..."
+        if "$PROJECT_ROOT/scripts/utilidades/pin-helm-versions.sh" --write >/dev/null 2>&1; then
+            (
+                set -e
+                cd "$PROJECT_ROOT"
+                if ! git diff --quiet; then
+                    git add -A
+                    git commit -m "chore(helm): pin charts a versiones estables antes de aplicar herramientas" >/dev/null 2>&1 || true
+                    git push -u gitea main >/dev/null 2>&1 || true
+                    log_success "✅ Charts pinneados y publicados en Gitea"
+                else
+                    log_info "ℹ️ No hay cambios de pin de versiones"
+                fi
+            )
+        else
+            log_warning "⚠️ No se pudo pinnear versiones de charts (verifica conectividad helm)"
+        fi
+    else
+        log_info "ℹ️ Script de pin de versiones no encontrado; omitiendo"
+    fi
+
     # 7) Validación previa: conectividad y acceso git al repo desde el cluster
     local svc_url="http://gitea-http-stable.gitea.svc.cluster.local:3000"
     if kubectl -n argocd run --rm -i gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \

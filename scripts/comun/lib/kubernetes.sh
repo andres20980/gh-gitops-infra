@@ -24,6 +24,10 @@ readonly MINIKUBE_DRIVER="docker"
 readonly MINIKUBE_NETWORK="bridge" 
 readonly DOCKER_DAEMON_TIMEOUT=60
 
+# Versiones fijas para addons de cluster
+readonly INGRESS_NGINX_KIND_URL="https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/kind/deploy.yaml"
+readonly METRICS_SERVER_URL="https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml"
+
 # Ajustes dinámicos
 : "${DYNAMIC_DEV_SIZING:=true}"   # true/false: auto dimensionar dev
 : "${CLUSTER_DEV_CPUS:=}"         # override explícito CPUs dev
@@ -567,11 +571,11 @@ setup_cluster_addons() {
     
     kubectl config use-context "kind-${profile}"
 
-    log_info "🔌 Instalando NGINX Ingress Controller..."
-    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+    log_info "🔌 Instalando NGINX Ingress Controller (pinned)..."
+    kubectl apply -f "$INGRESS_NGINX_KIND_URL"
     
-    log_info "📊 Instalando Metrics Server..."
-    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+    log_info "📊 Instalando Metrics Server (pinned)..."
+    kubectl apply -f "$METRICS_SERVER_URL"
 
     log_info "⏳ Esperando que los addons esten listos..."
     kubectl wait --namespace ingress-nginx \

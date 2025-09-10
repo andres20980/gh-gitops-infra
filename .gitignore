@@ -187,6 +187,9 @@ terraform.tfvars
 node_modules/
 vendor/
 .vendor/
+# allow vendored Helm charts inside charts/vendor
+!charts/vendor/
+!charts/vendor/**
 
 # ==========================================
 # Archivos de Testing

@@ -14,6 +14,16 @@ service:
 
 # Configuración mínima para Loki con filesystem en entorno local
 loki:
+  # for chart 5.x, ensure single binary mode
+deploymentMode: SingleBinary
+singleBinary:
+  replicas: 1
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
   auth_enabled: false
   commonConfig:
     replication_factor: 1

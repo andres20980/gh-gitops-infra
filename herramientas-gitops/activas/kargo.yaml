@@ -8,13 +8,13 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://akuity.github.io/helm-charts
+    - repoURL: https://charts.kargo.akuity.io
       chart: kargo
       targetRevision: ">=0.0.0"
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/kargo-dev-values.yaml
-    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
+    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
       targetRevision: HEAD
       ref: values
       path: .

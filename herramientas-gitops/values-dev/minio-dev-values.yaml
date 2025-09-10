@@ -6,4 +6,7 @@ resources:
   limits:
     cpu: 200m
     memory: 256Mi
-replicaCount: 1
+mode: standalone
+replicas: 1
+persistence:
+  enabled: false

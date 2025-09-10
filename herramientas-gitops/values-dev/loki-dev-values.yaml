@@ -11,3 +11,29 @@ service:
   enabled: true
   type: ClusterIP
   port: 3100
+
+# Configuración mínima para Loki con filesystem en entorno local
+loki:
+  auth_enabled: false
+  # Evitar el bloque commonConfig que dispara helpers con bucketNames
+  storage_config:
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+  schema_config:
+    configs:
+      - from: 2020-10-24
+        store: boltdb-shipper
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  ruler:
+    storage:
+      type: local
+      local:
+        directory: /var/loki/rules
+
+persistence:
+  enabled: false

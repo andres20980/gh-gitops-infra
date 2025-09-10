@@ -14,7 +14,7 @@ spec:
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/argo-events-dev-values.yaml
-    - repoURL: https://github.com/andres20980/gh-gitops-infra.git
+    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
       targetRevision: HEAD
       ref: values
       path: .

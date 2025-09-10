@@ -12,4 +12,4 @@ dashboard:
   service:
     type: ClusterIP
     port: 3100
-installCRDs: true
+installCRDs: false

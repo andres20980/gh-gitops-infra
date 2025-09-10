@@ -173,6 +173,27 @@ EOF
         log_info "ℹ️ Script de pin de versiones no encontrado; omitiendo"
     fi
 
+    # 6d) (Nuevo) Vendor de charts críticos para evitar dependencias externas (loki, kargo)
+    if [[ -x "$PROJECT_ROOT/scripts/utilidades/vendor-charts.sh" ]]; then
+        log_info "📦 Vendorizando charts críticos (loki, kargo)..."
+        if "$PROJECT_ROOT/scripts/utilidades/vendor-charts.sh" >/dev/null 2>&1; then
+            (
+                set -e
+                cd "$PROJECT_ROOT"
+                if ! git diff --quiet; then
+                    git add -A
+                    git commit -m "chore(charts): vendor loki/kargo para despliegue offline reproducible" >/dev/null 2>&1 || true
+                    git push -u gitea main >/dev/null 2>&1 || true
+                    log_success "✅ Charts vendorizados y publicados"
+                else
+                    log_info "ℹ️ No hay novedades de vendor"
+                fi
+            )
+        else
+            log_warning "⚠️ Vendor de charts no completado (revisa red/repos)"
+        fi
+    fi
+
     # 7) Validación previa: conectividad y acceso git al repo desde el cluster
     local svc_url="http://gitea-http-stable.gitea.svc.cluster.local:3000"
     if kubectl -n argocd run --rm -i gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \

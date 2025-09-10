@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://charts.kargo.akuity.io
-      chart: kargo
-      targetRevision: "0.6.0"
+    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
+      targetRevision: HEAD
+      path: charts/vendor/kargo/0.6.0
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/kargo-dev-values.yaml

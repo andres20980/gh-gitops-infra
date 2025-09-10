@@ -15,6 +15,14 @@ service:
 # Configuración mínima para Loki con filesystem en entorno local
 loki:
   auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+    bucketNames:
+      chunks: chunks
+      ruler: ruler
+      admin: admin
   # Evitar el bloque commonConfig que dispara helpers con bucketNames
   storage_config:
     filesystem:

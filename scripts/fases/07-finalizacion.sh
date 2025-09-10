@@ -16,7 +16,17 @@ set -euo pipefail
 
 main() {
     log_section "🏁 FASE 7: Finalización y Reporte"
-    
+
+    # 0. (Nuevo) Crear clusters de promoción pre/pro al final del proceso
+    log_info "🚀 Creando clusters de promoción (pre/pro) al final..."
+    if ! create_promotion_clusters; then
+        log_warning "⚠️ No fue posible crear alguno de los clusters pre/pro"
+    else
+        # Ajustar DNS en pre/pro si es necesario
+        ensure_cluster_dns "gitops-pre" || true
+        ensure_cluster_dns "gitops-pro" || true
+    fi
+
     # 1. Generar reporte del sistema
     log_info "📊 Generando reporte final..."
     generate_validation_report "/tmp/gitops-final-report.txt"

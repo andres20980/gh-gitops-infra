@@ -27,6 +27,14 @@ main() {
             log_error "❌ No fue posible instalar todas las dependencias"
             return 1
         fi
+        # Asegurar kind instalado (post-reset puede faltar)
+        if ! command -v kind >/dev/null 2>&1; then
+            log_info "🧩 Instalando kind explícitamente..."
+            if ! install_kind; then
+                log_error "❌ No se pudo instalar kind"
+                return 1
+            fi
+        fi
         # Verificación final
         if ! check_all_dependencies; then
             log_error "❌ Dependencias aún incompletas tras la instalación"

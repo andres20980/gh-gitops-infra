@@ -44,20 +44,11 @@ main() {
         ensure_metrics_server "gitops-dev"
     fi
 
-    # 3. Crear clusters mínimos de pre/pro (por defecto activado)
-    #    Requisito del proyecto: disponer de gitops-pre y gitops-pro siempre
-    log_info "Creando clusters mínimos pre/pro..."
-    if ! create_promotion_clusters; then
-        log_warning "Algunas creaciones de pre/pro fallaron"
-    fi
-
-    # 4. Mitigación DNS: si el host usa DNS privados, forzar CoreDNS a 1.1.1.1/8.8.8.8 en los tres clusters
-    log_info "Asegurando DNS funcional en clusters..."
+    # 3. Asegurar DNS solo en dev (pre/pro se crean al final en Fase 07)
+    log_info "Asegurando DNS funcional en cluster dev..."
     ensure_cluster_dns "gitops-dev" || true
-    ensure_cluster_dns "gitops-pre" || true
-    ensure_cluster_dns "gitops-pro" || true
 
-    # 5. Resumen
+    # 4. Resumen
     show_clusters_summary
     # Validación final: el cluster dev debe existir sí o sí
     if kind get clusters 2>/dev/null | grep -q "^gitops-dev$"; then

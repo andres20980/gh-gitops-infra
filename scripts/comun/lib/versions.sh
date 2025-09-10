@@ -51,34 +51,15 @@ obtener_ultima_version() {
 }
 
 # Obtener versión estable de Kubernetes según minikube (sin arrancar cluster)
-obtener_k8s_estable_minikube() {
-    if ! command -v minikube >/dev/null 2>&1; then
-        return 1
-    fi
-    local estable
-    estable=$(minikube start --help 2>/dev/null | grep -oP "'stable' for v\K[0-9]+\.[0-9]+\.[0-9]+" | head -n1 || true)
-    if [[ -n "$estable" ]]; then
-        printf '%s' "$estable"
-        return 0
-    fi
-    return 1
-}
+obtener_k8s_estable_minikube() { return 1; }
 
 # Determinar versión de kubectl compatible con minikube (dinámica y con overrides)
 obtener_version_kubectl_compatible() {
-    local version_minikube="${1:-}"
     # Overrides por entorno
     if [[ -n "${KUBECTL_VERSION:-}" ]]; then printf '%s' "${KUBECTL_VERSION#v}"; return 0; fi
     if [[ -n "${K8S_VERSION:-}" ]]; then printf '%s' "${K8S_VERSION#v}"; return 0; fi
-    if [[ -n "${MINIKUBE_K8S_VERSION:-}" ]]; then printf '%s' "${MINIKUBE_K8S_VERSION#v}"; return 0; fi
-
-    # Preferir la versión estable que reporta minikube
+    # Usar estable pública de Kubernetes (no dependemos de minikube)
     local v
-    if v=$(obtener_k8s_estable_minikube 2>/dev/null); then
-        printf '%s' "$v"
-        return 0
-    fi
-    # Fallback a estable pública de Kubernetes
     v=$(curl -fsSL https://dl.k8s.io/release/stable.txt 2>/dev/null | sed 's/^v//' || true)
     if [[ -z "$v" ]]; then v="1.28.0"; fi
     printf '%s' "$v"

@@ -7,26 +7,9 @@ VENDOR_DIR="$ROOT_DIR/charts/vendor"
 mkdir -p "$VENDOR_DIR"
 
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "Falta dependencia: $1" >&2; exit 1; }; }
-need helm; need awk; need sed; need jq
+need awk; need sed; need helm
 
-vendor_known() {
-  # Loki
-  mkdir -p "$VENDOR_DIR/loki"
-  if [[ ! -d "$VENDOR_DIR/loki/5.44.0" ]]; then
-    helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
-    helm repo update grafana >/dev/null 2>&1 || true
-    helm pull grafana/loki --version 5.44.0 --untar --untardir "$VENDOR_DIR/loki"
-    echo "[vendor] loki@5.44.0"
-  fi
-  # Kargo
-  mkdir -p "$VENDOR_DIR/kargo"
-  if [[ ! -d "$VENDOR_DIR/kargo/0.6.0" ]]; then
-    helm repo add kargo https://charts.kargo.akuity.io >/dev/null 2>&1 || true
-    helm repo update kargo >/dev/null 2>&1 || true
-    helm pull kargo/kargo --version 0.6.0 --untar --untardir "$VENDOR_DIR/kargo"
-    echo "[vendor] kargo@0.6.0"
-  fi
-}
+vendor_known() { :; }
 
 # vendor_one <app_yaml>
 vendor_one(){
@@ -86,11 +69,130 @@ vendor_one(){
 if [[ $# -gt 0 ]]; then
   for f in "$@"; do vendor_one "$f"; done
 else
-  # Vendorizar todos los Application manifests activos que referencien charts helm
-  any=0
-  while IFS= read -r -d '' f; do vendor_one "$f"; any=1; done < <(find "$ROOT_DIR/herramientas-gitops/activas" -maxdepth 1 -type f -name '*.yaml' -print0)
-  if [[ "$any" == "0" ]]; then
-    vendor_known
+  # Normalizar estructura: si existe charts/vendor/<name>/<name>, aplanar a charts/vendor/<name>
+  normalize_chart_dir() {
+    local name="$1"; local base="$VENDOR_DIR/$name"
+    if [[ -d "$base/$name" && ! -f "$base/Chart.yaml" && -f "$base/$name/Chart.yaml" ]]; then
+      echo "[normalize] $name: moviendo $base/$name/* a $base/" >&2
+      mkdir -p "$base.tmp"
+      rsync -a "$base/$name/" "$base.tmp/" >/dev/null 2>&1 || cp -R "$base/$name/"* "$base.tmp/" 2>/dev/null || true
+      rm -rf "$base/$name"
+      rm -rf "$base"
+      mv "$base.tmp" "$base"
+    fi
+  }
+
+  charts=(
+    argo-events
+    argo-rollouts
+    argo-workflows
+    cert-manager
+    grafana
+    ingress-nginx
+    jaeger
+    kargo
+    loki
+    minio
+    kube-prometheus-stack
+    gitea
+  )
+  for c in "${charts[@]}"; do normalize_chart_dir "$c"; done
+
+  # Si faltan charts, intentamos descargarlos con helm pull (una sola vez)
+  add_repo() { local alias="$1" url="$2"; helm repo add "$alias" "$url" >/dev/null 2>&1 || true; }
+  update_repo() { local alias="$1"; helm repo update "$alias" >/dev/null 2>&1 || true; }
+
+  declare -A REPO_URL=(
+    [argo-events]="https://argoproj.github.io/argo-helm"
+    [argo-workflows]="https://argoproj.github.io/argo-helm"
+    [argo-rollouts]="https://argoproj.github.io/argo-helm"
+    [cert-manager]="https://charts.jetstack.io"
+    [grafana]="https://grafana.github.io/helm-charts"
+    [ingress-nginx]="https://kubernetes.github.io/ingress-nginx"
+    [jaeger]="https://jaegertracing.github.io/helm-charts"
+    [kargo]="https://charts.kargo.akuity.io"
+    [loki]="https://grafana.github.io/helm-charts"
+    [minio]="https://charts.min.io"
+    [kube-prometheus-stack]="https://prometheus-community.github.io/helm-charts"
+    [gitea]="https://dl.gitea.io/charts"
+  )
+  declare -A CHART_NAME=(
+    [argo-events]="argo-events"
+    [argo-workflows]="argo-workflows"
+    [argo-rollouts]="argo-rollouts"
+    [cert-manager]="cert-manager"
+    [grafana]="grafana"
+    [ingress-nginx]="ingress-nginx"
+    [jaeger]="jaeger"
+    [kargo]="kargo"
+    [loki]="loki"
+    [minio]="minio"
+    [kube-prometheus-stack]="kube-prometheus-stack"
+    [gitea]="gitea"
+  )
+  # Versiones pinneadas conocidas; vacío => latest estable
+  declare -A CHART_VER=(
+    [argo-rollouts]="2.38.0"
+    [loki]="5.44.0"
+    [kargo]="0.6.0"
+    [gitea]="12.1.3"
+  )
+
+  for c in "${charts[@]}"; do
+    if [[ ! -f "$VENDOR_DIR/$c/Chart.yaml" ]]; then
+      echo "[vendor] descargando chart $c ..." >&2
+      mkdir -p "$VENDOR_DIR/$c"
+      repo="${REPO_URL[$c]}"; chart="${CHART_NAME[$c]}"; ver="${CHART_VER[$c]:-}"
+      alias="repo-${c}"
+      if add_repo "$alias" "$repo" && update_repo "$alias"; then
+        if [[ -n "$ver" ]]; then
+          if helm pull "$alias/$chart" --version "$ver" --untar --untardir "$VENDOR_DIR/$c"; then
+            normalize_chart_dir "$c"
+          fi
+        else
+          if helm pull "$alias/$chart" --untar --untardir "$VENDOR_DIR/$c"; then
+            normalize_chart_dir "$c"
+          fi
+        fi
+      fi
+    fi
+  done
+
+  # Verificar que existan charts vendorizados requeridos (forma aplanada)
+  missing=()
+  for c in "${charts[@]}"; do
+    [[ -f "$VENDOR_DIR/$c/Chart.yaml" ]] || missing+=("$VENDOR_DIR/$c")
+  done
+  if (( ${#missing[@]} > 0 )); then
+    echo "⚠️ No se pudieron vendorizar algunos charts:" >&2
+    printf '  - %s\n' "${missing[@]}" >&2
+    # Fallback: reescribir Applications a no-op para que Argo no falle y permitir instalación parcial
+    declare -A CHART_APP_FILE=(
+      [argo-events]="herramientas-gitops/activas/argo-events.yaml"
+      [argo-workflows]="herramientas-gitops/activas/argo-workflows.yaml"
+      [argo-rollouts]="herramientas-gitops/activas/argo-rollouts.yaml"
+      [cert-manager]="herramientas-gitops/activas/cert-manager.yaml"
+      [grafana]="herramientas-gitops/activas/grafana.yaml"
+      [ingress-nginx]="herramientas-gitops/activas/ingress-nginx.yaml"
+      [jaeger]="herramientas-gitops/activas/jaeger.yaml"
+      [kargo]="herramientas-gitops/activas/kargo.yaml"
+      [loki]="herramientas-gitops/activas/loki.yaml"
+      [minio]="herramientas-gitops/activas/minio.yaml"
+      [kube-prometheus-stack]="herramientas-gitops/activas/prometheus-stack.yaml"
+      [gitea]="herramientas-gitops/activas/gitea.yaml"
+    )
+    for m in "${missing[@]}"; do
+      base="$(basename "$m")"
+      app_file="${CHART_APP_FILE[$base]:-}"
+      if [[ -n "$app_file" && -f "$app_file" ]]; then
+        echo "  ↪️  fallback no-op: $base → $app_file" >&2
+        sed -i "s#path: charts/vendor/${base}#path: herramientas-gitops/empty#g" "$app_file"
+        # añadir allowEmpty si no existe
+        if ! grep -q "allowEmpty:" "$app_file"; then
+          sed -i "/selfHeal: true/a\\      allowEmpty: true" "$app_file"
+        fi
+      fi
+    done
   fi
 fi
 

@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://argoproj.github.io/argo-helm
-      chart: argo-rollouts
-      targetRevision: "2.38.0"
+    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
+      targetRevision: HEAD
+      path: charts/vendor/argo-rollouts
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/argo-rollouts-dev-values.yaml

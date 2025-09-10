@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://jaegertracing.github.io/helm-charts
-      chart: jaeger
-      targetRevision: ">=0.0.0"
+    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
+      targetRevision: HEAD
+      path: charts/vendor/jaeger
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/jaeger-dev-values.yaml

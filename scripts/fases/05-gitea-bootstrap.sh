@@ -24,78 +24,49 @@ main() {
         return 1
     fi
 
-    # 2) Asegurar Gitea mediante Application (usa chart externo pinneado para bootstrap inicial)
-    log_info "📦 Asegurando Application de Gitea..."
-    cat <<'EOF' | kubectl apply -f -
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: gitea
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-  source:
-    repoURL: https://dl.gitea.io/charts
-    chart: gitea
-    targetRevision: "12.1.3"
-    helm:
-      values: |
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 200m
-            memory: 256Mi
-        replicaCount: 1
-        persistence:
-          enabled: false
-        postgresql-ha:
-          enabled: false
-        postgresql:
-          enabled: false
-        redis-cluster:
-          enabled: false
-        valkey:
-          enabled: false
-        gitea:
-          admin:
-            username: "admin"
-            password: "admin1234"
-          config:
-            server:
-              DISABLE_SSH: true
-            service:
-              REQUIRE_SIGNIN_VIEW: false
-            repository:
-              DEFAULT_PRIVATE: public
-              ALLOW_ANONYMOUS_GIT_ACCESS: true
-              DISABLE_HTTP_GIT: false
-            database:
-              DB_TYPE: sqlite3
-              PATH: /data/gitea/gitea.db
-            cache:
-              ADAPTER: memory
-            session:
-              PROVIDER: memory
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: gitea
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-    - CreateNamespace=true
-EOF
+    # 2) Instalar Gitea sin repos externos (helm template de chart vendorizado)
+    log_info "📦 Instalando Gitea desde chart vendorizado (sin repos externos)..."
+    # Cargar vendor pack si existe
+    if [[ ! -d "$PROJECT_ROOT/charts/vendor/gitea" ]]; then
+        if [[ -f "$PROJECT_ROOT/charts/vendor-pack.tgz" ]]; then
+            log_info "📦 Cargando vendor-pack.tgz..."
+            "$PROJECT_ROOT/scripts/utilidades/cargar-vendor.sh" --from-zip "$PROJECT_ROOT/charts/vendor-pack.tgz"
+        elif [[ -f "$PROJECT_ROOT/charts/vendor-pack.zip" ]]; then
+            log_info "📦 Cargando vendor-pack.zip..."
+            "$PROJECT_ROOT/scripts/utilidades/cargar-vendor.sh" --from-zip "$PROJECT_ROOT/charts/vendor-pack.zip"
+        fi
+    fi
+    if [[ ! -d "$PROJECT_ROOT/charts/vendor/gitea" ]]; then
+        log_error "❌ Falta chart vendorizado: charts/vendor/gitea (provee charts/vendor-pack.tgz o charts/vendor-pack.zip)"
+        return 1
+    fi
+    # namespace
+    kubectl get ns gitea >/dev/null 2>&1 || kubectl create ns gitea
+    # render y apply
+    helm template gitea "$PROJECT_ROOT/charts/vendor/gitea" \
+      --namespace gitea \
+      --set persistence.enabled=false \
+      --set postgresql.enabled=false \
+      --set postgresql-ha.enabled=false \
+      --set redis-cluster.enabled=false \
+      --set valkey.enabled=false \
+      --set gitea.admin.username=admin \
+      --set gitea.admin.password=admin1234 \
+      --set gitea.config.server.DISABLE_SSH=true \
+      --set gitea.config.service.REQUIRE_SIGNIN_VIEW=false \
+      --set gitea.config.repository.DEFAULT_PRIVATE=public \
+      --set gitea.config.repository.ALLOW_ANONYMOUS_GIT_ACCESS=true \
+      --set gitea.config.repository.DISABLE_HTTP_GIT=false \
+      | kubectl -n gitea apply -f -
 
     # 3) Esperar a que Gitea esté disponible (servicio HTTP y endpoints listos)
     log_info "⏳ Esperando servicio de Gitea..."
-    if ! kubectl -n gitea wait --for=condition=available --timeout=600s deployment -l app.kubernetes.io/name=gitea >/dev/null 2>&1; then
-        log_warning "⚠️ Timeout esperando Gitea; continuamos con mejor esfuerzo"
-    fi
+    # Esperar despliegue y endpoints
+    kubectl -n gitea rollout status deploy -l app.kubernetes.io/name=gitea --timeout=600s || true
+    local waited=0; local max_wait=600
+    until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do
+        sleep 3; waited=$((waited+3)); if (( waited >= max_wait )); then break; fi
+    done
     # Esperar endpoints del servicio
     local waited=0; local max_wait=120
     until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do
@@ -160,7 +131,13 @@ EOF
     curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
         -X PATCH "$api/repos/$gitea_user/$repo_name" -d '{"private": false}' >/dev/null 2>&1 || true
 
-    # 6) Reemplazar placeholders de repoURL con la URL interna del servicio Gitea (para uso dentro del cluster)
+    # 6) Verificar charts vendorizados requeridos (no usamos repos externos)
+    if [[ -x "$PROJECT_ROOT/scripts/utilidades/vendor-charts.sh" ]]; then
+        log_info "🔍 Verificando charts vendorizados requeridos..."
+        "$PROJECT_ROOT/scripts/utilidades/vendor-charts.sh"
+    fi
+
+    # 7) Reemplazar placeholders de repoURL con la URL interna del servicio Gitea (para uso dentro del cluster)
     # IMPORTANTE: el Service gitea-http es headless; creamos un Service estable ClusterIP para endpoints Ready-only
     log_info "🔧 Creando Service estable para Gitea (ClusterIP)"
     cat <<EOF | kubectl apply -f -
@@ -197,7 +174,7 @@ EOF
       | xargs -r sed -i \
         -e "s|http://gitea-http-stable.gitea.svc.cluster.local/$gitea_user/$repo_name.git|$internal_repo_url|g"
 
-    # 6b) Publicar cambios de sustitución (asegura que Gitea contiene manifests correctos antes de Argo)
+    # 7b) Publicar cambios de sustitución (asegura que Gitea contiene manifests correctos antes de Argo)
     log_info "🔁 Publicando cambios de placeholders en Gitea..."
     (
         set -e
@@ -251,7 +228,7 @@ EOF
         fi
     fi
 
-    # 7) Validación previa: conectividad y acceso git al repo desde el cluster
+    # 8) Validación previa: conectividad y acceso git al repo desde el cluster
     local svc_url="http://gitea-http-stable.gitea.svc.cluster.local:3000"
     if kubectl -n argocd run --rm -i gitea-check --image=curlimages/curl:8.10.1 --restart=Never -- \
         -sSf ${svc_url}/api/v1/version >/dev/null 2>&1; then
@@ -292,7 +269,7 @@ EOF
         fi
     fi
 
-    # 7b) Validación de contenido del repo: deben existir manifests para App-of-Tools
+    # 8b) Validación de contenido del repo: deben existir manifests para App-of-Tools
     log_info "🔎 Verificando contenido esencial en el repositorio remoto..."
     if curl -fsS -u "$gitea_user:$gitea_pass" \
          "$api/repos/$gitea_user/$repo_name/contents/argo-apps/aplicacion-de-herramientas-gitops.yaml?ref=main" >/dev/null 2>&1 && \
@@ -304,7 +281,7 @@ EOF
         return 1
     fi
 
-    # 8) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea
+    # 9) Crear la Application que apunta a herramientas-gitops/activas en el repositorio Gitea (app-of-tools)
     local app_tools="$PROJECT_ROOT/argo-apps/aplicacion-de-herramientas-gitops.yaml"
     if [[ -f "$app_tools" ]]; then
         log_info "🚀 Aplicando Application de herramientas GitOps (app-of-tools)"

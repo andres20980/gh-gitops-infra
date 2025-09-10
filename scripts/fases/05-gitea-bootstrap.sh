@@ -24,19 +24,76 @@ main() {
         return 1
     fi
 
-    # 2) Asegurar que la Application de Gitea está aplicada (usa carpeta activas)
-    local gitea_app_file="$PROJECT_ROOT/herramientas-gitops/activas/gitea.yaml"
-    if [[ -f "$gitea_app_file" ]]; then
-        log_info "📦 Aplicando Application de Gitea..."
-        kubectl apply -f "$gitea_app_file"
-    else
-        log_error "❌ No se encuentra el manifiesto de Gitea activo: $gitea_app_file"
-        return 1
-    fi
+    # 2) Asegurar Gitea mediante Application (usa chart externo pinneado para bootstrap inicial)
+    log_info "📦 Asegurando Application de Gitea..."
+    cat <<'EOF' | kubectl apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://dl.gitea.io/charts
+    chart: gitea
+    targetRevision: "12.1.3"
+    helm:
+      values: |
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        replicaCount: 1
+        persistence:
+          enabled: false
+        postgresql-ha:
+          enabled: false
+        postgresql:
+          enabled: false
+        redis-cluster:
+          enabled: false
+        valkey:
+          enabled: false
+        gitea:
+          admin:
+            username: "admin"
+            password: "admin1234"
+          config:
+            server:
+              DISABLE_SSH: true
+            service:
+              REQUIRE_SIGNIN_VIEW: false
+            repository:
+              DEFAULT_PRIVATE: public
+              ALLOW_ANONYMOUS_GIT_ACCESS: true
+              DISABLE_HTTP_GIT: false
+            database:
+              DB_TYPE: sqlite3
+              PATH: /data/gitea/gitea.db
+            cache:
+              ADAPTER: memory
+            session:
+              PROVIDER: memory
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+EOF
 
     # 3) Esperar a que Gitea esté disponible (servicio HTTP y endpoints listos)
     log_info "⏳ Esperando servicio de Gitea..."
-    if ! kubectl -n gitea wait --for=condition=available --timeout=300s deployment -l app.kubernetes.io/name=gitea >/dev/null 2>&1; then
+    if ! kubectl -n gitea wait --for=condition=available --timeout=600s deployment -l app.kubernetes.io/name=gitea >/dev/null 2>&1; then
         log_warning "⚠️ Timeout esperando Gitea; continuamos con mejor esfuerzo"
     fi
     # Esperar endpoints del servicio

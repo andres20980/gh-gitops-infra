@@ -109,6 +109,18 @@ spec:
     syncOptions:
     - CreateNamespace=true
 EOF
+      # Forzar Replace para permitir recreación limpia si hay cambios en selectores/imagen
+      kubectl -n argocd annotate application gitea argocd.argoproj.io/sync-options=Replace=true --overwrite || true
+      kubectl -n argocd annotate application gitea argocd.argoproj.io/refresh=hard --overwrite || true
+      # Esperar unos segundos a que Argo procese
+      sleep 8
+      # Si existe un deployment con imagen inválida (rootless-rootless), eliminarlo y refrescar
+      bad_img=$(kubectl -n gitea get deploy gitea -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+      if echo "$bad_img" | grep -q 'rootless-rootless'; then
+        log_warning "⚠️ Detectada imagen inválida en gitea: $bad_img; recreando deployment"
+        kubectl -n gitea delete deploy gitea || true
+        kubectl -n argocd annotate application gitea argocd.argoproj.io/refresh=hard --overwrite || true
+      fi
     fi
 
     # 3) Esperar a que Gitea esté disponible (servicio HTTP y endpoints listos)
@@ -197,6 +209,21 @@ EOF
     until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do
         sleep 3; waited=$((waited+3)); if (( waited >= max_wait )); then break; fi
     done
+
+    # Confirmación estricta de que Gitea está operativo y accesible desde ArgoCD
+    log_info "✅ Verificando salud de Gitea (Deployment + Service + Endpoints)"
+    if ! kubectl -n gitea get deploy gitea >/dev/null 2>&1; then
+      log_error "❌ Deployment gitea no presente"
+      return 1
+    fi
+    if ! kubectl -n gitea get svc gitea-http >/dev/null 2>&1; then
+      log_error "❌ Service gitea-http no presente"
+      return 1
+    fi
+    if ! kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; then
+      log_error "❌ Service gitea-http sin endpoints"
+      return 1
+    fi
     # Esperar endpoints del servicio
     local waited=0; local max_wait=120
     until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do

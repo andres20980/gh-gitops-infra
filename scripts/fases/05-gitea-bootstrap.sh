@@ -66,6 +66,9 @@ spec:
     targetRevision: "12.1.3"
     helm:
       values: |
+        image:
+          repository: gitea/gitea
+          tag: 1.24.3-rootless
         persistence:
           enabled: false
         postgresql-ha:

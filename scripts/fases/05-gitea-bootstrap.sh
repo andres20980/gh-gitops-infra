@@ -25,44 +25,171 @@ main() {
     fi
 
     # 2) Instalar Gitea sin repos externos (helm template de chart vendorizado)
-    log_info "📦 Instalando Gitea desde chart vendorizado (sin repos externos)..."
-    # Cargar vendor pack si existe
-    if [[ ! -d "$PROJECT_ROOT/charts/vendor/gitea" ]]; then
-        if [[ -f "$PROJECT_ROOT/charts/vendor-pack.tgz" ]]; then
-            log_info "📦 Cargando vendor-pack.tgz..."
-            "$PROJECT_ROOT/scripts/utilidades/cargar-vendor.sh" --from-zip "$PROJECT_ROOT/charts/vendor-pack.tgz"
-        elif [[ -f "$PROJECT_ROOT/charts/vendor-pack.zip" ]]; then
-            log_info "📦 Cargando vendor-pack.zip..."
-            "$PROJECT_ROOT/scripts/utilidades/cargar-vendor.sh" --from-zip "$PROJECT_ROOT/charts/vendor-pack.zip"
-        fi
+    if [[ "${GITOPS_MODE:-online}" == "airgap" ]]; then
+      log_info "📦 Instalando Gitea desde chart vendorizado (modo airgap)"
+      kubectl get ns gitea >/dev/null 2>&1 || kubectl create ns gitea
+      local gitea_image="${GITEA_IMAGE:-gitea/gitea:1.22.3-rootless}"
+      if command -v docker >/dev/null 2>&1; then docker pull "$gitea_image" >/dev/null 2>&1 || true; fi
+      if command -v kind >/dev/null 2>&1; then kind load docker-image "$gitea_image" --name gitops-dev >/dev/null 2>&1 || true; fi
+      helm template gitea "$PROJECT_ROOT/charts/vendor/gitea" \
+        --namespace gitea \
+        --set image.repository="${gitea_image%:*}" \
+        --set image.tag="${gitea_image##*:}" \
+        --set persistence.enabled=false \
+        --set postgresql.enabled=false \
+        --set postgresql-ha.enabled=false \
+        --set redis-cluster.enabled=false \
+        --set valkey.enabled=false \
+        --set gitea.admin.username=admin \
+        --set gitea.admin.password=admin1234 \
+        --set gitea.config.server.DISABLE_SSH=true \
+        --set gitea.config.service.REQUIRE_SIGNIN_VIEW=false \
+        --set gitea.config.repository.DEFAULT_PRIVATE=public \
+        --set gitea.config.repository.ALLOW_ANONYMOUS_GIT_ACCESS=true \
+        --set gitea.config.repository.DISABLE_HTTP_GIT=false \
+        | kubectl -n gitea apply -f -
+    else
+      log_info "📦 Asegurando Application de Gitea (repo externo pinneado)"
+      cat <<'EOF' | kubectl apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://dl.gitea.io/charts
+    chart: gitea
+    targetRevision: "12.1.3"
+    helm:
+      values: |
+        persistence:
+          enabled: false
+        postgresql-ha:
+          enabled: false
+        postgresql:
+          enabled: false
+        redis-cluster:
+          enabled: false
+        valkey:
+          enabled: false
+        gitea:
+          admin:
+            username: "admin"
+            password: "admin1234"
+          config:
+            server:
+              DISABLE_SSH: true
+            service:
+              REQUIRE_SIGNIN_VIEW: false
+            repository:
+              DEFAULT_PRIVATE: public
+              ALLOW_ANONYMOUS_GIT_ACCESS: true
+              DISABLE_HTTP_GIT: false
+            database:
+              DB_TYPE: sqlite3
+              PATH: /data/gitea/gitea.db
+            cache:
+              ADAPTER: memory
+            session:
+              PROVIDER: memory
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+EOF
     fi
-    if [[ ! -d "$PROJECT_ROOT/charts/vendor/gitea" ]]; then
-        log_error "❌ Falta chart vendorizado: charts/vendor/gitea (provee charts/vendor-pack.tgz o charts/vendor-pack.zip)"
-        return 1
-    fi
-    # namespace
-    kubectl get ns gitea >/dev/null 2>&1 || kubectl create ns gitea
-    # render y apply
-    helm template gitea "$PROJECT_ROOT/charts/vendor/gitea" \
-      --namespace gitea \
-      --set persistence.enabled=false \
-      --set postgresql.enabled=false \
-      --set postgresql-ha.enabled=false \
-      --set redis-cluster.enabled=false \
-      --set valkey.enabled=false \
-      --set gitea.admin.username=admin \
-      --set gitea.admin.password=admin1234 \
-      --set gitea.config.server.DISABLE_SSH=true \
-      --set gitea.config.service.REQUIRE_SIGNIN_VIEW=false \
-      --set gitea.config.repository.DEFAULT_PRIVATE=public \
-      --set gitea.config.repository.ALLOW_ANONYMOUS_GIT_ACCESS=true \
-      --set gitea.config.repository.DISABLE_HTTP_GIT=false \
-      | kubectl -n gitea apply -f -
 
     # 3) Esperar a que Gitea esté disponible (servicio HTTP y endpoints listos)
     log_info "⏳ Esperando servicio de Gitea..."
     # Esperar despliegue y endpoints
     kubectl -n gitea rollout status deploy -l app.kubernetes.io/name=gitea --timeout=600s || true
+    # Debug de estado si no disponible
+    if ! kubectl -n gitea get deploy -l app.kubernetes.io/name=gitea -o jsonpath='{.items[0].status.availableReplicas}' 2>/dev/null | grep -q "1"; then
+      log_info "🔎 Estado Gitea (pods):"; kubectl -n gitea get pods -o wide || true
+      log_info "🔎 Eventos namespace gitea:"; kubectl -n gitea get events --sort-by=.lastTimestamp | tail -n 20 || true
+      # Mostrar describe del primer pod
+      local podn; podn=$(kubectl -n gitea get pods -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+      if [[ -n "$podn" ]]; then
+        log_info "🔎 Describe pod $podn:"; kubectl -n gitea describe pod "$podn" | tail -n 80 || true
+        log_info "🔎 Logs pod $podn (primer contenedor):"; kubectl -n gitea logs "$podn" --tail=80 || true
+      fi
+      # Fallback: desplegar manifiesto mínimo sin init containers
+      log_warning "⚠️ Gitea del chart no está disponible; aplicando fallback mínimo offline"
+      cat <<EOF | kubectl -n gitea apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-http
+  labels:
+    app: gitea
+spec:
+  selector:
+    app: gitea
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  labels:
+    app: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitea
+  template:
+    metadata:
+      labels:
+        app: gitea
+    spec:
+      containers:
+        - name: gitea
+          image: ${GITEA_IMAGE:-gitea/gitea:1.22.3-rootless}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GITEA__database__DB_TYPE
+              value: sqlite3
+            - name: GITEA__database__PATH
+              value: /data/gitea/gitea.db
+            - name: GITEA__security__INSTALL_LOCK
+              value: "true"
+            - name: GITEA__server__DISABLE_SSH
+              value: "true"
+            - name: GITEA__service__REQUIRE_SIGNIN_VIEW
+              value: "false"
+            - name: GITEA__repository__DEFAULT_PRIVATE
+              value: public
+            - name: GITEA__repository__ALLOW_ANONYMOUS_GIT_ACCESS
+              value: "true"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+EOF
+      kubectl -n gitea rollout status deploy/gitea --timeout=300s || true
+      # Crear admin por CLI (ignorar si ya existe)
+      if kubectl -n gitea get deploy/gitea >/dev/null 2>&1; then
+        kubectl -n gitea exec deploy/gitea -- bash -lc "gitea admin user create --username admin --password admin1234 --email admin@example.com --admin --must-change-password=false" >/dev/null 2>&1 || true
+      fi
+    fi
+    # Esperar endpoints del servicio http
     local waited=0; local max_wait=600
     until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do
         sleep 3; waited=$((waited+3)); if (( waited >= max_wait )); then break; fi

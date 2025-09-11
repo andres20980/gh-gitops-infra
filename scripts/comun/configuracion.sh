@@ -76,6 +76,7 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
     # ============================================================================
     
     # Comportamiento por defecto
+    readonly GITOPS_MODE="${GITOPS_MODE:-online}"  # online|airgap
     readonly DEFAULT_DRY_RUN="${DRY_RUN:-false}"
     readonly DEFAULT_VERBOSE="${VERBOSE:-false}"
     readonly DEFAULT_DEBUG="${DEBUG:-false}"

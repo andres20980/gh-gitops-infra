@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
-      targetRevision: HEAD
-      path: charts/vendor/cert-manager
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: ">=v1.0.0"
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/cert-manager-dev-values.yaml

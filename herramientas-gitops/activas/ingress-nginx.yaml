@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
-      targetRevision: HEAD
-      path: charts/vendor/ingress-nginx
+    - repoURL: https://kubernetes.github.io/ingress-nginx
+      chart: ingress-nginx
+      targetRevision: ">=0.0.0"
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/ingress-nginx-dev-values.yaml

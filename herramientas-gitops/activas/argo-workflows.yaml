@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
-      targetRevision: HEAD
-      path: charts/vendor/argo-workflows
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-workflows
+      targetRevision: ">=0.0.0"
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/argo-workflows-dev-values.yaml

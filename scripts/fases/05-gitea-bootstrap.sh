@@ -417,32 +417,35 @@ EOF
       if [[ -n "$podn" ]]; then
         kubectl -n gitea port-forward pod/$podn 8088:3000 >/tmp/gitea-pf.log 2>&1 &
         pf_pid=$!
+        # Asegurar limpieza del port-forward al salir
+        trap 'if [[ -n "${pf_pid:-}" ]] && ps -p "$pf_pid" >/dev/null 2>&1; then kill "$pf_pid" >/dev/null 2>&1 || true; fi' EXIT
+
         # esperar un poco
         sleep 2
-      fi
-    fi
-
-    # Usar el service estable para URLs internas
-    local internal_repo_url="http://gitea-http-stable.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"
-    log_info "📝 Sustituyendo URLs de repo hacia: $internal_repo_url"
-    # Placeholder genérico
-    find "$PROJECT_ROOT" -type f -name "*.yaml" -print0 \
-      | xargs -0 -I{} sed -i "s|http://gitea-service/your-user/your-repo.git|$internal_repo_url|g" {}
-    # Variantes conocidas sin puerto, con hostname antiguo y/o ruta con 'gitea/'
+          if ! curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
+            # Si falla, intentar usar cuentas conocidas/fallback
+            gitea_user="gitea"; gitea_pass="gitea"
+            log_warning "⚠️ Creación con usuario inicial falló; probando cuenta $gitea_user"
+            if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+              curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
+            fi
     grep -RIl "http://gitea-http\.gitea\.svc\.cluster\.local" "$PROJECT_ROOT" 2>/dev/null \
       | xargs -r sed -i \
-        -e "s|http://gitea-http.gitea.svc.cluster.local/$gitea_user/$repo_name.git|$internal_repo_url|g" \
-        -e "s|http://gitea-http.gitea.svc.cluster.local/gitea/$repo_name.git|$internal_repo_url|g" \
-        -e "s|http://gitea-http.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git|$internal_repo_url|g"
-    # Variantes sobre hostname estable pero sin puerto explícito
-    grep -RIl "http://gitea-http-stable\.gitea\.svc\.cluster\.local" "$PROJECT_ROOT" 2>/dev/null \
-      | xargs -r sed -i \
-        -e "s|http://gitea-http-stable.gitea.svc.cluster.local/$gitea_user/$repo_name.git|$internal_repo_url|g"
-
-    # 7b) Publicar cambios de sustitución (asegura que Gitea contiene manifests correctos antes de Argo)
-    log_info "🔁 Publicando cambios de placeholders en Gitea..."
-    (
-        set -e
+        # Si aún no fue creado por las vías anteriores, intentar crear repo como admin via endpoint de admin
+        if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+          log_info "ℹ️ Intentando crear repo via admin API usando account 'bootstrap' si está disponible"
+          pod_create=$(kubectl -n gitea get pods -l app=gitea -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [[ -n "$pod_create" ]]; then
+            # Crear admin bootstrap si no existe
+            kubectl -n gitea exec "$pod_create" -- /bin/sh -c "gitea admin user create --username bootstrap --password bootstrap --email bootstrap@example.com --admin --must-change-password=false" 2>/dev/null || true
+            # Usar admin bootstrap para crear repo mediante admin endpoint
+            if curl -fsS -u bootstrap:bootstrap -H 'Content-Type: application/json' -X POST "$api/admin/users/$gitea_user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
+              log_success "✅ Repo creado vía admin API: $gitea_user/$repo_name"
+            else
+              log_warning "⚠️ Creación vía admin API falló; se continuará intentando con credenciales disponibles"
+            fi
+          fi
+        fi
         cd "$PROJECT_ROOT"
         git add -A
         git commit -m "chore(bootstrap): sustituye URLs a Gitea interno (:3000)" >/dev/null 2>&1 || true

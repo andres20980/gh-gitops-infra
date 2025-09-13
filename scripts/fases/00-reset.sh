@@ -1,93 +1,114 @@
 #!/bin/bash
 
 # =============================================================================
-# FASE 0: RESETEO LIMPIO DEL ENTORNO LOCAL
+# FASE 0: PREPARACIÓN/RESET DEL ENTORNO (SEGURA POR DEFECTO)
 # =============================================================================
-# Objetivo: dejar el entorno limpio (clusters kind, namespaces, CRDs, PF)
-# para ejecutar una instalación real, desatendida y reproducible.
+# Modos:
+#  - (default)       Seguro: sin acciones destructivas; detiene PF del proyecto,
+#                    limpia temporales, muestra estado y recomendaciones.
+#  - --fix           Arreglos no destructivos.
+#  - --soft-clean    Limpia SOLO recursos del proyecto (clusters kind gitops-*,
+#                    contextos kube gitops-*, PF); backup kubeconfig.
+#  - --nuke --yes    Reseteo profundo SOLO de recursos del proyecto.
+#  - --dry-run       Muestra el plan de acciones sin ejecutarlas.
 # =============================================================================
 
 set -euo pipefail
 
+DRY_RUN=false
+MODE="safe"
+ASSUME_YES=false
+
+usage() { echo "Uso: $0 [--dry-run] [--fix|--soft-clean|--nuke] [--yes]" >&2; }
+plan()  { if [[ "$DRY_RUN" == "true" ]]; then echo "[plan] $*"; else eval "$*"; fi; }
+
+stop_project_port_forwards() {
+  log_info "Deteniendo port-forwards en puertos 8080-8091..."
+  for p in $(seq 8080 8091); do
+    if lsof -t -i :"$p" >/dev/null 2>&1; then plan "lsof -t -i :$p | xargs -r kill -9 || true"; fi
+  done
+  [[ -f "$PROJECT_ROOT/scripts/accesos-herramientas.sh" ]] && plan "bash \"$PROJECT_ROOT/scripts/accesos-herramientas.sh\" stop || true"
+}
+
+backup_kubeconfig() {
+  if [[ -f "$HOME/.kube/config" ]]; then
+    local ts; ts=$(date +%Y%m%d-%H%M%S)
+    local dest="$HOME/.kube/config.backup-$ts"
+    log_info "Backup kubeconfig → $dest"; plan "mkdir -p \"$HOME/.kube\" && cp \"$HOME/.kube/config\" \"$dest\""
+  fi
+}
+
+delete_kind_cluster_if_gitops() {
+  local name="$1"
+  if kind get clusters 2>/dev/null | grep -q "^${name}$"; then log_info "Eliminando cluster kind: $name"; plan "kind delete cluster --name \"$name\" || true"; fi
+}
+
+remove_gitops_contexts() {
+  log_info "Eliminando contextos kube gitops-* (si existen)"
+  for ctx in kind-gitops-dev kind-gitops-pre kind-gitops-pro; do
+    if kubectl config get-contexts "$ctx" >/dev/null 2>&1; then plan "kubectl config delete-context \"$ctx\" || true"; fi
+  done
+}
+
+report_env() {
+  log_section "📋 Estado actual del entorno"; log_info "Clusters kind:"; kind get clusters 2>/dev/null || true; log_info "Contextos kube:"; kubectl config get-contexts 2>/dev/null || true
+}
+
+confirm_or_abort() {
+  local msg="$1"; [[ "$ASSUME_YES" == "true" ]] && return 0; log_warning "$msg"; echo "Usa --yes para continuar sin confirmación." >&2; return 1
+}
+
 main() {
-    log_section "🧹 FASE 0: Reset Limpio del Entorno"
+  # Parseo de flags
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dry-run) DRY_RUN=true; shift ;;
+      --fix) MODE="fix"; shift ;;
+      --soft-clean) MODE="soft-clean"; shift ;;
+      --nuke) MODE="nuke"; shift ;;
+      --yes|-y) ASSUME_YES=true; shift ;;
+      -h|--help) usage; return 0 ;;
+      *) log_warning "Flag desconocida: $1"; usage; return 1 ;;
+    esac
+  done
 
-    # Confirmación fuerte salvo ejecución no interactiva con --yes o variable
-    local force="false"
-    while [[ ${1:-} ]]; do
-      case "$1" in
-        --yes|-y) force="true"; shift ;;
-        *) shift ;;
-      esac
-    done
-    if [[ "${GITOPS_FORCE_RESET:-}" == "true" || "${GITOPS_FORCE_RESET:-}" == "1" ]]; then
-      force="true"
-    fi
-    if [[ "$force" != "true" ]]; then
-      if [[ -t 0 ]]; then
-        echo "ADVERTENCIA: Esta acción eliminará clusters kind, binarios (kubectl/helm/kind/argocd) y datos Docker/containerd." >&2
-        read -r -p "¿Deseas continuar? Escribe 'YES' para confirmar: " ans
-        if [[ "$ans" != "YES" ]]; then
-          log_warning "Reset cancelado por el usuario"
-          return 0
-        fi
-      else
-        log_error "Fase 0 requiere confirmación. Reintenta con --yes o GITOPS_FORCE_RESET=true"
-        return 1
-      fi
-    fi
+  log_section "🧹 FASE 0: Preparación/Reset (modo: $MODE)"
 
-    # 0. Detener port-forwards locales (rangos 8080-8091 y conocidos)
-    log_info "Deteniendo port-forwards en puertos 8080-8091..."
-    for p in $(seq 8080 8091); do
-        if lsof -t -i :"$p" >/dev/null 2>&1; then
-            lsof -t -i :"$p" | xargs -r kill -9 || true
-        fi
-    done
+  # Siempre: detener PF y mostrar estado
+  stop_project_port_forwards
+  report_env
 
-    # 1. No intentamos borrar namespaces/CRDs: vamos a borrar los clusters directamente
-    log_info "Omitiendo borrado de Namespaces/CRDs: se eliminarán directamente los clusters kind"
+  case "$MODE" in
+    safe)
+      log_info "Modo seguro: sin acciones destructivas."
+      log_info "Siguiente paso sugerido: ./instalar.sh fase-02"
+      ;;
+    fix)
+      log_info "Aplicando arreglos no destructivos..."
+      command -v kind >/dev/null 2>&1 || log_info "kind no encontrado; se instalará en Fase 02"
+      log_success "✅ Arreglos básicos aplicados (no destructivo)"
+      ;;
+    soft-clean)
+      backup_kubeconfig
+      delete_kind_cluster_if_gitops gitops-dev
+      delete_kind_cluster_if_gitops gitops-pre
+      delete_kind_cluster_if_gitops gitops-pro
+      remove_gitops_contexts
+      log_success "✅ Soft-clean completado (solo recursos del proyecto)"
+      ;;
+    nuke)
+      confirm_or_abort "⚠️ Nuke: se eliminarán clusters kind gitops-(dev|pre|pro) y contextos kube asociados" || return 1
+      backup_kubeconfig
+      delete_kind_cluster_if_gitops gitops-dev
+      delete_kind_cluster_if_gitops gitops-pre
+      delete_kind_cluster_if_gitops gitops-pro
+      remove_gitops_contexts
+      log_success "✅ Nuke del entorno del proyecto completado"
+      ;;
+    *) log_error "Modo desconocido: $MODE"; return 1 ;;
+  esac
 
-    # 2. Eliminar clusters kind (si existen)
-    for c in gitops-dev gitops-pre gitops-pro; do
-      if kind get clusters 2>/dev/null | grep -q "^${c}$"; then
-        log_info "Eliminando cluster kind: $c"
-        kind delete cluster --name "$c" || true
-      fi
-    done
-
-    # 3. Purga de dependencias del sistema (siempre en Fase 00)
-    log_section "🧽 Purga de dependencias del sistema"
-    # Mejor esfuerzo: si hay apt y sudo disponibles, desinstalar paquetes; además, borrar binarios sueltos
-    if command -v apt-get >/dev/null 2>&1; then
-      log_info "Eliminando paquetes apt relacionados (Docker/kubectl/helm/jq)..."
-      sudo apt-get remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker.io jq helm kubectl 2>/dev/null || true
-      sudo apt-get autoremove -y 2>/dev/null || true
-      # Borrar repositorios/llaves Docker para evitar reinstalación accidental de canal inadecuado
-      sudo rm -f /etc/apt/sources.list.d/docker.list 2>/dev/null || true
-      sudo rm -f /etc/apt/keyrings/docker.gpg 2>/dev/null || true
-      sudo apt-get update || true
-    else
-      log_info "apt-get no disponible; se omitirá purga vía paquetes"
-    fi
-
-    log_info "Eliminando binarios en /usr/local/bin (kubectl, helm, kind, argocd)..."
-    sudo rm -f /usr/local/bin/kubectl /usr/local/bin/helm /usr/local/bin/kind /usr/local/bin/argocd 2>/dev/null || true
-
-    # Limpiar configuraciones locales
-    log_info "Limpiando configuraciones locales (kubeconfig/argocd/helm caches)..."
-    rm -rf "$HOME/.kube" 2>/dev/null || true
-    rm -rf "$HOME/.config/argocd" 2>/dev/null || true
-    rm -rf "$HOME/.cache/helm" "$HOME/.config/helm" 2>/dev/null || true
-
-    # Eliminar datos de Docker/containerd
-    log_warning "Eliminando datos de Docker local (/var/lib/docker, /var/lib/containerd)" 
-    sudo systemctl stop docker 2>/dev/null || true
-    # En entornos sin systemd, puede no parar; continuar igualmente
-    sudo rm -rf /var/lib/docker /var/lib/containerd 2>/dev/null || true
-    log_success "✅ Purga de dependencias completada"
-
-    log_success "✅ Entorno limpio"
+    # Sección anterior eliminada: acciones destructivas pasan a --soft-clean/--nuke
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

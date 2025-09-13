@@ -422,35 +422,38 @@ EOF
 
         # esperar un poco
         sleep 2
-          if ! curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
-            # Si falla, intentar usar cuentas conocidas/fallback
-            gitea_user="gitea"; gitea_pass="gitea"
-            log_warning "⚠️ Creación con usuario inicial falló; probando cuenta $gitea_user"
-            if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
-              curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
-            fi
-    grep -RIl "http://gitea-http\.gitea\.svc\.cluster\.local" "$PROJECT_ROOT" 2>/dev/null \
-      | xargs -r sed -i \
-        # Si aún no fue creado por las vías anteriores, intentar crear repo como admin via endpoint de admin
+
+        # Intentar crear/reconocer el repo usando las credenciales disponibles
+        repo_created=false
+        for attempt in 1 2 3; do
+          if curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+            repo_created=true; break
+          fi
+          if curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
+            repo_created=true; break
+          fi
+          sleep 2
+        done
+
+        if ! $repo_created; then
+          # Intentar usar cuenta 'gitea' como fallback
+          gitea_user="gitea"; gitea_pass="gitea"
+          log_warning "⚠️ Creación con usuario inicial falló; probando cuenta $gitea_user"
+          if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+            curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
+          fi
+        fi
+
+        # Si sigue sin existir, intentar crear via admin API (crear admin bootstrap si falta)
         if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
           log_info "ℹ️ Intentando crear repo via admin API usando account 'bootstrap' si está disponible"
           pod_create=$(kubectl -n gitea get pods -l app=gitea -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
           if [[ -n "$pod_create" ]]; then
-            # Crear admin bootstrap si no existe
             kubectl -n gitea exec "$pod_create" -- /bin/sh -c "gitea admin user create --username bootstrap --password bootstrap --email bootstrap@example.com --admin --must-change-password=false" 2>/dev/null || true
-            # Usar admin bootstrap para crear repo mediante admin endpoint
-            if curl -fsS -u bootstrap:bootstrap -H 'Content-Type: application/json' -X POST "$api/admin/users/$gitea_user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
-              log_success "✅ Repo creado vía admin API: $gitea_user/$repo_name"
-            else
-              log_warning "⚠️ Creación vía admin API falló; se continuará intentando con credenciales disponibles"
-            fi
+            curl -fsS -u bootstrap:bootstrap -H 'Content-Type: application/json' -X POST "$api/admin/users/$gitea_user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
           fi
         fi
-        cd "$PROJECT_ROOT"
-        git add -A
-        git commit -m "chore(bootstrap): sustituye URLs a Gitea interno (:3000)" >/dev/null 2>&1 || true
-        git push -u gitea main >/dev/null 2>&1 || true
-    )
+      fi
 
     # 6c) (Nuevo) Pin de versiones Helm: fija targetRevision a la última estable antes de aplicar herramientas
     if [[ -x "$PROJECT_ROOT/scripts/utilidades/pin-helm-versions.sh" ]]; then

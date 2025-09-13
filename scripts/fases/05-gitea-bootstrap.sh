@@ -114,8 +114,21 @@ EOF
       kubectl -n argocd annotate application gitea argocd.argoproj.io/refresh=hard --overwrite || true
       # Esperar unos segundos a que Argo procese
       sleep 8
+      # Esperar a que el namespace 'gitea' lo cree ArgoCD; si no aparece, crearlo manualmente
+      local waited_ns=0; local max_ns_wait=60
+      until kubectl get ns gitea >/dev/null 2>&1; do
+        sleep 2; waited_ns=$((waited_ns+2)); if (( waited_ns >= max_ns_wait )); then
+          log_warning "⚠️ Namespace 'gitea' no fue creado por ArgoCD en ${max_ns_wait}s; creando manualmente"
+          kubectl create ns gitea || true
+          break
+        fi
+      done
+
       # Si existe un deployment con imagen inválida (rootless-rootless), eliminarlo y refrescar
-      bad_img=$(kubectl -n gitea get deploy gitea -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+      local bad_img=""
+      if kubectl get ns gitea >/dev/null 2>&1; then
+        bad_img=$(kubectl -n gitea get deploy gitea -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+      fi
       if echo "$bad_img" | grep -q 'rootless-rootless'; then
         log_warning "⚠️ Detectada imagen inválida en gitea: $bad_img; recreando deployment"
         kubectl -n gitea delete deploy gitea || true
@@ -123,10 +136,12 @@ EOF
       fi
     fi
 
-    # 3) Esperar a que Gitea esté disponible (servicio HTTP y endpoints listos)
+  # 3) Esperar a que Gitea esté disponible (servicio HTTP y endpoints listos)
     log_info "⏳ Esperando servicio de Gitea..."
     # Esperar despliegue y endpoints
-    kubectl -n gitea rollout status deploy -l app.kubernetes.io/name=gitea --timeout=600s || true
+  # Asegurar namespace antes de esperar por rollout
+  kubectl get ns gitea >/dev/null 2>&1 || kubectl create ns gitea >/dev/null 2>&1 || true
+  kubectl -n gitea rollout status deploy -l app.kubernetes.io/name=gitea --timeout=600s || true
     # Debug de estado si no disponible
     if ! kubectl -n gitea get deploy -l app.kubernetes.io/name=gitea -o jsonpath='{.items[0].status.availableReplicas}' 2>/dev/null | grep -q "1"; then
       log_info "🔎 Estado Gitea (pods):"; kubectl -n gitea get pods -o wide || true
@@ -137,9 +152,11 @@ EOF
         log_info "🔎 Describe pod $podn:"; kubectl -n gitea describe pod "$podn" | tail -n 80 || true
         log_info "🔎 Logs pod $podn (primer contenedor):"; kubectl -n gitea logs "$podn" --tail=80 || true
       fi
-      # Fallback: desplegar manifiesto mínimo sin init containers
+  # Fallback: desplegar manifiesto mínimo sin init containers
       log_warning "⚠️ Gitea del chart no está disponible; aplicando fallback mínimo offline"
-      cat <<EOF | kubectl -n gitea apply -f -
+  # Asegurar namespace antes de aplicar manifiesto de fallback
+  kubectl get ns gitea >/dev/null 2>&1 || kubectl create ns gitea || true
+  cat <<EOF | kubectl -n gitea apply -f -
 apiVersion: v1
 kind: Service
 metadata:

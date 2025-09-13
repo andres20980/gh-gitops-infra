@@ -225,6 +225,12 @@ graph TD
 ✅ Validación completa de prerrequisitos
 ✅ Configuración optimizada para GitOps
 ✅ Verificación automática del estado final
+
+> Nota: Los scripts de prueba antiguos `scripts/test-e2e-excelente.sh` y
+> `scripts/reset-entorno.sh` fueron removidos del repositorio porque eran
+> destructivos y ya no forman parte del flujo principal. Si necesitas
+> ejecutar pruebas, usa las opciones `--dry-run` o `--solo-cluster` del
+> orquestador, o crea scripts locales de prueba fuera del repositorio.
 ```
 
 ### 🔍 **Modo Diagnóstico**

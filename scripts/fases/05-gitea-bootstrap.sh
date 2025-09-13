@@ -71,63 +71,63 @@ YAML
     sleep 2; wait=$((wait+2)); if (( wait >= max )); then break; fi
   done
 
-  kubectl -n gitea port-forward svc/gitea-http 8088:3000 >/tmp/gitea-pf.log 2>&1 & pf_pid=$!
-  trap 'kill ${pf_pid:-} >/dev/null 2>&1 || true' EXIT
-  wait=0; until curl -fsS http://127.0.0.1:8088/api/v1/version >/dev/null 2>&1; do sleep 2; wait=$((wait+2)); if (( wait >= 120 )); then break; fi; done
+  # Use in-pod HTTP to avoid host port forwarding and make behavior deterministic
+  local repo="gitops-infra"; local created=false
+  if [[ -z "$podn" ]]; then
+    log_error "No hay pod de gitea disponible"; return 1
+  fi
 
-  local api="http://127.0.0.1:8088/api/v1"; local repo="gitops-infra"; local created=false
+  # Wait until in-pod HTTP API responds
+  local ready_wait=0; local ready_max=120
+  until kubectl -n gitea exec "$podn" -- sh -c "curl -sS http://127.0.0.1:3000/api/v1/version >/dev/null 2>&1" || (( ready_wait >= ready_max )); do
+    sleep 2; ready_wait=$((ready_wait+2))
+  done
 
-  # Probe for working credentials (prefer bootstrap if present)
-  for candidate in "admin:admin1234" "bootstrap:bootstrap" "automation:automation"; do
-    user="${candidate%%:*}"; pass="${candidate#*:}"
-    if curl -fsS -u "$user:$pass" "$api/user" >/dev/null 2>&1; then
-      break
-    else
-      unset user; unset pass
+  # Prefer deterministic users: bootstrap (admin), then automation
+  for candidate in "bootstrap:bootstrap" "automation:automation"; do
+    u="${candidate%%:*}"; p="${candidate#*:}"
+    if kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u ${u}:${p} http://127.0.0.1:3000/api/v1/user >/dev/null 2>&1"; then
+      user="$u"; pass="$p"; break
     fi
   done
 
-  # If no candidate worked, try creating a bootstrap admin inside the pod and test it
-  if [[ -z "${user:-}" && -n "$podn" ]]; then
-    kubectl -n gitea exec "$podn" -- /bin/sh -c "gitea admin user create --username bootstrap --password bootstrap --email bootstrap@example.com --admin --must-change-password=false" >/dev/null 2>&1 || true
-    if curl -fsS -u "bootstrap:bootstrap" "$api/user" >/dev/null 2>&1; then
+  # If no user, create bootstrap admin deterministically
+  if [[ -z "${user:-}" ]]; then
+    kubectl -n gitea exec "$podn" -- sh -c "gitea admin user create --username bootstrap --password bootstrap --email bootstrap@example.com --admin --must-change-password=false" >/dev/null 2>&1 || true
+    if kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u bootstrap:bootstrap http://127.0.0.1:3000/api/v1/user >/dev/null 2>&1"; then
       user="bootstrap"; pass="bootstrap"
     fi
   fi
 
   if [[ -z "${user:-}" ]]; then
-    log_error "No se encontraron credenciales válidas para Gitea"
-    return 1
+    log_error "No se encontraron/crearon credenciales válidas para Gitea"; return 1
   fi
 
-  # If repo already exists for this user, mark created
-  if curl -fsS -u "$user:$pass" "$api/repos/$user/$repo" >/dev/null 2>&1; then
+  # Check repo existence and create if needed
+  if kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u ${user}:${pass} http://127.0.0.1:3000/api/v1/repos/${user}/${repo} >/dev/null 2>&1"; then
     created=true
   fi
 
-  # Try to create repo as the authenticated user
   if ! $created; then
-    if curl -fsS -u "$user:$pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo\",\"private\":false}" >/dev/null 2>&1; then
+    kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u ${user}:${pass} -H 'Content-Type: application/json' -X POST http://127.0.0.1:3000/api/v1/user/repos -d '{\"name\":\"${repo}\",\"private\":false}' >/dev/null 2>&1" || true
+    if kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u ${user}:${pass} http://127.0.0.1:3000/api/v1/repos/${user}/${repo} >/dev/null 2>&1"; then
       created=true
     fi
   fi
 
-  # If still not created and we have pod admin (bootstrap), attempt to create an 'automation' user and create the repo for it
-  if ! $created && [[ -n "$podn" ]]; then
-    kubectl -n gitea exec "$podn" -- /bin/sh -c "gitea admin user create --username automation --password automation --email automation@example.com --must-change-password=false" >/dev/null 2>&1 || true
-    if curl -fsS -u "automation:automation" "$api/repos/automation/$repo" >/dev/null 2>&1; then
+  # If still not created and we are bootstrap admin, create automation user and repo
+  if ! $created && [[ "${user}" == "bootstrap" ]]; then
+    kubectl -n gitea exec "$podn" -- sh -c "gitea admin user create --username automation --password automation --email automation@example.com --must-change-password=false" >/dev/null 2>&1 || true
+    kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u bootstrap:bootstrap -H 'Content-Type: application/json' -X POST http://127.0.0.1:3000/api/v1/admin/users/automation/repos -d '{\"name\":\"${repo}\",\"private\":false}' >/dev/null 2>&1" || true
+    if kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u automation:automation http://127.0.0.1:3000/api/v1/repos/automation/${repo} >/dev/null 2>&1"; then
       created=true; user="automation"; pass="automation"
-    else
-      # If we are admin (bootstrap), try to create repo on behalf of automation
-      if curl -fsS -u "bootstrap:bootstrap" -H 'Content-Type: application/json' -X POST "$api/admin/users/automation/repos" -d "{\"name\":\"$repo\",\"private\":false}" >/dev/null 2>&1; then
-        created=true; user="automation"; pass="automation"
-      fi
     fi
   fi
 
-  if ! $created; then log_error "No se pudo crear el repo en Gitea"; return 1; fi
+  if ! $created; then log_error "No se pudo crear el repo en Gitea (in-pod)"; return 1; fi
 
-  (cd "$PROJECT_ROOT" && git init >/dev/null 2>&1 || true; git branch -M main >/dev/null 2>&1 || true; git remote remove gitea >/dev/null 2>&1 || true; git remote add gitea "http://$user:$pass@127.0.0.1:8088/$user/$repo.git" >/dev/null 2>&1 || true; git add -A; git commit -m "bootstrap" >/dev/null 2>&1 || true; git push -u gitea main >/dev/null 2>&1 || true)
+  # Push repository to created remote (attempt, non-fatal)
+  (cd "$PROJECT_ROOT" && git init >/dev/null 2>&1 || true; git branch -M main >/dev/null 2>&1 || true; git remote remove gitea >/dev/null 2>&1 || true; git remote add gitea "http://${user}:${pass}@127.0.0.1:3000/${user}/${repo}.git" >/dev/null 2>&1 || true; git add -A; git commit -m "bootstrap" >/dev/null 2>&1 || true; git push -u gitea main >/dev/null 2>&1 || true)
 
   cat <<EOF | kubectl apply -n gitea -f -
 apiVersion: v1

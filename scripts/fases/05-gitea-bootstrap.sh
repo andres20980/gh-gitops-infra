@@ -28,7 +28,8 @@ main() {
     if [[ "${GITOPS_MODE:-online}" == "airgap" ]]; then
       log_info "📦 Instalando Gitea desde chart vendorizado (modo airgap)"
       kubectl get ns gitea >/dev/null 2>&1 || kubectl create ns gitea
-      local gitea_image="${GITEA_IMAGE:-gitea/gitea:1.22.3-rootless}"
+      # Usar imagen no-rootless por defecto para mayor compatibilidad en entornos kind
+      local gitea_image="${GITEA_IMAGE:-gitea/gitea:1.24.3}"
       if command -v docker >/dev/null 2>&1; then docker pull "$gitea_image" >/dev/null 2>&1 || true; fi
       if command -v kind >/dev/null 2>&1; then kind load docker-image "$gitea_image" --name gitops-dev >/dev/null 2>&1 || true; fi
       helm template gitea "$PROJECT_ROOT/charts/vendor/gitea" \
@@ -61,14 +62,14 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://dl.gitea.io/charts
+        repoURL: https://dl.gitea.io/charts
     chart: gitea
     targetRevision: "12.1.3"
     helm:
       values: |
         image:
           repository: gitea/gitea
-          tag: 1.24.3-rootless
+          tag: 1.24.3
         persistence:
           enabled: false
         postgresql-ha:
@@ -218,14 +219,28 @@ EOF
       kubectl -n gitea rollout status deploy/gitea --timeout=300s || true
       # Crear admin por CLI (ignorar si ya existe)
       if kubectl -n gitea get deploy/gitea >/dev/null 2>&1; then
-        kubectl -n gitea exec deploy/gitea -- bash -lc "gitea admin user create --username admin --password admin1234 --email admin@example.com --admin --must-change-password=false" >/dev/null 2>&1 || true
+        # Esperar a que exista un pod Ready y usarlo para ejecutar el comando gitea
+        local podn=""
+        local pod_wait=0; local pod_max_wait=180
+        until podn=$(kubectl -n gitea get pods -l app=gitea -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true) && [[ -n "$podn" && $(kubectl -n gitea get pod "$podn" -o jsonpath='{.status.phase}' 2>/dev/null) == "Running" && $(kubectl -n gitea get pod "$podn" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null) == "true" ]]; do
+          sleep 3; pod_wait=$((pod_wait+3)); if (( pod_wait >= pod_max_wait )); then
+            log_warning "⚠️ No se encontró pod Ready de Gitea en ${pod_max_wait}s; se continuará intentando"
+            break
+          fi
+        done
+        if [[ -n "$podn" ]]; then
+          log_info "🔧 Creando usuario admin dentro del pod $podn"
+          kubectl -n gitea exec "$podn" -- /bin/sh -c "gitea admin user create --username admin --password admin1234 --email admin@example.com --admin --must-change-password=false" || true
+        else
+          log_warning "⚠️ No se pudo determinar pod para crear admin; omitiendo creación automática"
+        fi
       fi
     fi
-    # Esperar endpoints del servicio http
-    local waited=0; local max_wait=600
-    until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do
-        sleep 3; waited=$((waited+3)); if (( waited >= max_wait )); then break; fi
-    done
+  # Esperar endpoints del servicio http (más tiempo para inicialización completa)
+  local waited=0; local max_wait=600
+  until kubectl -n gitea get endpoints gitea-http -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -qE '.'; do
+    sleep 3; waited=$((waited+3)); if (( waited >= max_wait )); then break; fi
+  done
 
     # Confirmación estricta de que Gitea está operativo y accesible desde ArgoCD
     log_info "✅ Verificando salud de Gitea (Deployment + Service + Endpoints)"
@@ -247,18 +262,23 @@ EOF
         sleep 2; waited=$((waited+2)); [[ $waited -ge $max_wait ]] && break
     done
 
-    # 4) Configurar port-forward temporal para Gitea y validar API
+  # 4) Configurar port-forward temporal para Gitea y validar API
     log_info "🔌 Iniciando port-forward temporal a Gitea (localhost:8088)"
-    kubectl -n gitea port-forward svc/gitea-http 8088:3000 >/tmp/gitea-pf.log 2>&1 &
-    local pf_pid=$!
+  # Preferir Service estable si existe, si no usar gitea-http
+  local pf_target="svc/gitea-http"
+  if kubectl -n gitea get svc gitea-http-stable >/dev/null 2>&1; then
+    pf_target="svc/gitea-http-stable"
+  fi
+  kubectl -n gitea port-forward $pf_target 8088:3000 >/tmp/gitea-pf.log 2>&1 &
+  local pf_pid=$!
     # Esperar a que responda la API
-    waited=0; max_wait=60
-    until curl -fsS http://localhost:8088/api/v1/version >/dev/null 2>&1; do
-        sleep 2; waited=$((waited+2)); if (( waited >= max_wait )); then
-            log_warning "⚠️ Gitea API no respondió a tiempo; se continúa"
-            break
-        fi
-    done
+  waited=0; max_wait=300
+  until curl -fsS http://localhost:8088/api/v1/version >/dev/null 2>&1; do
+    sleep 3; waited=$((waited+3)); if (( waited >= max_wait )); then
+      log_warning "⚠️ Gitea API no respondió en ${max_wait}s; se continuará con intentos posteriores"
+      break
+    fi
+  done
 
     local gitea_user="admin" gitea_pass="admin1234" repo_name="gitops-infra"
     local api="http://localhost:8088/api/v1"
@@ -266,7 +286,21 @@ EOF
     # Intento de autenticación: admin/admin; si falla probamos gitea/gitea
     log_info "📚 Asegurando repositorio en Gitea: $repo_name"
     # Comprobar si existe
-    if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+    # Reintentos para creación de repo vía API con backoff
+    local repo_created=false
+    for attempt in 1 2 3; do
+      if curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
+        repo_created=true
+        break
+      fi
+      if curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
+        repo_created=true
+        break
+      fi
+      log_info "ℹ️ Intento $attempt: repo no disponible todavía, reintentando en 5s..."
+      sleep 5
+    done
+    if ! $repo_created; then
         # Intentar con admin/admin crear repo público; fallback a gitea/gitea
         if ! curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
             -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
@@ -274,8 +308,8 @@ EOF
             log_warning "⚠️ admin/admin no válido; probando gitea/gitea"
             # Rechequear existencia con nuevo usuario
             if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
-                curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
-                    -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
+        curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
+          -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
             fi
         fi
     else
@@ -284,7 +318,7 @@ EOF
 
     # 5) Empujar contenido local al nuevo remoto (primera publicación)
     local remote_url="http://$gitea_user:$gitea_pass@localhost:8088/$gitea_user/$repo_name.git"
-    log_info "🔁 Publicando repositorio actual en Gitea..."
+  log_info "🔁 Publicando repositorio actual en Gitea..."
     (
         set -e
         cd "$PROJECT_ROOT"
@@ -297,7 +331,10 @@ EOF
         fi
         git add -A
         git commit -m "feat(bootstrap): publicación inicial en Gitea" >/dev/null 2>&1 || true
-        git push -u gitea main >/dev/null 2>&1 || true
+        # Reintentar push hasta que Gitea acepte la conexión
+        for i in 1 2 3; do
+          git push -u gitea main >/dev/null 2>&1 && break || (sleep 3)
+        done
     )
 
     # 5b) Forzar repo público por si la instancia requiere autenticación por defecto
@@ -313,7 +350,7 @@ EOF
 
     # 7) Reemplazar placeholders de repoURL con la URL interna del servicio Gitea (para uso dentro del cluster)
     # IMPORTANTE: el Service gitea-http es headless; creamos un Service estable ClusterIP para endpoints Ready-only
-    log_info "🔧 Creando Service estable para Gitea (ClusterIP)"
+  log_info "🔧 Creando Service estable para Gitea (ClusterIP)"
     cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Service
@@ -330,6 +367,14 @@ spec:
     port: 3000
     targetPort: 3000
 EOF
+
+  # Si ya había un port-forward activo, reiniciarlo hacia el service estable
+  if ps -p "$pf_pid" >/dev/null 2>&1; then
+    kill "$pf_pid" >/dev/null 2>&1 || true
+    sleep 1
+    kubectl -n gitea port-forward svc/gitea-http-stable 8088:3000 >/tmp/gitea-pf.log 2>&1 &
+    pf_pid=$!
+  fi
 
     # Usar el service estable para URLs internas
     local internal_repo_url="http://gitea-http-stable.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"

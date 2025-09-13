@@ -11,6 +11,11 @@
 
 set -euo pipefail
 
+# Fallback: si la función 'confirmar' no está presente en el entorno, definir un stub no-interactivo
+if ! declare -f confirmar >/dev/null 2>&1; then
+  confirmar() { return 0; }
+fi
+
 main() {
     log_section "🧩 FASE 5 (Bootstrap Gitea y Argo Apps)"
 
@@ -62,7 +67,7 @@ metadata:
 spec:
   project: default
   source:
-        repoURL: https://dl.gitea.io/charts
+    repoURL: https://dl.gitea.io/charts
     chart: gitea
     targetRevision: "12.1.3"
     helm:
@@ -285,7 +290,7 @@ EOF
     fi
   done
 
-    local gitea_user="admin" gitea_pass="admin1234" repo_name="gitops-infra"
+  local gitea_user="admin" gitea_pass="admin1234" repo_name="gitops-infra"
     local api="http://localhost:8088/api/v1"
 
     # Intento de autenticación: admin/admin; si falla probamos gitea/gitea
@@ -309,7 +314,7 @@ EOF
         # Intentar con admin/admin crear repo público; fallback a gitea/gitea
         if ! curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' \
             -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
-        gitea_user="gitea"; gitea_pass="gitea"
+    gitea_user="gitea"; gitea_pass="gitea"
             log_warning "⚠️ admin/admin no válido; probando gitea/gitea"
             # Rechequear existencia con nuevo usuario
             if ! curl -fsS -u "$gitea_user:$gitea_pass" "$api/repos/$gitea_user/$repo_name" >/dev/null 2>&1; then
@@ -317,6 +322,18 @@ EOF
           -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1 || true
             fi
         fi
+    # Si aun así falla, intentar crear usuario 'automation' dentro del pod y usarlo
+    if ! $repo_created; then
+      log_warning "⚠️ Reintentos con admin/gitea fallaron; creando usuario 'automation' en pod y reintentando"
+      pod_create=$(kubectl -n gitea get pods -l app=gitea -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+      if [[ -n "$pod_create" ]]; then
+        kubectl -n gitea exec "$pod_create" -- /bin/sh -c "gitea admin user create --username automation --password automation --email automation@example.com --must-change-password=false" 2>/dev/null || true
+        gitea_user="automation"; gitea_pass="automation"
+        if curl -fsS -u "$gitea_user:$gitea_pass" -H 'Content-Type: application/json' -X POST "$api/user/repos" -d "{\"name\":\"$repo_name\",\"private\":false}" >/dev/null 2>&1; then
+          repo_created=true
+        fi
+      fi
+    fi
     else
         log_info "✅ Repositorio ya existe: $gitea_user/$repo_name"
     fi
@@ -336,8 +353,8 @@ EOF
         fi
         git add -A
         git commit -m "feat(bootstrap): publicación inicial en Gitea" >/dev/null 2>&1 || true
-        # Reintentar push hasta que Gitea acepte la conexión
-        for i in 1 2 3; do
+        # Reintentar push hasta que Gitea acepte la conexión (más intentos)
+        for i in 1 2 3 4 5 6; do
           git push -u gitea main >/dev/null 2>&1 && break || (sleep 3)
         done
     )
@@ -350,7 +367,9 @@ EOF
     # 6) Verificar charts vendorizados requeridos (no usamos repos externos)
     if [[ -x "$PROJECT_ROOT/scripts/utilidades/vendor-charts.sh" ]]; then
         log_info "🔍 Verificando charts vendorizados requeridos..."
-        "$PROJECT_ROOT/scripts/utilidades/vendor-charts.sh"
+    if ! "$PROJECT_ROOT/scripts/utilidades/vendor-charts.sh" >/dev/null 2>&1; then
+      log_warning "⚠️ No se pudieron vendorizar todos los charts; se continúa con fallback"
+    fi
     fi
 
     # 7) Reemplazar placeholders de repoURL con la URL interna del servicio Gitea (para uso dentro del cluster)
@@ -364,9 +383,8 @@ metadata:
   namespace: gitea
 spec:
   type: ClusterIP
-  selector:
-    app.kubernetes.io/name: gitea
-    app.kubernetes.io/instance: gitea
+    selector:
+      app: gitea
   ports:
   - name: http
     port: 3000

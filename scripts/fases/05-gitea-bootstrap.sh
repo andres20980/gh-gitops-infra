@@ -230,7 +230,12 @@ EOF
         done
         if [[ -n "$podn" ]]; then
           log_info "🔧 Creando usuario admin dentro del pod $podn"
-          kubectl -n gitea exec "$podn" -- /bin/sh -c "gitea admin user create --username admin --password admin1234 --email admin@example.com --admin --must-change-password=false" || true
+          out=$(kubectl -n gitea exec "$podn" -- /bin/sh -c "gitea admin user create --username admin --password admin1234 --email admin@example.com --admin --must-change-password=false" 2>&1 || true)
+          if echo "$out" | grep -qi "name is reserved"; then
+            log_info "ℹ️ Usuario 'admin' ya reservado/creado; se omite creación"
+          else
+            log_debug "Salida creación admin: $out"
+          fi
         else
           log_warning "⚠️ No se pudo determinar pod para crear admin; omitiendo creación automática"
         fi
@@ -368,13 +373,36 @@ spec:
     targetPort: 3000
 EOF
 
-  # Si ya había un port-forward activo, reiniciarlo hacia el service estable
-  if ps -p "$pf_pid" >/dev/null 2>&1; then
-    kill "$pf_pid" >/dev/null 2>&1 || true
-    sleep 1
-    kubectl -n gitea port-forward svc/gitea-http-stable 8088:3000 >/tmp/gitea-pf.log 2>&1 &
-    pf_pid=$!
-  fi
+    # Si ya había un port-forward activo, reiniciarlo hacia el service estable
+    if ps -p "$pf_pid" >/dev/null 2>&1; then
+        kill "$pf_pid" >/dev/null 2>&1 || true
+        sleep 1
+        kubectl -n gitea port-forward svc/gitea-http-stable 8088:3000 >/tmp/gitea-pf.log 2>&1 &
+        pf_pid=$!
+    fi
+
+    # Si la API no responde por el service, intentar port-forward directo al pod
+    local api_ok=false
+    for try in 1 2 3; do
+      if curl -fsS http://localhost:8088/api/v1/version >/dev/null 2>&1; then
+        api_ok=true; break
+      fi
+      sleep 2
+    done
+    if ! $api_ok; then
+      log_warning "⚠️ Service port-forward no responde; intentando port-forward directo al pod"
+      if ps -p "$pf_pid" >/dev/null 2>&1; then
+        kill "$pf_pid" >/dev/null 2>&1 || true
+      fi
+      # Encontrar un pod Ready y hacer port-forward a él
+      podn=$(kubectl -n gitea get pods -l app=gitea -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+      if [[ -n "$podn" ]]; then
+        kubectl -n gitea port-forward pod/$podn 8088:3000 >/tmp/gitea-pf.log 2>&1 &
+        pf_pid=$!
+        # esperar un poco
+        sleep 2
+      fi
+    fi
 
     # Usar el service estable para URLs internas
     local internal_repo_url="http://gitea-http-stable.gitea.svc.cluster.local:3000/$gitea_user/$repo_name.git"

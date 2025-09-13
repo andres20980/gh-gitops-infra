@@ -40,6 +40,58 @@ ejecutar_proceso_completo_impl() {
     log_success "Todas las fases de instalación se han ejecutado."
 }
 
+ejecutar_fase_individual_impl() {
+    local fase_num="$1"
+    shift
+    local args=("$@")
+
+    # Validar que el número de fase es un número
+    if ! [[ "$fase_num" =~ ^[0-9]+$ ]]; then
+        log_error "El número de fase debe ser un entero. Se recibió: '$fase_num'"
+        return 1
+    fi
+
+    # Formatear el número de fase con cero a la izquierda si es necesario (e.g., 1 -> 01)
+    printf -v fase_num_padded "%02d" "$fase_num"
+
+    local fase_script_pattern="$SCRIPTS_DIR/fases/$fase_num_padded-"*.sh
+    local fase_scripts_found=($fase_script_pattern)
+
+    # Verificar si se encontró exactamente un script de fase
+    if [[ ${#fase_scripts_found[@]} -eq 0 ]] || [[ ! -f "${fase_scripts_found[0]}" ]]; then
+        log_error "No se encontró un script para la fase '$fase_num_padded'."
+        log_info "Verifique que exista un archivo como '$fase_num_padded-nombre.sh' en el directorio $SCRIPTS_DIR/fases/"
+        return 1
+    elif [[ ${#fase_scripts_found[@]} -gt 1 ]]; then
+        log_error "Se encontraron múltiples scripts para la fase '$fase_num_padded':"
+        for script in "${fase_scripts_found[@]}"; do
+            log_error "  - $(basename "$script")"
+        done
+        return 1
+    fi
+
+    local fase_script="${fase_scripts_found[0]}"
+    log_section "Ejecutando fase individual: $(basename "$fase_script")"
+
+    # 'source' carga el script en el shell actual, haciendo que sus funciones (como 'main')
+    # estén disponibles. Luego, llamamos a 'main' explícitamente.
+    if source "$fase_script"; then
+        if command -v main >/dev/null 2>&1; then
+            if main "${args[@]}"; then
+                log_success "Fase '$(basename "$fase_script")' completada exitosamente."
+            else
+                log_error "La ejecución de la fase '$(basename "$fase_script")' falló (la función 'main' devolvió un error)."
+                return 1
+            fi
+        else
+            log_warning "El script de fase '$(basename "$fase_script")' fue cargado pero no contiene una función 'main'. Se considera completado."
+        fi
+    else
+        log_error "Falló la carga del script de fase '$(basename "$fase_script")'."
+        return 1
+    fi
+}
+
 
 verificar_dependencias_criticas() {
     check_all_dependencies

@@ -95,13 +95,13 @@ main() {
             if ! ejecutar_proceso_completo; then
                 echo "[FROM-SCRATCH] ❌ Falló la instalación completa" >&2; exit 1
             fi
-            # Reintentos de validación final (fase-07)
+            # Reintentos de validación final (fase-06)
             local intentos=0
             local max_intentos=3
             while (( intentos < max_intentos )); do
                 intentos=$((intentos+1))
-                echo "[FROM-SCRATCH] Intento de validación ${intentos}/${max_intentos}: fase-07"
-                if ejecutar_fase_individual 07; then
+                echo "[FROM-SCRATCH] Intento de validación ${intentos}/${max_intentos}: fase-06"
+                if ejecutar_fase_individual 06; then
                     echo "[FROM-SCRATCH] ✅ Instalación validada (Synced+Healthy + UIs accesibles)"
                     exit 0
                 fi
@@ -122,20 +122,20 @@ main() {
         completo|"")
             # Instalación EXCELENTE por defecto (desatendida):
             # - Ejecuta TODAS las fases disponibles en orden (incluida 00-reset si existe)
-            # - Ejecuta validación final (fase-07) con reintentos para asegurar Synced+Healthy + UIs accesibles
+            # - Ejecuta validación final (fase-06) con reintentos para asegurar Synced+Healthy + UIs accesibles
             if [[ ${#args[@]} -gt 0 ]]; then
                 ejecutar_proceso_completo "${args[@]}"
             else
                 ejecutar_proceso_completo
             fi
 
-            # Reintentos de validación final (fase-07)
+            # Reintentos de validación final (fase-06)
             local intentos=0
             local max_intentos=3
             while (( intentos < max_intentos )); do
                 intentos=$((intentos+1))
-                echo "[COMPLETO] Intento de validación ${intentos}/${max_intentos}: fase-07"
-                if ejecutar_fase_individual 07; then
+                echo "[COMPLETO] Intento de validación ${intentos}/${max_intentos}: fase-06"
+                if ejecutar_fase_individual 06; then
                     echo "[COMPLETO] ✅ Instalación validada (Synced+Healthy + UIs accesibles)"
                     exit 0
                 fi

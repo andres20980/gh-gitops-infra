@@ -18,3 +18,13 @@ Los registros se rotan automáticamente por fecha y se mantienen los últimos 30
 - Formato: `[TIMESTAMP] LEVEL [COMPONENT] MESSAGE`
 - Codificación: UTF-8
 - Tamaño máximo: 100MB por archivo
+
+```markdown
+# Directorio de Registros (nota de limpieza)
+
+Los marcadores de ejecución de fases fueron archivados en `obsolete/logs/`.
+
+Si necesitas restaurar los archivos originales, copia los ficheros desde
+`obsolete/logs/` de vuelta a este directorio.
+
+```

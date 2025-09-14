@@ -95,9 +95,8 @@ EOF
 
     log_info "🆕 Creando nuevo cluster kind $profile..."
     if kind create cluster --config "/tmp/kind-config-${profile}.yaml"; then
-        # Asegurar contextos kubectl
+        # Asegurar contexto kubectl principal (usar el contexto 'kind-<perfil>' por consistencia)
         kubectl config use-context "kind-${profile}" >/dev/null 2>&1 || true
-        kubectl config set-context "${profile}" --cluster "kind-${profile}" --user "kind-${profile}" >/dev/null 2>&1 || true
         log_success "✅ Cluster kind $profile creado correctamente"
         return 0
     fi
@@ -747,9 +746,10 @@ create_dev_cluster() {
     
     # Crear cluster
     if create_minikube_cluster "$profile" "$cpus" "$memory" "$preset" "$description"; then
-    setup_cluster_addons "$profile" "$preset"
-        kubectl config use-context "$profile"
-    log_success "Cluster desarrollo configurado"
+        setup_cluster_addons "$profile" "$preset"
+        # Mantener el contexto activo en la forma 'kind-<perfil>' para evitar duplicados
+        kubectl config use-context "kind-${profile}" >/dev/null 2>&1 || true
+        log_success "Cluster desarrollo configurado"
         return 0
     else
     log_error "Error creando cluster desarrollo"

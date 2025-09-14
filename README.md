@@ -143,13 +143,14 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 ./instalar.sh fase-02            # Solo dependencias del sistema
 ./instalar.sh fase-03            # Solo Docker + clusters
 ./instalar.sh fase-04            # Solo ArgoCD
-./instalar.sh fase-05            # Solo herramientas GitOps
-./instalar.sh fase-06            # Solo aplicaciones custom
-./instalar.sh fase-07            # Solo finalización + accesos
+# Nota: las herramientas GitOps (fase-05) se consideran dependencias externas y
+# deben instalarse por separado (por ejemplo Gitea). Una vez instaladas, ejecutar:
+./instalar.sh fase-05            # Solo aplicaciones custom
+./instalar.sh fase-06            # Solo finalización + accesos
 
 # Rangos de fases (ideal para testing parcial)
 ./instalar.sh fase-01-03         # Infraestructura base (permisos → clusters)
-./instalar.sh fase-04-07         # Plataforma GitOps (ArgoCD → finalización)
+./instalar.sh fase-04-06         # Plataforma GitOps (ArgoCD → finalización)
 ```
 
 ### 🔍 **Debugging por Fases**
@@ -159,7 +160,8 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 ./instalar.sh fase-03 --dry-run --verbose
 
 # Debug completo de una fase
-./instalar.sh fase-05 --debug --log-file herramientas-debug.log
+# Nota: las herramientas GitOps (fase-05) se gestionan como dependencias externas.
+# Para debug de herramientas instálalas por separado y usa sus logs/instaladores.
 
 # Rango con logging personalizado
 ./instalar.sh fase-01-04 --verbose --log-file infraestructura.log
@@ -173,9 +175,9 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 | **02** | Dependencias | `fase-02-dependencias.sh` | Verificación/instalación de herramientas |
 | **03** | Docker + Clusters | `fase-03-clusters.sh` | Configuración Docker, creación gitops-dev |
 | **04** | ArgoCD | `fase-04-argocd.sh` | Instalación y configuración ArgoCD maestro |
-| **05** | Herramientas GitOps | `fase-05-herramientas.sh` | Despliegue Prometheus, Grafana, etc. |
-| **06** | Aplicaciones Custom | `fase-06-aplicaciones.sh` | Apps de demostración y ejemplos |
-| **07** | Finalización | `fase-07-finalizacion.sh` | Clusters promoción, información accesos |
+| **05** | Herramientas GitOps | (external) | Despliegue gestionado fuera del instalador (p.ej. Gitea externo) |
+| **05** | Aplicaciones Custom | `05-aplicaciones.sh` | Apps de demostración y ejemplos |
+| **06** | Finalización | `06-finalizacion.sh` | Clusters promoción, información accesos |
 
 ## 🏗️ Arquitectura del Sistema
 
@@ -699,13 +701,13 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 ./instalar.sh fase-02            # Solo dependencias del sistema
 ./instalar.sh fase-03            # Solo Docker + clusters
 ./instalar.sh fase-04            # Solo ArgoCD
-./instalar.sh fase-05            # Solo herramientas GitOps
-./instalar.sh fase-06            # Solo aplicaciones custom
-./instalar.sh fase-07            # Solo finalización + accesos
+# Nota: herramientas GitOps (fase-05) se gestionan como dependencias externas
+./instalar.sh fase-05            # Solo aplicaciones custom
+./instalar.sh fase-06            # Solo finalización + accesos
 
 # Rangos de fases (ideal para testing parcial)
 ./instalar.sh fase-01-03         # Infraestructura base (permisos → clusters)
-./instalar.sh fase-04-07         # Plataforma GitOps (ArgoCD → finalización)
+./instalar.sh fase-04-06         # Plataforma GitOps (ArgoCD → finalización)
 ```
 
 ### 🔍 **Debugging por Fases**
@@ -715,7 +717,7 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 ./instalar.sh fase-03 --dry-run --verbose
 
 # Debug completo de una fase
-./instalar.sh fase-05 --debug --log-file herramientas-debug.log
+# Nota: herramientas GitOps (fase-05) se gestionan como dependencias externas.
 
 # Rango con logging personalizado
 ./instalar.sh fase-01-04 --verbose --log-file infraestructura.log
@@ -729,9 +731,9 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 | **02** | Dependencias | `fase-02-dependencias.sh` | Verificación/instalación de herramientas |
 | **03** | Docker + Clusters | `fase-03-clusters.sh` | Configuración Docker, creación gitops-dev |
 | **04** | ArgoCD | `fase-04-argocd.sh` | Instalación y configuración ArgoCD maestro |
-| **05** | Herramientas GitOps | `fase-05-herramientas.sh` | Despliegue Prometheus, Grafana, etc. |
-| **06** | Aplicaciones Custom | `fase-06-aplicaciones.sh` | Apps de demostración y ejemplos |
-| **07** | Finalización | `fase-07-finalizacion.sh` | Clusters promoción, información accesos |
+| **05** | Herramientas GitOps | (external) | Despliegue gestionado fuera del instalador (p.ej. Gitea externo) |
+| **05** | Aplicaciones Custom | `05-aplicaciones.sh` | Apps de demostración y ejemplos |
+| **06** | Finalización | `06-finalizacion.sh` | Clusters promoción, información accesos |
 
 ## 🏗️ Arquitectura del Sistema
 

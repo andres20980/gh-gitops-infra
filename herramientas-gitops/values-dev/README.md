@@ -59,13 +59,12 @@ spec:
 
 ## 🔄 Actualización Automática
 
-Los valores se actualizan automáticamente cuando se ejecuta:
+Los valores se actualizan cuando se gestionas las herramientas GitOps (nota: las
+herramientas se tratan como dependencias externas y no forman parte del
+instalador principal). Para generar/actualizar valores, ejecuta los
+scripts/herramientas correspondientes o usa tus herramientas de CI.
 
-```bash
-bash scripts/fases/fase-05-herramientas.sh
-```
-
-El sistema:
+El sistema (si ejecutas una herramienta de generación) realiza:
 1. Descubre herramientas automáticamente
 2. Busca versiones más recientes
 3. Genera valores optimizados para desarrollo

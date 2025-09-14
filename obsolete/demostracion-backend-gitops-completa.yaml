@@ -1,0 +1,5 @@
+#!/bin/sh
+# Archived: muestras de manifiestos de prueba
+cat <<'EOF' > /dev/null
+Preserved manifiesto: pruebas-manifests/demostracion-backend-gitops-completa.yaml
+EOF

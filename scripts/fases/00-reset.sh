@@ -20,7 +20,7 @@ MODE="safe"
 ASSUME_YES=false
 
 usage() { echo "Uso: $0 [--dry-run] [--fix|--soft-clean|--nuke] [--yes]" >&2; }
-plan()  { if [[ "$DRY_RUN" == "true" ]]; then echo "[plan] $*"; else eval "$*"; fi; }
+plan()  { if [[ "$DRY_RUN" == "true" ]]; then echo "[plan] $*"; else bash -c "set +e; $*"; fi; }
 
 stop_project_port_forwards() {
   log_info "Deteniendo port-forwards en puertos 8080-8091..."
@@ -63,6 +63,7 @@ main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --dry-run) DRY_RUN=true; shift ;;
+      --deep-nuke) MODE="deep-nuke"; shift ;;
       --fix) MODE="fix"; shift ;;
       --soft-clean) MODE="soft-clean"; shift ;;
       --nuke) MODE="nuke"; shift ;;
@@ -81,7 +82,7 @@ main() {
   case "$MODE" in
     safe)
       log_info "Modo seguro: sin acciones destructivas."
-      log_info "Siguiente paso sugerido: ./instalar.sh fase-02"
+  log_info "Siguiente paso sugerido: ./instalar.sh fase-01"
       ;;
     fix)
       log_info "Aplicando arreglos no destructivos..."
@@ -104,6 +105,67 @@ main() {
       delete_kind_cluster_if_gitops gitops-pro
       remove_gitops_contexts
       log_success "✅ Nuke del entorno del proyecto completado"
+      ;;
+    deep-nuke)
+      confirm_or_abort "⚠️ Deep-nuke: esto detendrá/eliminará contenedores Docker, imágenes, volúmenes y puede intentar desinstalar paquetes Docker del host. Asegúrate de no necesitar nada en este host." || return 1
+      backup_kubeconfig
+      delete_kind_cluster_if_gitops gitops-dev
+      delete_kind_cluster_if_gitops gitops-pre
+      delete_kind_cluster_if_gitops gitops-pro
+      remove_gitops_contexts
+
+      log_info "Iniciando limpieza profunda del host (Docker/podman si existen)..."
+
+      if command -v docker >/dev/null 2>&1; then
+        log_info "Docker detectado: parando y eliminando contenedores, imágenes y volúmenes"
+        plan "sudo systemctl stop docker || true"
+        plan "sudo docker ps -aq | xargs -r sudo docker rm -f || true"
+        plan "sudo docker images -aq | xargs -r sudo docker rmi -f || true"
+        plan "sudo docker volume ls -q | xargs -r sudo docker volume rm -f || true"
+        plan "sudo docker network ls -q | xargs -r sudo docker network rm || true"
+        plan "sudo rm -rf /var/lib/docker || true"
+
+        if command -v apt-get >/dev/null 2>&1; then
+          log_info "apt detected: intentando purgar paquetes Docker (apt-get)"
+          plan "sudo apt-get purge -y docker-ce docker-ce-cli containerd.io docker-compose-plugin || true"
+          plan "sudo apt-get autoremove -y || true"
+        elif command -v yum >/dev/null 2>&1; then
+          log_info "yum detected: intentando eliminar paquetes Docker (yum)"
+          plan "sudo yum remove -y docker-ce docker-ce-cli containerd.io docker-compose-plugin || true"
+        else
+          log_info "No se detectó gestor de paquetes apt/yum; omitiendo desinstalación de paquetes (se eliminaron recursos de Docker)"
+        fi
+      elif command -v podman >/dev/null 2>&1; then
+        log_info "Podman detectado: parando y eliminando contenedores y volúmenes"
+        plan "sudo podman ps -aq | xargs -r sudo podman rm -f || true"
+        plan "sudo podman images -q | xargs -r sudo podman rmi -f || true"
+        plan "sudo rm -rf /var/lib/containers || true"
+      else
+        log_info "No se detectó Docker ni Podman en el host; no hay acciones de runtime a realizar."
+      fi
+
+      # Además: eliminar binarios/tools que el instalador puede haber colocado
+      log_info "Eliminando binarios instalados por el instalador (kind,kubectl,helm,minikube,argocd) si existen..."
+      plan "sudo rm -f /usr/local/bin/kind /usr/local/bin/kubectl /usr/local/bin/helm /usr/local/bin/minikube /usr/local/bin/argocd /usr/local/bin/argocd || true"
+
+      # Intentar purgar paquetes instalados via apt (git, jq)
+      if command -v apt-get >/dev/null 2>&1; then
+        log_info "Purgando paquetes apt instalados por el instalador: git, jq"
+        plan "sudo apt-get purge -y git jq || true"
+        plan "sudo apt-get autoremove -y || true"
+      fi
+
+      # Limpiar caches y configuraciones locales
+      log_info "Limpiando caches y configuraciones locales (helm, kube, argocd, tmp)..."
+      plan "rm -rf $HOME/.cache/helm $HOME/.helm $HOME/.kube $HOME/.config/argocd /tmp/get_helm.sh /tmp/argocd* /tmp/kind-config-* /tmp/gitops-final-report.txt || true"
+
+      # Eliminar fuentes apt docker si quedaron
+      plan "sudo rm -f $DOCKER_SOURCES /etc/apt/keyrings/docker.gpg || true"
+
+      # Eliminar pid/logs de port-forwards comunes
+      plan "rm -f /tmp/argocd-port-forward.pid /tmp/argocd-port-forward.log /tmp/gitea_pf.pid /tmp/gitea-port-forward.log || true"
+
+  log_success '✅ Deep-nuke completado (intento). Revise manualmente paquetes con "dpkg -l|grep -E "docker|git|jq"" si es necesario.'
       ;;
     *) log_error "Modo desconocido: $MODE"; return 1 ;;
   esac

@@ -90,46 +90,46 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
     
     # Lista de fases disponibles (orden de ejecución)
     readonly FASES_DISPONIBLES=(
-        "fase-01-permisos.sh"
-        "fase-02-dependencias.sh"
-        "fase-03-clusters.sh"
-        "fase-04-argocd.sh"
-        "fase-05-herramientas.sh"
-        "fase-06-aplicaciones.sh"
-        "fase-07-finalizacion.sh"
+        "00-reset.sh"
+        "01-permisos.sh"
+        "02-dependencias.sh"
+        "03-clusters.sh"
+        "04-argocd.sh"
+        "05-aplicaciones.sh"
+        "06-finalizacion.sh"
     )
     
     # Mapeo de nombres de fases a números
     readonly -A FASE_NOMBRES=(
+        ["00"]="Reset del Entorno"
         ["01"]="Gestión de Permisos"
         ["02"]="Dependencias del Sistema"
         ["03"]="Docker y Clusters"
         ["04"]="Instalación ArgoCD"
-        ["05"]="Herramientas GitOps"
-        ["06"]="Aplicaciones Custom"
-        ["07"]="Finalización y Accesos"
+        ["05"]="Aplicaciones Custom"
+        ["06"]="Finalización y Accesos"
     )
     
     # Estimaciones de tiempo por fase (en minutos)
     readonly -A FASE_TIEMPOS=(
+        ["00"]="1"
         ["01"]="1-2"
         ["02"]="2-3"
         ["03"]="3-5"
-        ["04"]="1-2"        # Optimizada: antes 2-3, ahora 1-2
-        ["05"]="5-7"
-        ["06"]="3-4"
-        ["07"]="2-3"
+        ["04"]="1-2"
+        ["05"]="3-4"
+        ["06"]="2-3"
     )
     
     # Dependencias de fases (qué fase debe completarse antes)
     readonly -A FASE_DEPENDENCIAS=(
-        ["01"]=""           # Sin dependencias
+        ["00"]=""           # Sin dependencias
+        ["01"]="00"         # Requiere reset
         ["02"]="01"         # Requiere permisos
         ["03"]="02"         # Requiere dependencias
         ["04"]="03"         # Requiere clusters
         ["05"]="04"         # Requiere ArgoCD
-        ["06"]="05"         # Requiere herramientas GitOps
-        ["07"]="06"         # Requiere aplicaciones
+        ["06"]="05"         # Requiere aplicaciones
     )
     
     # ============================================================================

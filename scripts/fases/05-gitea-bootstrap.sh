@@ -1,62 +1,29 @@
 #!/bin/bash
 
-# FASE 5 (Bootstrap Gitea) - Clean single-file implementation
-set -euo pipefail
+# Active installer phase removed: Gitea is handled as an external dependency.
+# See the preserved implementation in `scripts/fases/obsolete/05-gitea-bootstrap.sh`.
 
-# Ensure confirmar exists
-if ! declare -f confirmar >/dev/null 2>&1; then
-  confirmar() { return 0; }
-fi
+echo "[INFO] fase-05 (gitea bootstrap) has been removed from the active installer."
+echo "See: scripts/fases/obsolete/05-gitea-bootstrap.sh"
+exit 0
+#!/bin/bash
 
-log_section "🧩 FASE 5 (Bootstrap Gitea)"
+# This file has been archived in `/home/asanchez/gh-gitops-infra/gh-gitops-infra/scripts/fases/obsolete/05-gitea-bootstrap.sh`.
+# Gitea is now treated as an external dependency and should be installed
+# outside the automated phase-runner. The preserved implementation is available
+# under `/home/asanchez/gh-gitops-infra/gh-gitops-infra/scripts/fases/obsolete/` for reference.
 
-main() {
-  if ! check_cluster_available "gitops-dev"; then log_error "Cluster gitops-dev no disponible"; return 1; fi
-  if ! check_argocd_exists; then log_error "ArgoCD no instalado"; return 1; fi
+echo "[INFO] fase-05 has been archived. See /home/asanchez/gh-gitops-infra/gh-gitops-infra/scripts/fases/obsolete/05-gitea-bootstrap.sh"
+exit 0
+#!/bin/bash
 
-  kubectl get ns gitea >/dev/null 2>&1 || kubectl create ns gitea || true
+# This file has been archived in `scripts/fases/obsolete/05-gitea-bootstrap.sh`.
+# Gitea is now treated as an external dependency and should be installed
+# outside the automated phase-runner. The preserved implementation is available
+# under `scripts/fases/obsolete/` for reference.
 
-  cat <<'YAML' | kubectl -n gitea apply -f -
-apiVersion: v1
-kind: Service
-metadata:
-  name: gitea-http
-  labels:
-    app: gitea
-spec:
-  selector:
-    app: gitea
-  ports:
-    - name: http
-      port: 3000
-      targetPort: 3000
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: gitea
-  labels:
-    app: gitea
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: gitea
-  template:
-    metadata:
-      labels:
-        app: gitea
-    spec:
-      containers:
-        - name: gitea
-          image: ${GITEA_IMAGE:-gitea/gitea:1.22.3-rootless}
-          ports:
-            - containerPort: 3000
-          env:
-            - name: GITEA__database__DB_TYPE
-              value: sqlite3
-            - name: GITEA__database__PATH
-              value: /data/gitea/gitea.db
+echo "[INFO] fase-05 has been archived. See scripts/fases/obsolete/05-gitea-bootstrap.sh"
+exit 0
           volumeMounts:
             - name: data
               mountPath: /data
@@ -126,8 +93,12 @@ YAML
 
   if ! $created; then log_error "No se pudo crear el repo en Gitea (in-pod)"; return 1; fi
 
-  # Push repository to created remote (attempt, non-fatal)
-  (cd "$PROJECT_ROOT" && git init >/dev/null 2>&1 || true; git branch -M main >/dev/null 2>&1 || true; git remote remove gitea >/dev/null 2>&1 || true; git remote add gitea "http://${user}:${pass}@127.0.0.1:3000/${user}/${repo}.git" >/dev/null 2>&1 || true; git add -A; git commit -m "bootstrap" >/dev/null 2>&1 || true; git push -u gitea main >/dev/null 2>&1 || true)
+  # Create an initial README.md inside the repository via Gitea API (in-pod)
+  local readme_content
+  readme_content="# gitops-infra\n\nBootstrap repository created by instalar.sh fase-05 on $(date -u +%Y-%m-%dT%H:%M:%SZ)\n"
+  local readme_b64
+  readme_b64=$(printf "%s" "$readme_content" | base64 | tr -d '\n')
+  kubectl -n gitea exec "$podn" -- sh -c "curl -sS -u ${user}:${pass} -H 'Content-Type: application/json' -X POST http://127.0.0.1:3000/api/v1/repos/${user}/${repo}/contents/README.md -d '{\"message\":\"bootstrap\",\"content\":\"${readme_b64}\",\"branch\":\"main\"}' >/dev/null 2>&1 || true"
 
   cat <<EOF | kubectl apply -n gitea -f -
 apiVersion: v1
@@ -149,8 +120,42 @@ EOF
     sleep 1; wait_ep=$((wait_ep+1));
   done
 
-  register_additional_clusters || true
-  wait_all_apps_healthy argocd 600 || true
+
+  # Create a lightweight ArgoCD Application so Gitea appears in the ArgoCD UI
+  # Use git remote origin if available; otherwise point to in-cluster Gitea (repo may not exist yet)
+  repo_url="$(git -C "${PWD}" remote get-url origin 2>/dev/null || true)"
+  if [[ -n "$repo_url" ]]; then
+    # Normalize SSH url to https if needed
+    if [[ "$repo_url" =~ ^git@([^:]+):(.+)\.git$ ]]; then
+      host="${BASH_REMATCH[1]}"; path="${BASH_REMATCH[2]}"; repo_url="https://$host/$path.git"
+    fi
+  else
+    repo_url="http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git"
+  fi
+
+  log_info "Creando Application 'tool-gitea' en ArgoCD apuntando a $repo_url (path: herramientas-gitops/activas)"
+  cat <<EOF | kubectl apply -n argocd -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tool-gitea
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: "$repo_url"
+    targetRevision: HEAD
+    path: herramientas-gitops/activas
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+EOF
+
+  log_info "Application 'tool-gitea' creada (si ArgoCD puede acceder al repo, aparecerá en la UI)."
 
   log_success "Fase 05 completada"
 }

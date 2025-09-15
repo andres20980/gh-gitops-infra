@@ -23,6 +23,11 @@ spec:
             limits:
               cpu: 200m
               memory: 256Mi
+          podSecurityContext:
+            fsGroup: 1000
+          securityContext:
+            runAsUser: 1000
+            runAsNonRoot: true
           replicaCount: 1
           # Evitar dependencias pesadas: usar SQLite y sin redis/postgres
           persistence:

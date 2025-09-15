@@ -160,6 +160,17 @@ if [[ -z "${GITOPS_CONFIG_LOADED:-}" ]]; then
             export LOG_LEVEL="DEBUG"
             export SHOW_TIMESTAMP="true"
         fi
+
+        # ============================================================================
+        # CONFIGURACIÓN DE GITEA (dependencia externa en WSL)
+        # - Si el usuario instala Gitea localmente en WSL, puede exportar estas
+        #   variables para que el instalador cree/clone el repositorio automáticamente.
+        # ============================================================================
+        export GITEA_PROTOCOL="${GITEA_PROTOCOL:-http}"
+        export GITEA_HOST="${GITEA_HOST:-}"          # e.g. localhost or 172.28.XXX.XXX (WSL)
+        export GITEA_PORT="${GITEA_PORT:-3000}"
+        export GITEA_ADMIN_USER="${GITEA_ADMIN_USER:-admin}"
+        export GITEA_ADMIN_PASS="${GITEA_ADMIN_PASS:-admin1234}"
     }
     
     # Validar configuración

@@ -45,6 +45,9 @@ mostrar_ayuda() {
 
 # Función principal (solo orquestación)
 main() {
+    # Forzar modo no-interactivo por defecto (installer debe ser cero-interacción)
+    export ASSUME_YES="true"
+
     # Extraer comando (primer argumento que no sea una opción)
     local comando=""
     local args=()

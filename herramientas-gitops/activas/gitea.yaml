@@ -14,8 +14,10 @@ spec:
       helm:
         values: |
           image:
+            registry: docker.io
             repository: gitea/gitea
-            tag: 1.24.3-rootless
+            tag: 1.24.3
+            rootless: true
           resources:
             requests:
               cpu: 100m
@@ -69,5 +71,3 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
-
-

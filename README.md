@@ -196,7 +196,7 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 │   └── 📄 orquestador.sh             # Coordinador principal
 │
 ├── 📁 herramientas-gitops/           # Manifiestos GitOps
-│   ├── 📄 app-of-apps.yaml          # Aplicación principal ArgoCD
+│   ├── 📄 aplicacion-de-herramientas-gitops.yaml  # Agregador del stack GitOps
 │   ├── 📄 argo-rollouts.yaml        # Despliegues progresivos
 │   ├── 📄 cert-manager.yaml         # Gestión de certificados
 │   ├── 📄 external-secrets.yaml     # Gestión de secretos
@@ -210,7 +210,7 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 │   └── 📄 gitea.yaml                # Git server interno
 │
 ├── 📁 argo-apps/                     # Aplicaciones ArgoCD
-│   ├── 📄 app-of-apps.yaml          # Orquestador de aplicaciones
+│   ├── 📄 aplicacion-de-herramientas-gitops.yaml  # Agregador del stack GitOps
 │   ├── 📄 aplicacion-de-herramientas-gitops.yaml  # Referencia a herramientas
 │   └── 📄 conjunto-aplicaciones-personalizadas.yaml  # Aplicaciones de usuario
 │
@@ -752,7 +752,7 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 │   └── 📄 orquestador.sh             # Coordinador principal
 │
 ├── 📁 herramientas-gitops/           # Manifiestos GitOps
-│   ├── 📄 app-of-apps.yaml          # Aplicación principal ArgoCD
+│   ├── 📄 aplicacion-de-herramientas-gitops.yaml  # Agregador del stack GitOps
 │   ├── 📄 argo-rollouts.yaml        # Despliegues progresivos
 │   ├── 📄 cert-manager.yaml         # Gestión de certificados
 │   ├── 📄 external-secrets.yaml     # Gestión de secretos
@@ -766,12 +766,12 @@ La arquitectura modular v3.0.0 permite ejecutar fases específicas para desarrol
 │   └── 📄 gitea.yaml                # Git server interno
 │
 ├── 📁 argo-apps/                     # Aplicaciones ArgoCD
-│   ├── 📄 app-of-apps.yaml          # Orquestador de aplicaciones
+│   ├── 📄 aplicacion-de-herramientas-gitops.yaml  # Agregador del stack GitOps
 │   ├── � herramientas-gitops.yaml  # Referencia a herramientas
 │   └── 📄 aplicaciones-custom.yaml  # Aplicaciones de usuario
 │
 ├── 📁 aplicaciones/                  # Ejemplos de aplicaciones
-│   ├── 📄 appset-aplicaciones.yaml  # ApplicationSet principal
+│   ├── 📄 conjunto-aplicaciones.yaml  # ApplicationSet principal
 │   ├── 📁 demo-project/             # Proyecto de demostración
 │   └── 📁 simple-app/               # Aplicación simple de ejemplo
 │

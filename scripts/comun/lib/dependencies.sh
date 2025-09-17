@@ -266,11 +266,52 @@ install_kind() {
     version=$(get_latest_version "kind")
 
     log_info "Descargando kind v$version..."
-    curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${version}/kind-linux-amd64"
-    chmod +x ./kind
-    sudo mv ./kind /usr/local/bin/kind
+    # Detectar arquitectura
+    local arch
+    case "$(uname -m)" in
+        x86_64) arch="amd64" ;;
+        aarch64|arm64) arch="arm64" ;;
+        *) arch="amd64" ;;
+    esac
 
-    log_success "kind v$version instalado"
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    local attempt=0
+    local max_attempts=3
+    local out="${tmpdir}/kind"
+    local url
+    url="https://kind.sigs.k8s.io/dl/v${version}/kind-linux-${arch}"
+
+    while [[ $attempt -lt $max_attempts ]]; do
+        attempt=$((attempt + 1))
+        log_info "Descargando kind desde $url (intento $attempt/$max_attempts)..."
+        if curl -fsSLo "$out" "$url"; then
+            chmod +x "$out"
+            if sudo mv "$out" /usr/local/bin/kind; then
+                break
+            else
+                log_warning "No se pudo mover kind a /usr/local/bin en el intento $attempt"
+            fi
+        else
+            log_warning "Fallo la descarga de kind en el intento $attempt"
+        fi
+        sleep 1
+    done
+
+    # Verificación final
+    if [[ -x "/usr/local/bin/kind" ]]; then
+        if /usr/local/bin/kind --version >/dev/null 2>&1; then
+            log_success "kind v$version instalado en /usr/local/bin/kind"
+        else
+            log_error "kind instalado pero no responde correctamente"
+            return 1
+        fi
+    else
+        log_error "No se pudo instalar kind en /usr/local/bin/kind"
+        return 1
+    fi
+
+    rm -rf "$tmpdir" || true
 }
 
 # Instalar Helm más reciente

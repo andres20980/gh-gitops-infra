@@ -8,7 +8,7 @@ metadata:
 spec:
   generators:
   - git:
-      repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
+      repoURL: http://gitea-http.gitea.svc.cluster.local:3000/admin/gitops-infra.git
       revision: HEAD
       directories:
       - path: aplicaciones/*
@@ -21,7 +21,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
+        repoURL: http://gitea-http.gitea.svc.cluster.local:3000/admin/gitops-infra.git
         targetRevision: HEAD
         path: '{{path}}'
         directory:

@@ -7,14 +7,14 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
+  sources:
     - repoURL: https://grafana.github.io/helm-charts
-      chart: loki/loki
-      targetRevision: ""
-      targetRevision: ""
+      chart: loki
+      targetRevision: ">=0.0.0"
       helm:
         valueFiles:
           - $values/herramientas-gitops/values-dev/loki-dev-values.yaml
-    - repoURL: http://gitea-http-stable.gitea.svc.cluster.local:3000/admin/gitops-infra.git
+    - repoURL: http://gitea-http.gitea.svc.cluster.local:3000/admin/gitops-infra.git
       targetRevision: HEAD
       ref: values
       path: .
@@ -28,5 +28,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-
 

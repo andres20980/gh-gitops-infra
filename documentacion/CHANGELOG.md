@@ -104,7 +104,7 @@ y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es
 ### Cambiado
 - **CAMBIO RUPTURISTA**: Migración de instalaciones individuales al patrón App of Apps
 - Todos los componentes ahora gestionados por Aplicaciones ArgoCD
-- Proceso de despliegue unificado a través de `app-of-apps-gitops.yaml`
+- Proceso de despliegue unificado a través de `aplicacion-de-herramientas-gitops.yaml`
 
 ### Eliminado
 - Métodos de instalación de componentes individuales

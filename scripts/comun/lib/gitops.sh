@@ -52,7 +52,7 @@ fi
 check_argocd_exists() {
     if kubectl get namespace "$ARGOCD_NAMESPACE" >/dev/null 2>&1; then
         log_info "📋 Namespace $ARGOCD_NAMESPACE existe"
-        
+
         if kubectl get deployment argocd-server -n "$ARGOCD_NAMESPACE" >/dev/null 2>&1; then
             local ready_replicas
             ready_replicas=$(kubectl get deployment argocd-server -n "$ARGOCD_NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
@@ -74,6 +74,38 @@ check_argocd_exists() {
     fi
 }
 
+# Aplicar las aplicaciones bootstrap (agregador GitOps + ApplicationSet) desde argo-apps/
+apply_argocd_bootstrap_apps() {
+    local apps_dir="${PROJECT_ROOT}/argo-apps"
+    if [[ ! -d "$apps_dir" ]]; then
+        log_error "Directorio $apps_dir no existe"
+        return 1
+    fi
+
+    local reachable_url="${GITEA_PROBE_URL:-http://gitea-http.gitea.svc.cluster.local:3000/}"
+    log_info "Usando endpoint Gitea accesible: $reachable_url"
+
+    local file
+    for file in aplicacion-de-herramientas-gitops.yaml conjunto-aplicaciones-personalizadas.yaml; do
+        local file_path="$apps_dir/$file"
+        if [[ ! -f "$file_path" ]]; then
+            log_info "⚠️ Archivo $file_path no encontrado, saltando"
+            continue
+        fi
+
+        log_info "Aplicando $file..."
+        if ! kubectl apply -f "$file_path" -n "$ARGOCD_NAMESPACE"; then
+            log_error "kubectl apply falló para $file"
+            return 1
+        fi
+    done
+
+    kubectl -n "$ARGOCD_NAMESPACE" get applications --ignore-not-found -o name |
+        xargs -r -n1 kubectl -n "$ARGOCD_NAMESPACE" annotate --overwrite {} argocd.argoproj.io/refresh=hard >/dev/null 2>&1 || true
+
+    return 0
+}
+
 # Instalar ArgoCD
 install_argocd() {
     log_info "📦 Instalando ArgoCD..."
@@ -93,6 +125,55 @@ install_argocd() {
     
     log_success "✅ ArgoCD instalado"
     return 0
+}
+
+# Esperar a que una Application concreta esté Synced+Healthy
+wait_argocd_application() {
+    local app_name="$1" timeout="${2:-300}" sleep_s=5 waited=0
+
+    if [[ -z "$app_name" ]]; then
+        log_error "Nombre de Application no proporcionado"
+        return 1
+    fi
+
+    if ! kubectl -n "$ARGOCD_NAMESPACE" get application "$app_name" >/dev/null 2>&1; then
+        log_error "Application '$app_name' no existe en el namespace $ARGOCD_NAMESPACE"
+        return 1
+    fi
+
+    while (( waited < timeout )); do
+        local sync_status health_status
+        sync_status=$(kubectl -n "$ARGOCD_NAMESPACE" get application "$app_name" -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        health_status=$(kubectl -n "$ARGOCD_NAMESPACE" get application "$app_name" -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+
+        if [[ "$sync_status" == "Synced" && "$health_status" == "Healthy" ]]; then
+            log_success "✅ Application '$app_name' Synced+Healthy"
+            return 0
+        fi
+
+        local conditions
+        conditions=$(kubectl -n "$ARGOCD_NAMESPACE" get application "$app_name" -o jsonpath='{range .status.conditions[*]}{.type}::{.message}{"\n"}{end}' 2>/dev/null || true)
+
+        if [[ -n "$conditions" ]]; then
+            while IFS= read -r condition_line; do
+                [[ -z "$condition_line" ]] && continue
+                local condition_type condition_msg
+                condition_type="${condition_line%%::*}"
+                condition_msg="${condition_line#*::}"
+                if [[ "$condition_type" == "ComparisonError" ]] || [[ "$condition_type" == "SyncError" ]] || [[ "$condition_type" == "InvalidSpecError" ]]; then
+                    log_error "❌ '${app_name}' error ${condition_type}: ${condition_msg}"
+                    return 1
+                fi
+            done <<< "$conditions"
+        fi
+
+        log_info "⌛ Application '$app_name' sync=$sync_status health=$health_status (esperando...)"
+        sleep "$sleep_s"; waited=$((waited + sleep_s))
+    done
+
+    log_warning "⚠️ Timeout esperando Application '$app_name'"
+    kubectl -n "$ARGOCD_NAMESPACE" get application "$app_name" || true
+    return 1
 }
 
 # Configurar servicio ArgoCD

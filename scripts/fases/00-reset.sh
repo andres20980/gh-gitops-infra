@@ -15,9 +15,21 @@
 
 set -euo pipefail
 
+# If this script is executed directly, try to source the common startup (logging helpers)
+if [[ -z "${PROJECT_ROOT:-}" ]]; then
+  readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  export PROJECT_ROOT
+fi
+if [[ -f "$PROJECT_ROOT/scripts/comun/arranque.sh" ]] && [[ "${DRY_SYSTEM_INITIALIZED:-false}" != "true" ]]; then
+  # shellcheck source=scripts/comun/arranque.sh
+  source "$PROJECT_ROOT/scripts/comun/arranque.sh"
+fi
+
 DRY_RUN=false
-MODE="safe"
-ASSUME_YES=false
+# Por defecto hacer un nuke profundo cuando se ejecuta sin opciones
+MODE="deep-nuke"
+# Evitar confirmaciones interactivas por defecto (según requerimiento del instalador)
+ASSUME_YES=true
 
 usage() { echo "Uso: $0 [--dry-run] [--fix|--soft-clean|--nuke] [--yes]" >&2; }
 plan()  { if [[ "$DRY_RUN" == "true" ]]; then echo "[plan] $*"; else bash -c "set +e; $*"; fi; }
@@ -28,6 +40,58 @@ stop_project_port_forwards() {
     if lsof -t -i :"$p" >/dev/null 2>&1; then plan "lsof -t -i :$p | xargs -r kill -9 || true"; fi
   done
   [[ -f "$PROJECT_ROOT/scripts/accesos-herramientas.sh" ]] && plan "bash \"$PROJECT_ROOT/scripts/accesos-herramientas.sh\" stop || true"
+}
+
+remove_local_gitea_container() {
+  log_info "Comprobando contenedor local Gitea (gitea-wsl) y eliminando si existe"
+  if command -v docker >/dev/null 2>&1; then
+    if docker ps -a --format '{{.Names}}' | grep -q '^gitea-wsl$'; then
+      plan "docker rm -f gitea-wsl || true"
+    fi
+  fi
+}
+
+remove_port_forward_pids() {
+  log_info "Eliminando pid/logs de port-forwards comunes"
+  plan "rm -f /tmp/argocd-port-forward.pid /tmp/argocd-port-forward.log /tmp/gitea_pf.pid /tmp/gitea-port-forward.log || true"
+  # Kill any background port-forward processes by reading pids
+  if [[ -f /tmp/argocd-port-forward.pid ]]; then
+    plan "if ps -p \$(cat /tmp/argocd-port-forward.pid) >/dev/null 2>&1; then kill -9 \$(cat /tmp/argocd-port-forward.pid) || true; fi"
+  fi
+}
+
+remove_project_namespaces() {
+  log_info "Eliminando namespaces relacionados al proyecto en clusters disponibles (argocd,gitea,ingress-nginx)"
+  for ctx in $(kubectl config get-contexts -o name 2>/dev/null || true); do
+    # Solo actuar sobre contexts kind-gitops-* para evitar borrar namespaces ajenos
+    if [[ "$ctx" =~ ^kind-gitops- ]]; then
+      plan "kubectl --context \"$ctx\" delete ns argocd gitea ingress-nginx --ignore-not-found || true"
+    fi
+  done
+}
+
+# Kill any process binding common host ports used for promotion clusters
+kill_processes_on_promotion_ports() {
+  local ports=(8081 8444 43111)
+  for p in "${ports[@]}"; do
+    if lsof -t -i :"$p" >/dev/null 2>&1; then
+      log_info "Matando proceso que usa el puerto $p"
+      plan "lsof -t -i :$p | xargs -r kill -9 || true"
+    fi
+  done
+}
+
+remove_kind_network_and_residuals() {
+  # Stop any running kind containers and remove kind network if stale
+  if command -v docker >/dev/null 2>&1; then
+    log_info "Comprobando contenedores kind residuales y red 'kind'"
+    # Remove containers with label io.x-k8s.kind.cluster
+    plan "docker ps -a --filter label=io.x-k8s.kind.cluster -q | xargs -r docker rm -f || true"
+    # Remove kind network if exists and not used
+    if docker network ls --format '{{.Name}}' | grep -q '^kind$'; then
+      plan "docker network rm kind || true"
+    fi
+  fi
 }
 
 backup_kubeconfig() {
@@ -94,6 +158,9 @@ main() {
       delete_kind_cluster_if_gitops gitops-dev
       delete_kind_cluster_if_gitops gitops-pre
       delete_kind_cluster_if_gitops gitops-pro
+      remove_local_gitea_container
+      remove_port_forward_pids
+      remove_project_namespaces
       remove_gitops_contexts
       log_success "✅ Soft-clean completado (solo recursos del proyecto)"
       ;;
@@ -103,6 +170,9 @@ main() {
       delete_kind_cluster_if_gitops gitops-dev
       delete_kind_cluster_if_gitops gitops-pre
       delete_kind_cluster_if_gitops gitops-pro
+      remove_local_gitea_container
+      remove_port_forward_pids
+      remove_project_namespaces
       remove_gitops_contexts
       log_success "✅ Nuke del entorno del proyecto completado"
       ;;
@@ -114,6 +184,11 @@ main() {
       delete_kind_cluster_if_gitops gitops-pro
       remove_gitops_contexts
 
+  # Eliminar contenedor Gitea local y port-forwards antes de operaciones profundas
+  remove_local_gitea_container
+  remove_port_forward_pids
+  remove_project_namespaces
+
       log_info "Iniciando limpieza profunda del host (Docker/podman si existen)..."
 
       if command -v docker >/dev/null 2>&1; then
@@ -124,6 +199,10 @@ main() {
         plan "sudo docker volume ls -q | xargs -r sudo docker volume rm -f || true"
         plan "sudo docker network ls -q | xargs -r sudo docker network rm || true"
         plan "sudo rm -rf /var/lib/docker || true"
+        plan "sudo rm -rf /var/lib/containerd || true"
+        # Remove any named containers used by this installer (gitea-wsl, kind nodes)
+        plan "sudo docker rm -f gitea-wsl || true"
+        plan "sudo docker ps -a --filter label=io.x-k8s.kind.cluster -q | xargs -r sudo docker rm -f || true"
 
         if command -v apt-get >/dev/null 2>&1; then
           log_info "apt detected: intentando purgar paquetes Docker (apt-get)"
@@ -157,7 +236,11 @@ main() {
 
       # Limpiar caches y configuraciones locales
       log_info "Limpiando caches y configuraciones locales (helm, kube, argocd, tmp)..."
-      plan "rm -rf $HOME/.cache/helm $HOME/.helm $HOME/.kube $HOME/.config/argocd /tmp/get_helm.sh /tmp/argocd* /tmp/kind-config-* /tmp/gitops-final-report.txt || true"
+  plan "rm -rf $HOME/.cache/helm $HOME/.helm $HOME/.kube $HOME/.config/argocd /tmp/get_helm.sh /tmp/argocd* /tmp/kind-config-* /tmp/gitops-final-report.txt || true"
+
+  # Additional WSL specific cleanup: docker context and local images
+  plan "docker context rm kind || true"
+  plan "sudo rm -rf /var/tmp/gh-gitops-infra || true"
 
       # Eliminar fuentes apt docker si quedaron
       plan "sudo rm -f $DOCKER_SOURCES /etc/apt/keyrings/docker.gpg || true"

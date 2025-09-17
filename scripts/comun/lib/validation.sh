@@ -591,3 +591,30 @@ setup_logging() {
         log_info "🤫 Modo quiet habilitado"
     fi
 }
+
+# Confirmación interactiva (compatible con modo no-interactivo)
+# Uso: confirmar "Mensaje de confirmación"
+confirmar() {
+    local prompt="${1:-¿Continuar?}"
+
+    # Si se fuerza asunción afirmativa por variables de entorno, devolver true
+    if [[ "${ASSUME_YES:-false}" == "true" ]] || [[ "${CI:-false}" == "true" ]] || [[ "${NONINTERACTIVE:-false}" == "true" ]]; then
+        log_info "Auto-confirmado: $prompt"
+        return 0
+    fi
+
+    # Si no hay TTY disponible, no podemos preguntar; devolver fallo por seguridad
+    if [[ ! -t 0 ]]; then
+        log_warning "No hay TTY para confirmar: $prompt"
+        return 1
+    fi
+
+    # Preguntar al usuario
+    local reply
+    read -r -p "$prompt [y/N]: " reply
+    case "$reply" in
+        [yY]|[yY][eE][sS]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+

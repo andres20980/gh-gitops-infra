@@ -91,13 +91,61 @@ main() {
             exit 0
             ;;
         from-scratch)
-            # Reset total y luego instalación completa + validación sin intervención
-            echo "[FROM-SCRATCH] 🧹 Reset total (fase-00)"
-            ejecutar_fase_individual 00 --yes || { log_error "Reset falló"; exit 1; }
-            echo "[FROM-SCRATCH] 🚀 Instalación completa"
-            if ! ejecutar_proceso_completo; then
-                echo "[FROM-SCRATCH] ❌ Falló la instalación completa" >&2; exit 1
+            # Reset total (limpieza profunda) y ejecución fase por fase para aislar fallos
+            local prev_fail_fast="${FAIL_FAST_ON_PHASE_ERROR:-__unset__}"
+            export FAIL_FAST_ON_PHASE_ERROR="true"
+            restore_fail_fast() {
+                if [[ "$prev_fail_fast" == "__unset__" ]]; then
+                    unset FAIL_FAST_ON_PHASE_ERROR
+                else
+                    export FAIL_FAST_ON_PHASE_ERROR="$prev_fail_fast"
+                fi
+            }
+            echo "[FROM-SCRATCH] 🧹 Reset total profundo (fase-00 --deep-nuke)"
+            if ! ejecutar_fase_individual 00 --deep-nuke --yes; then
+                log_error "Reset falló"
+                restore_fail_fast
+                exit 1
             fi
+
+            echo "[FROM-SCRATCH] 🔍 Ejecutando fases de instalación una a una"
+            local fases_dir="${FASES_DIR:-$PROJECT_ROOT/scripts/fases}"
+            if [[ ! -d "$fases_dir" ]]; then
+                echo "[FROM-SCRATCH] ❌ Directorio de fases no encontrado: $fases_dir" >&2
+                exit 1
+            fi
+
+            local -a fases_a_ejecutar=()
+            declare -A fases_vistas=()
+            while IFS= read -r -d '' fase_path; do
+                local fase_basename
+                fase_basename="$(basename "$fase_path")"
+                local fase_id="${fase_basename%%-*}"
+                # Ya ejecutamos la fase 00 manualmente; la 06 se maneja en la validación final
+                if [[ "$fase_id" == "00" || "$fase_id" == "06" ]]; then
+                    continue
+                fi
+                if [[ -z "${fases_vistas[$fase_id]:-}" ]]; then
+                    fases_vistas[$fase_id]=1
+                    fases_a_ejecutar+=("$fase_id")
+                fi
+            done < <(find "$fases_dir" -maxdepth 1 -type f -name "??-*.sh" -print0 | sort -z)
+
+            if [[ ${#fases_a_ejecutar[@]} -eq 0 ]]; then
+                echo "[FROM-SCRATCH] ⚠️ No se encontraron fases posteriores a 00 para ejecutar." >&2
+            fi
+
+            local fase_id
+            for fase_id in "${fases_a_ejecutar[@]}"; do
+                echo "[FROM-SCRATCH] ▶️ Ejecutando fase-${fase_id}"
+                if ! ejecutar_fase_individual "$fase_id"; then
+                    echo "[FROM-SCRATCH] ❌ Falló la fase-${fase_id}. Revisa el log anterior para más detalles." >&2
+                    restore_fail_fast
+                    exit 1
+                fi
+                echo "[FROM-SCRATCH] ✅ fase-${fase_id} completada"
+            done
+
             # Reintentos de validación final (fase-06)
             local intentos=0
             local max_intentos=3
@@ -106,11 +154,13 @@ main() {
                 echo "[FROM-SCRATCH] Intento de validación ${intentos}/${max_intentos}: fase-06"
                 if ejecutar_fase_individual 06; then
                     echo "[FROM-SCRATCH] ✅ Instalación validada (Synced+Healthy + UIs accesibles)"
+                    restore_fail_fast
                     exit 0
                 fi
                 echo "[FROM-SCRATCH] Reintentando en 15s..."; sleep 15
             done
             echo "[FROM-SCRATCH] ❌ No se logró validar la instalación tras ${max_intentos} intentos" >&2
+            restore_fail_fast
             exit 1
             ;;
         fase-*)

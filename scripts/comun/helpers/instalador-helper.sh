@@ -79,6 +79,20 @@ verificar_dependencias_criticas() {
 # Ejecutar una fase individual por número (ej: "01", "02", "05", etc.)
 ejecutar_fase_individual_impl() {
     local fase_id="$1"; shift || true
+    local fail_fast_on_error="${FAIL_FAST_ON_PHASE_ERROR:-false}"
+    # Soporte para ejecución no-interactiva: --yes | -y
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --yes|-y)
+                export ASSUME_YES="true"
+                shift ;;
+            --dry-run)
+                export DRY_RUN="true"
+                shift ;;
+            *)
+                shift ;;
+        esac
+    done
     local fases_dir="$SCRIPTS_DIR/fases"
 
     if [[ -z "$fase_id" ]]; then
@@ -104,6 +118,7 @@ ejecutar_fase_individual_impl() {
 
     # Ejecutar todas las coincidencias (p.ej., 05 tiene varias subfases)
     local fase_script
+    local encountered_error=false
     for fase_script in "${matches[@]}"; do
         log_section "Ejecutando fase: $(basename "$fase_script")"
 
@@ -115,6 +130,10 @@ ejecutar_fase_individual_impl() {
         if declare -F main >/dev/null 2>&1; then
             if ! main "$@"; then
                 log_error "La fase '$(basename "$fase_script")' retornó error."
+                if [[ "$fail_fast_on_error" == "true" ]]; then
+                    return 1
+                fi
+                encountered_error=true
                 if ! confirmar "¿Continuar con la siguiente fase encontrada?"; then
                     log_error "Instalación abortada por el usuario."
                     return 1
@@ -124,6 +143,10 @@ ejecutar_fase_individual_impl() {
             log_warning "La fase '$(basename "$fase_script")' no define función main(); se continúa."
         fi
     done
+
+    if [[ "$encountered_error" == "true" ]]; then
+        return 1
+    fi
 
     log_success "Fase(s) '${fase_id}' ejecutada(s) correctamente."
 }

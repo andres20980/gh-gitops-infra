@@ -13,7 +13,7 @@ spec:
       targetRevision: ">=0.0.0"
       helm:
         valueFiles:
-          - $values/herramientas-gitops/values-dev/loki-dev-values.yaml
+          - herramientas-gitops/values-dev/loki-dev-values.yaml
     
   destination:
     server: https://kubernetes.default.svc

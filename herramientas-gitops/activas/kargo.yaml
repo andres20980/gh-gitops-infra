@@ -11,10 +11,7 @@ spec:
     - repoURL: https://charts.kargo.akuity.io
       chart: kargo
       targetRevision: "0.6.0"
-    - repoURL: http://gitea-http.gitea.svc.cluster.local:3000/admin/gitops-infra.git
-      targetRevision: HEAD
-      ref: values
-      path: .
+    
   destination:
     server: https://kubernetes.default.svc
     namespace: kargo
